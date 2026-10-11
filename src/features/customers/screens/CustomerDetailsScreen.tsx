@@ -21,7 +21,8 @@ import {
   createN1Styles,
   useN1Breakpoint,
   useN1Styles,
-  useN1Theme,
+  useSectionTabsOptions,
+  sectionTabLabel,
 } from '../../../shared/components';
 import { PROFILE_PANEL_WIDTH } from '../../../shared/constants';
 import { useConfirmDelete } from '../../../shared/hooks';
@@ -52,6 +53,7 @@ const D = CUSTOMER_STRINGS.details;
 const FROM_ROUTE = {
   dashboard: 'Overview',
   orders: 'Orders',
+  order: 'Orders',
 } as const satisfies Record<CustomerDetailsOrigin, keyof AdminDrawerParamList>;
 
 type Tab = CustomerSection | 'stats' | 'orders' | 'quotes';
@@ -68,29 +70,6 @@ const TABS: N1Tab<Tab>[] = [
 /** Phones: one swipeable page per section. */
 const SectionTabs = createMaterialTopTabNavigator<Record<Tab, undefined>>();
 
-function SectionTabLabel({
-  title,
-  focused,
-}: {
-  title: string;
-  focused: boolean;
-}) {
-  return (
-    <N1Text
-      variant="label"
-      weight={focused ? 'bold' : undefined}
-      color={focused ? 'primary' : 'secondary'}
-    >
-      {title}
-    </N1Text>
-  );
-}
-
-const sectionTabLabel =
-  (title: string) =>
-  ({ focused }: { focused: boolean }) =>
-    <SectionTabLabel title={title} focused={focused} />;
-
 const makeStyles = createN1Styles(t => ({
   // Phones: like Employee details, the customer above swipeable tabs.
   compactRoot: { flex: 1, backgroundColor: t.colors.surface },
@@ -102,18 +81,6 @@ const makeStyles = createN1Styles(t => ({
   },
   identityText: { flex: 1, gap: t.spacing.xxs },
   badges: { flexDirection: 'row', flexWrap: 'wrap', gap: t.spacing.sm },
-  tabBar: {
-    backgroundColor: t.colors.surface,
-    elevation: 0,
-    shadowOpacity: 0,
-    borderBottomWidth: t.borderWidth.hairline,
-    borderBottomColor: t.colors.border,
-  },
-  tabItem: { width: 'auto', paddingHorizontal: t.spacing.lg },
-  tabIndicator: {
-    height: t.borderWidth.thick,
-    backgroundColor: t.colors.primary,
-  },
   // Wide screens: the card fills the window; the menu and the section each
   // scroll on their own.
   card: { flex: 1, minHeight: 0 },
@@ -145,7 +112,7 @@ export function CustomerDetailsScreen({
   navigation,
 }: CustomersScreenProps<'CustomerDetails'>) {
   const styles = useN1Styles(makeStyles);
-  const theme = useN1Theme();
+  const sectionTabsOptions = useSectionTabsOptions();
   const { isCompact } = useN1Breakpoint();
   const organizationName = useOrganizationName();
   const { customer, status, error, reload, remove, deletingId, deleteError } =
@@ -170,16 +137,21 @@ export function CustomerDetailsScreen({
     setTab(key);
     setEditing(false);
   }, []);
-  // Back returns where this page was opened from: the Dashboard or Orders,
-  // else the Customers list (also after a refresh or a shared link).
+  // Back returns where this page was opened from: the order it was pushed
+  // over (Orders stack), the Dashboard or Orders, else the Customers list
+  // (also after a refresh or a shared link).
   const { from } = route.params;
-  const goBack = useCallback(
-    () =>
-      from
-        ? navigation.navigate(FROM_ROUTE[from])
-        : navigation.popTo('CustomersList'),
-    [navigation, from],
-  );
+  const goBack = useCallback(() => {
+    const state = navigation.getState();
+    const below = state.routes[state.index - 1];
+    if (below && below.name !== 'CustomersList') {
+      navigation.goBack();
+    } else if (from) {
+      navigation.navigate(FROM_ROUTE[from]);
+    } else {
+      navigation.popTo('CustomersList');
+    }
+  }, [navigation, from]);
 
   // Phones: a header with back and the screen's name, in place of the link.
   const deletion = useConfirmDelete<Customer>(
@@ -197,8 +169,7 @@ export function CustomerDetailsScreen({
         customer && (
           <N1IconButton
             icon="trash"
-            variant="danger"
-            size="sm"
+            variant="tile"
             accessibilityLabel={CUSTOMER_STRINGS.a11y.delete(customer.name)}
             onPress={() => deletion.request(customer)}
             testID="delete-customer"
@@ -364,13 +335,7 @@ export function CustomerDetailsScreen({
           </View>
           <SectionTabs.Navigator
             initialRouteName={tab}
-            screenOptions={{
-              tabBarScrollEnabled: true,
-              tabBarStyle: styles.tabBar,
-              tabBarItemStyle: styles.tabItem,
-              tabBarIndicatorStyle: styles.tabIndicator,
-              tabBarPressColor: theme.colors.surfaceMuted,
-            }}
+            screenOptions={sectionTabsOptions}
             // Leaving a section drops its unsaved edits.
             screenListeners={({ route: page }) => ({
               focus: () => {

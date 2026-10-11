@@ -2,8 +2,10 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
   Animated,
+  KeyboardAvoidingView,
   Modal,
   PanResponder,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -17,6 +19,7 @@ import {
   type Metrics,
 } from 'react-native-safe-area-context';
 import { createN1Styles, useN1Styles } from '../../../theme/N1ThemeProvider';
+import { N1IconButton } from '../N1IconButton/N1IconButton';
 import { N1Text } from '../N1Text/N1Text';
 
 export type N1BottomSheetProps = {
@@ -25,6 +28,13 @@ export type N1BottomSheetProps = {
   onClose: () => void;
   /** Heading above the content, e.g. the select's label. */
   title?: string;
+  /**
+   * Always the full sheet height instead of fitting the content, e.g. a
+   * search whose results come and go. Still shrinks for the keyboard.
+   */
+  fixedHeight?: boolean;
+  /** An X beside the title, e.g. a form that's easy to miss swiping away. */
+  showClose?: boolean;
   children: ReactNode;
   testID?: string;
 };
@@ -48,7 +58,9 @@ const makeStyles = createN1Styles(t => ({
     ...StyleSheet.absoluteFill,
     backgroundColor: t.colors.overlay,
   },
+  // Shrinks when the keyboard is up (a search field in the sheet).
   sheet: {
+    flexShrink: 1,
     borderTopLeftRadius: t.radius.xl,
     borderTopRightRadius: t.radius.xl,
     backgroundColor: t.colors.surface,
@@ -68,6 +80,14 @@ const makeStyles = createN1Styles(t => ({
     backgroundColor: t.colors.border,
   },
   title: { alignSelf: 'stretch' },
+  titleRow: {
+    alignSelf: 'stretch',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: t.spacing.md,
+  },
+  titleText: { flex: 1 },
   content: {
     paddingHorizontal: t.spacing.lg,
     paddingBottom: t.spacing.lg,
@@ -82,6 +102,8 @@ export const N1BottomSheet = React.memo(function N1BottomSheetComponent({
   open,
   onClose,
   title,
+  fixedHeight = false,
+  showClose = false,
   children,
   testID,
 }: N1BottomSheetProps) {
@@ -150,7 +172,11 @@ export const N1BottomSheet = React.memo(function N1BottomSheetComponent({
       {/* A modal is its own native window: it needs its own provider for the
           SafeAreaView below to clear the home indicator. */}
       <SafeAreaProvider initialMetrics={initialWindowMetrics ?? NO_INSETS}>
-        <View style={styles.root}>
+        {/* A search field in the sheet keeps the sheet above the keyboard. */}
+        <KeyboardAvoidingView
+          style={styles.root}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
           <Animated.View
             style={[styles.backdrop, { opacity: backdropOpacity }]}
           >
@@ -164,25 +190,44 @@ export const N1BottomSheet = React.memo(function N1BottomSheetComponent({
             testID={testID}
             style={[
               styles.sheet,
-              { maxHeight, transform: [{ translateY: offset }] },
+              {
+                maxHeight,
+                height: fixedHeight ? maxHeight : undefined,
+                transform: [{ translateY: offset }],
+              },
             ]}
           >
             <View style={styles.grab} {...pan.panHandlers}>
               <View style={styles.handle} />
-              {title ? (
+              {showClose ? (
+                <View style={styles.titleRow}>
+                  <N1Text variant="h3" style={styles.titleText}>
+                    {title}
+                  </N1Text>
+                  <N1IconButton
+                    icon="close"
+                    size="sm"
+                    variant="card"
+                    accessibilityLabel="Close"
+                    onPress={onClose}
+                    testID={testID ? `${testID}-close` : undefined}
+                  />
+                </View>
+              ) : title ? (
                 <N1Text variant="h3" style={styles.title}>
                   {title}
                 </N1Text>
               ) : null}
             </View>
-            <ScrollView bounces={false}>
+            {/* A tap on a row lands while the keyboard is up. */}
+            <ScrollView bounces={false} keyboardShouldPersistTaps="handled">
               {/* Keeps the last row clear of the home indicator. */}
               <SafeAreaView edges={['bottom']} style={styles.content}>
                 {children}
               </SafeAreaView>
             </ScrollView>
           </Animated.View>
-        </View>
+        </KeyboardAvoidingView>
       </SafeAreaProvider>
     </Modal>
   );

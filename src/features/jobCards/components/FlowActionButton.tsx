@@ -7,16 +7,19 @@ import type { JobCard } from '../types';
 export const FlowActionButton = memo(function FlowActionButtonComponent({
   jobCard,
   onPress,
+  appearance = 'table',
 }: {
   jobCard: JobCard;
   onPress: (jobCard: JobCard) => void;
+  /** 'card': the grey square of a phone list card's actions. */
+  appearance?: 'table' | 'card';
 }) {
   const hasFlow = jobCard.operations.length > 0;
   return (
     <N1IconButton
       icon={hasFlow ? 'edit' : 'plus'}
-      variant="primary"
-      size="sm"
+      variant={appearance === 'card' ? 'card' : 'primary'}
+      size={appearance === 'card' ? 'md' : 'sm'}
       accessibilityLabel={
         hasFlow ? S.a11y.editFlow(jobCard.id) : S.a11y.createFlow(jobCard.id)
       }

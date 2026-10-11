@@ -33,6 +33,11 @@ const makeStyles = createN1Styles(t => ({
     gap: t.spacing.md,
     paddingVertical: t.spacing.md,
   },
+  // Phones: a line between checks, so each reads as its own entry.
+  itemDivider: {
+    borderTopWidth: t.borderWidth.hairline,
+    borderTopColor: t.colors.border,
+  },
   text: { flex: 1, gap: t.spacing.xs },
   report: {
     flexDirection: 'row',
@@ -133,9 +138,13 @@ export const QcHistory = memo(function QcHistoryComponent({
     [report],
   );
 
+  const firstId = entries[0]?.id;
   const renderCompactItem = useCallback(
     (e: QcEntry) => (
-      <View style={styles.item}>
+      <View
+        style={[styles.item, e.id !== firstId && styles.itemDivider]}
+        testID={`qc-entry-${e.id}`}
+      >
         <View style={styles.text}>
           <N1Text weight="semiBold">{e.stage}</N1Text>
           <N1Text variant="small" color="secondary">
@@ -152,7 +161,7 @@ export const QcHistory = memo(function QcHistoryComponent({
         {resultBadge(e)}
       </View>
     ),
-    [styles, report],
+    [styles, report, firstId],
   );
   if (!entries.length) {
     return <N1Text color="secondary">{JOB_CARD_STRINGS.details.noQc}</N1Text>;

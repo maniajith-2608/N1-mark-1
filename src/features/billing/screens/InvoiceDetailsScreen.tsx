@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import {
   AdminScreen,
@@ -9,6 +9,7 @@ import {
   N1Button,
   N1DetailGrid,
   N1DropDown,
+  N1IconButton,
   N1Text,
   N1TextInput,
   createN1Styles,
@@ -25,6 +26,7 @@ import {
 } from '../../../shared/utils';
 import { useSession } from '../../profile';
 import { InvoiceStatusBadge } from '../components/BillingBadges';
+import { InvoiceOverview } from '../components/InvoiceOverview';
 import { InvoicePreviewModal } from '../components/InvoicePreviewModal';
 import {
   BillingBackLink,
@@ -51,7 +53,6 @@ import type { BillingScreenProps } from '../types';
 const I = BILLING_STRINGS.invoice;
 const T = BILLING_STRINGS.totals;
 /** Room for a lakh-sized amount beside the title. */
-const PO_INPUT_WIDTH = 160;
 
 const makeStyles = createN1Styles(t => ({
   pressed: { opacity: t.opacity.pressed },
@@ -64,8 +65,10 @@ const makeStyles = createN1Styles(t => ({
   // The label on top (level with the title), the amount (or its input)
   // at the bottom (level with the invoice number).
   poAmount: { justifyContent: 'space-between', gap: t.spacing.xxs },
-  poInput: { width: PO_INPUT_WIDTH },
-  compactActions: { flex: 1, gap: t.spacing.sm },
+  // Phones' bottom bar: Preview and Download side by side, Mark as Paid
+  // under them. No flex: the bar's slot is a column, where flex would
+  // collapse the rows.
+  compactActions: { gap: t.spacing.sm },
   row: { flexDirection: 'row', gap: t.spacing.sm },
   grow: { flex: 1 },
 }));
@@ -102,20 +105,38 @@ export function InvoiceDetailsScreen({
     resetForm();
     setEditing(false);
   }, [resetForm]);
+  // Only its own Save ends editing, not Mark as Paid.
+  const savingHere = useRef(false);
   const save = useCallback(() => {
     const changes = form.validate();
     if (changes) {
+      savingHere.current = true;
       update(invoiceId, changes);
     }
   }, [form, update, invoiceId]);
-  useOnSettled(saving, saveError, () => setEditing(false));
-  // Opened with edit (the list's Edit, or a job card's "fill in the rates").
+  useOnSettled(saving, saveError, () => {
+    if (savingHere.current) {
+      savingHere.current = false;
+      setEditing(false);
+    }
+  });
+  // Phones: Edit invoice slides up as its own screen.
+  const openEdit = useCallback(
+    () => navigation.navigate('InvoiceEdit', { invoiceId }),
+    [navigation, invoiceId],
+  );
+  // Opened with edit (the list's Edit, or a job card's "fill in the rates"):
+  // phones slide up Edit invoice over it.
   useEffect(() => {
     if (editRequested && invoice) {
-      startEdit();
       navigation.setParams({ edit: undefined });
+      if (isCompact) {
+        openEdit();
+      } else {
+        startEdit();
+      }
     }
-  }, [editRequested, invoice, startEdit, navigation]);
+  }, [editRequested, invoice, startEdit, openEdit, isCompact, navigation]);
 
   // Back to the job card the invoice was opened from (keeping that page's
   // own Back), else always to the Billing list.
@@ -162,6 +183,12 @@ export function InvoiceDetailsScreen({
   const downloadPdf = useCallback(
     () => notifyUnavailable(I.downloadAction),
     [],
+  );
+  // Phones: the operations open on their own screen (to edit, while
+  // editing); Back returns here.
+  const openOperations = useCallback(
+    () => navigation.navigate('InvoiceOperations', { invoiceId }),
+    [navigation, invoiceId],
   );
 
   const gst = useGst(invoice?.customerName ?? '');
@@ -213,39 +240,36 @@ export function InvoiceDetailsScreen({
   }
 
   const isPaid = invoice.status === 'paid';
+  const openPreview = () =>
+    setPreview(invoiceDocument(invoice, totals, organization));
   const sendButton = (
     <N1Button
-      title={isCompact ? I.sendShort : I.send}
+      title={I.send}
       leftIcon="arrow-right"
       variant="secondary"
       onPress={send}
       disabled={isPaid}
-      style={isCompact && styles.grow}
-      fullWidth={!isCompact}
+      fullWidth
       testID="send-invoice"
     />
   );
   const previewButton = (
     <N1Button
-      title={isCompact ? I.previewShort : I.preview}
+      title={I.preview}
       leftIcon="eye"
       variant="secondary"
-      onPress={() =>
-        totals && setPreview(invoiceDocument(invoice, totals, organization))
-      }
-      style={isCompact && styles.grow}
-      fullWidth={!isCompact}
+      onPress={openPreview}
+      fullWidth
       testID="preview-invoice"
     />
   );
   const pdfButton = (
     <N1Button
-      title={isCompact ? I.pdfShort : I.downloadPdf}
+      title={I.downloadPdf}
       leftIcon="download"
       variant="secondary"
       onPress={downloadPdf}
-      style={isCompact && styles.grow}
-      fullWidth={!isCompact}
+      fullWidth
     />
   );
   const paidButton = (
@@ -271,28 +295,16 @@ export function InvoiceDetailsScreen({
     />
   );
 
-  // The customer's PO value, entered by hand, beside the title.
+  // The customer's PO value, from the order, beside the title. Fixed: not
+  // editable here, even while the invoice is being edited.
   const poAmount = (
     <View style={styles.poAmount} testID="invoice-po-amount">
       <N1Text variant="overline">{I.poAmount}</N1Text>
-      {editing ? (
-        <N1TextInput
-          value={form.poAmount}
-          onChangeText={form.setPoAmount}
-          keyboardType="decimal-pad"
-          placeholder={I.poAmountPlaceholder}
-          accessibilityLabel={I.poAmount}
-          errorText={form.poAmountError}
-          containerStyle={styles.poInput}
-          testID="invoice-po-amount-input"
-        />
-      ) : (
-        <N1Text weight="bold">
-          {invoice.poAmount == null
-            ? COMMON_STRINGS.dash
-            : formatCurrency(invoice.poAmount)}
-        </N1Text>
-      )}
+      <N1Text weight="bold">
+        {invoice.poAmount == null
+          ? COMMON_STRINGS.dash
+          : formatCurrency(invoice.poAmount)}
+      </N1Text>
     </View>
   );
 
@@ -430,6 +442,79 @@ export function InvoiceDetailsScreen({
       )}
     </BillingSection>
   );
+  const previewModal = (
+    <InvoicePreviewModal
+      doc={preview}
+      onClose={closePreview}
+      onPrint={print}
+      onDownload={downloadPdf}
+    />
+  );
+
+  // Phones: the invoice at a glance in small cards. The header's Edit
+  // slides up Edit invoice; Preview Invoice, Download PDF and Mark as Paid
+  // are pinned to the bottom.
+  if (isCompact) {
+    return (
+      <>
+        <AdminScreen
+          header={
+            <DetailHeader
+              title={I.title}
+              onBack={goBack}
+              compactRight={
+                <N1IconButton
+                  icon="edit"
+                  variant="tile"
+                  accessibilityLabel={COMMON_STRINGS.edit}
+                  onPress={openEdit}
+                  testID="edit-invoice"
+                />
+              }
+            />
+          }
+          compactFooter={
+            <View style={styles.compactActions}>
+              <View style={styles.row}>
+                <View style={styles.grow}>
+                  <N1Button
+                    title={I.preview}
+                    leftIcon="eye"
+                    variant="soft"
+                    fullWidth
+                    onPress={openPreview}
+                    testID="preview-invoice"
+                  />
+                </View>
+                <View style={styles.grow}>
+                  <N1Button
+                    title={I.downloadPdf}
+                    leftIcon="download"
+                    variant="soft"
+                    fullWidth
+                    onPress={downloadPdf}
+                  />
+                </View>
+              </View>
+              {paidButton}
+            </View>
+          }
+          testID="invoice-details-screen"
+        >
+          <InvoiceOverview
+            invoice={invoice}
+            totals={totals}
+            onOpenOrder={order ? openOrder : undefined}
+            onOpenOperations={openOperations}
+            onSend={send}
+            sendDisabled={isPaid}
+          />
+        </AdminScreen>
+        {previewModal}
+      </>
+    );
+  }
+
   return (
     <>
       <BillingDetailLayout
@@ -450,27 +535,10 @@ export function InvoiceDetailsScreen({
         operations={operations}
         amounts={amounts}
         aside={notes}
-        compactFooter={
-          editing ? (
-            saveFooter
-          ) : (
-            <View style={styles.compactActions}>
-              <View style={styles.row}>
-                {sendButton}
-                {previewButton}
-                {pdfButton}
-              </View>
-              {paidButton}
-            </View>
-          )
-        }
+        // Wide screens only; phones have their own views above.
+        compactFooter={saveFooter}
       />
-      <InvoicePreviewModal
-        doc={preview}
-        onClose={closePreview}
-        onPrint={print}
-        onDownload={downloadPdf}
-      />
+      {previewModal}
     </>
   );
 }

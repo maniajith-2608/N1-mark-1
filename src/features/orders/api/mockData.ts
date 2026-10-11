@@ -38,6 +38,7 @@ function order(seed: Seed): WorkOrder {
     customerEmail: CUSTOMER_EMAILS[seed.customerId] ?? '',
     description: `${seed.partName} — ${seed.jobName}`,
     poNumber: `PO-${8800 + (n % 100)}`,
+    poAmount: 50000 + (n % 10) * 5000,
     routeCardNo: `RC-${2168 + n - 1000}`,
     dcNo: `DC-${5519 + n - 1000}`,
     dcDate: '2026-09-24',

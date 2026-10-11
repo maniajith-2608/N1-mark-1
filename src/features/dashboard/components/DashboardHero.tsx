@@ -1,6 +1,10 @@
 import React, { useCallback, useState } from 'react';
-import { Pressable, View, type LayoutChangeEvent } from 'react-native';
-import { N1Text, useN1Styles, useN1Theme } from '../../../shared/components';
+import { View, type LayoutChangeEvent } from 'react-native';
+import {
+  HeaderTabs,
+  useN1Styles,
+  useN1Theme,
+} from '../../../shared/components';
 import { DASHBOARD_STRINGS as S } from '../constants';
 import { HERO_OVERSCROLL, makeDashboardHeroStyles } from '../styles';
 import type { DashboardPeriod } from '../types';
@@ -41,32 +45,13 @@ function DashboardHero({ period, onPeriodChange }: Props) {
         ]}
       />
       {/* Period chips: dark on the black, the chosen one white. */}
-      <View
-        style={styles.periods}
-        accessibilityRole="tablist"
+      <HeaderTabs
+        variant="bare"
+        tabs={S.periods}
+        value={period}
+        onChange={onPeriodChange}
         onLayout={onLayout}
-      >
-        {S.periods.map(tab => {
-          const selected = tab.key === period;
-          return (
-            <Pressable
-              key={tab.key}
-              accessibilityRole="tab"
-              aria-selected={selected}
-              onPress={() => onPeriodChange(tab.key)}
-              style={({ pressed }) => [
-                styles.period,
-                selected && styles.periodSelected,
-                pressed && styles.pressed,
-              ]}
-            >
-              <N1Text variant="label" color={selected ? 'primary' : 'inverse'}>
-                {tab.label}
-              </N1Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      />
     </>
   );
 }

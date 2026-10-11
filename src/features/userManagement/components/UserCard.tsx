@@ -80,6 +80,7 @@ export const UserCard = memo(function UserCardComponent({
           </N1Text>
         </View>
         <RowActions
+          appearance="card"
           onEdit={() => onEdit(user)}
           onDelete={() => onDelete(user)}
           editLabel={USER_STRINGS.a11y.edit(user.name)}

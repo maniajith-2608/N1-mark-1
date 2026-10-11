@@ -181,15 +181,17 @@ const renderQuoteCard = (q: Quote) => (
 );
 
 /**
- * Opens an order or quote on the Customers stack (the same screens as in
- * Orders and Billing), so Back returns to this customer.
+ * Opens an order or quote on the stack this customer is on (Customers, or
+ * Orders when opened from an order), the same screens as in Orders and
+ * Billing, so Back returns to this customer. Pushed, so an order already
+ * lower in the stack isn't popped back to.
  */
 function useOpenInModule() {
   const navigation =
     useNavigation<NativeStackNavigationProp<CustomersStackParamList>>();
   const openOrder = useCallback(
     (o: WorkOrder) =>
-      navigation.navigate('OrderDetails', {
+      navigation.push('OrderDetails', {
         orderId: o.id,
         fromCustomerId: o.customerId,
       }),
@@ -197,7 +199,7 @@ function useOpenInModule() {
   );
   const openQuote = useCallback(
     (q: Quote, customerId: string) =>
-      navigation.navigate('QuoteDetails', {
+      navigation.push('QuoteDetails', {
         quoteId: q.id,
         fromCustomerId: customerId,
       }),

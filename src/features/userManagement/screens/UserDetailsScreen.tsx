@@ -21,7 +21,8 @@ import {
   createN1Styles,
   useN1Breakpoint,
   useN1Styles,
-  useN1Theme,
+  useSectionTabsOptions,
+  sectionTabLabel,
 } from '../../../shared/components';
 import { SECTION_NAV_WIDTH } from '../../../shared/constants';
 import { useConfirmDelete } from '../../../shared/hooks';
@@ -56,45 +57,10 @@ const SECTIONS: N1Tab<Section>[] = [
 /** Phones: one swipeable page per section. */
 const SectionTabs = createMaterialTopTabNavigator<Record<Section, undefined>>();
 
-function SectionTabLabel({
-  title,
-  focused,
-}: {
-  title: string;
-  focused: boolean;
-}) {
-  return (
-    <N1Text
-      variant="label"
-      weight={focused ? 'bold' : undefined}
-      color={focused ? 'primary' : 'secondary'}
-    >
-      {title}
-    </N1Text>
-  );
-}
-
-const sectionTabLabel =
-  (title: string) =>
-  ({ focused }: { focused: boolean }) =>
-    <SectionTabLabel title={title} focused={focused} />;
-
 const makeStyles = createN1Styles(t => ({
   // Phones: the person above the swipeable section tabs, on white.
   compactRoot: { flex: 1, backgroundColor: t.colors.surface },
   compactHero: { padding: t.spacing.lg },
-  tabBar: {
-    backgroundColor: t.colors.surface,
-    elevation: 0,
-    shadowOpacity: 0,
-    borderBottomWidth: t.borderWidth.hairline,
-    borderBottomColor: t.colors.border,
-  },
-  tabItem: { width: 'auto', paddingHorizontal: t.spacing.lg },
-  tabIndicator: {
-    height: t.borderWidth.thick,
-    backgroundColor: t.colors.primary,
-  },
   // Wide screens: the card fills the window; only the section scrolls.
   card: { flex: 1, minHeight: 0 },
   row: {
@@ -150,7 +116,7 @@ export function UserDetailsScreen({
   navigation,
 }: UserManagementScreenProps<'UserDetails'>) {
   const styles = useN1Styles(makeStyles);
-  const theme = useN1Theme();
+  const sectionTabsOptions = useSectionTabsOptions();
   const { isCompact } = useN1Breakpoint();
   const { organization } = useSession();
   const {
@@ -351,8 +317,7 @@ export function UserDetailsScreen({
         user && (
           <N1IconButton
             icon="trash"
-            variant="danger"
-            size="sm"
+            variant="tile"
             accessibilityLabel={USER_STRINGS.a11y.delete(user.name)}
             onPress={() => deletion.request(user)}
             testID="delete-user"
@@ -418,13 +383,7 @@ export function UserDetailsScreen({
           <View style={styles.compactHero}>{identity}</View>
           <SectionTabs.Navigator
             initialRouteName={section}
-            screenOptions={{
-              tabBarScrollEnabled: true,
-              tabBarStyle: styles.tabBar,
-              tabBarItemStyle: styles.tabItem,
-              tabBarIndicatorStyle: styles.tabIndicator,
-              tabBarPressColor: theme.colors.surfaceMuted,
-            }}
+            screenOptions={sectionTabsOptions}
             // Leaving a section drops its unsaved edits.
             screenListeners={({ route: tab }) => ({
               focus: () => {

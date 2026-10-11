@@ -15,14 +15,14 @@ import {
   type N1TableColumn,
 } from '../../../shared/components';
 import type { BillingNavigation } from '../types';
-import {
-  AsyncContent,
-  ListToolbar,
-  StatGrid,
-} from '../../../shared/components';
+import { AsyncContent, ListToolbar } from '../../../shared/components';
 import { COMMON_STRINGS } from '../../../shared/constants';
 import { useListFilter, usePagination } from '../../../shared/hooks';
-import { formatCompactCurrency, formatCurrency } from '../../../shared/utils';
+import {
+  formatCompactCurrency,
+  formatCurrency,
+  notifyUnavailable,
+} from '../../../shared/utils';
 import { BILLING_STRINGS, INVOICE_STATUS_OPTIONS } from '../constants';
 import { useInvoiceStats, useInvoices } from '../hooks/useBilling';
 import type { Invoice, InvoiceFilters } from '../types';
@@ -37,6 +37,9 @@ import { InvoiceCard } from './BillingCards';
 import { useBillingHeader } from './BillingHeaderSlot';
 
 const S = BILLING_STRINGS.invoices;
+/** Downloading PDFs isn't available yet; the invoice page says the same. */
+const downloadPdf = () =>
+  notifyUnavailable(BILLING_STRINGS.invoice.downloadAction);
 
 const makeStyles = createN1Styles(t => ({
   actions: { flexDirection: 'row', gap: t.spacing.sm },
@@ -88,36 +91,6 @@ export function InvoicesTab({ toolbarStart }: Props) {
     (i: Invoice) =>
       navigation.navigate('InvoiceDetails', { invoiceId: i.id, edit: true }),
     [navigation],
-  );
-
-  const statItems = useMemo(
-    () => [
-      { key: 'total', label: S.stats.total, value: stats.total },
-      {
-        key: 'new',
-        label: S.stats.new,
-        value: stats.new,
-        tone: 'info' as const,
-      },
-      {
-        key: 'overdue',
-        label: S.stats.overdue,
-        value: stats.overdue,
-        tone: 'danger' as const,
-      },
-      {
-        key: 'paid',
-        label: S.stats.paid,
-        value: stats.paid,
-        tone: 'success' as const,
-      },
-      {
-        key: 'month',
-        label: S.stats.month,
-        value: formatCompactCurrency(stats.thisMonth),
-      },
-    ],
-    [stats],
   );
 
   const columns = useMemo<N1TableColumn<Invoice>[]>(
@@ -172,8 +145,15 @@ export function InvoicesTab({ toolbarStart }: Props) {
   );
 
   const renderCompactItem = useCallback(
-    (i: Invoice) => <InvoiceCard invoice={i} onView={view} />,
-    [view],
+    (i: Invoice) => (
+      <InvoiceCard
+        invoice={i}
+        onView={view}
+        onDownload={downloadPdf}
+        onEdit={edit}
+      />
+    ),
+    [view, edit],
   );
 
   const firstLoad =
@@ -199,7 +179,7 @@ export function InvoicesTab({ toolbarStart }: Props) {
     ),
     [query, setQuery, filterGroups, filters, applyFilters],
   );
-  useBillingHeader(headerBar, isCompact);
+  useBillingHeader('invoices', headerBar, isCompact);
 
   const toolbar = (
     <ListToolbar
@@ -229,11 +209,6 @@ export function InvoicesTab({ toolbarStart }: Props) {
       onRetry={reload}
       hasData={items.length > 0}
     >
-      {/* Phones keep the stat tiles; wide screens show the totals in the
-          pagination bar instead. */}
-      {isCompact && (
-        <StatGrid items={statItems} variant="muted" testID="invoice-stats" />
-      )}
       <N1Table
         loading={firstLoad}
         columns={columns}

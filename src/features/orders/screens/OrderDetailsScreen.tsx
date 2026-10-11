@@ -1,5 +1,7 @@
+import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, View } from 'react-native';
+import type { ReactNode } from 'react';
 import {
   KeyboardScrollView,
   DetailHeader,
@@ -9,22 +11,27 @@ import {
   N1DetailGrid,
   N1Divider,
   N1Icon,
+  N1IconButton,
   N1Tabs,
   N1Text,
   createN1Styles,
   useN1Breakpoint,
   useN1Styles,
+  sectionTabLabel,
+  useSectionTabsOptions,
   type N1Tab,
 } from '../../../shared/components';
 import type { OrdersScreenProps } from '../types';
 import {
   AdminScreen,
+  AdminScreenBackground,
   AsyncContent,
   ComingSoon,
 } from '../../../shared/components';
 import { COMMON_STRINGS, DETAIL_COLUMNS } from '../../../shared/constants';
 import { useOnSettled } from '../../../shared/hooks';
 import {
+  formatCurrency,
   formatLongDate,
   notifyUnavailable,
 } from '../../../shared/utils';
@@ -78,7 +85,13 @@ const TABS: N1Tab<Tab>[] = [
   { key: 'jobCard', label: D.tabs.jobCard, icon: 'clipboard' },
 ];
 
+/** Phones: one swipeable page per tab, like Employee and Customer details. */
+const OrderTabs = createMaterialTopTabNavigator<Record<Tab, undefined>>();
+
 const makeStyles = createN1Styles(t => ({
+  // Phones: the order above the swipeable tabs, on white.
+  compactRoot: { flex: 1, backgroundColor: t.colors.surface },
+  compactHero: { padding: t.spacing.lg },
   top: { gap: t.spacing.md },
   backLink: {
     flexDirection: 'row',
@@ -133,6 +146,7 @@ export function OrderDetailsScreen({
   navigation,
 }: OrdersScreenProps<'OrderDetails'>) {
   const styles = useN1Styles(makeStyles);
+  const sectionTabsOptions = useSectionTabsOptions();
   const { isCompact } = useN1Breakpoint();
   const { order, status, error, reload } = useOrder(route.params.orderId);
   const { items: customers } = useCustomers();
@@ -190,23 +204,44 @@ export function OrderDetailsScreen({
       }),
     [navigation, route.params.orderId],
   );
+  // Slides the customer in on this stack (no jump to Customers); Back
+  // returns to this order. Opened from that customer already: back to it.
   const openCustomer = useCallback(() => {
-    if (order?.customerId) {
-      navigation.navigate('Customers', {
-        screen: 'CustomerDetails',
-        // Back on the customer returns to Orders.
-        params: { customerId: order.customerId, from: 'orders' },
-        initial: false,
-      });
+    const customerId = order?.customerId;
+    if (!customerId) {
+      return;
+    }
+    const state = navigation.getState();
+    const below = state.routes[state.index - 1];
+    const belowParams = below?.params as { customerId?: string } | undefined;
+    if (
+      below?.name === 'CustomerDetails' &&
+      belowParams?.customerId === customerId
+    ) {
+      navigation.goBack();
+    } else {
+      navigation.push('CustomerDetails', { customerId, from: 'order' });
     }
   }, [navigation, order?.customerId]);
+  // Pushed on this stack: Back returns to this order. Opened from that job
+  // card already (Job Cards stack): back to it.
   const openJobCard = useCallback(
-    (card: JobCard) =>
-      // Pushed on the Orders stack: Back returns to this order.
-      navigation.navigate('JobCardDetails', {
-        jobCardId: card.id,
-        from: 'order',
-      }),
+    (card: JobCard) => {
+      const state = navigation.getState();
+      const below = state.routes[state.index - 1];
+      const belowParams = below?.params as { jobCardId?: string } | undefined;
+      if (
+        below?.name === 'JobCardDetails' &&
+        belowParams?.jobCardId === card.id
+      ) {
+        navigation.goBack();
+      } else {
+        navigation.push('JobCardDetails', {
+          jobCardId: card.id,
+          from: 'order',
+        });
+      }
+    },
     [navigation],
   );
   // No job card yet: make one from the order, then show it on its tab. If
@@ -302,8 +337,25 @@ export function OrderDetailsScreen({
     </Pressable>
   );
 
-  // Phones: a header with back and the screen's name, in place of the link.
-  const header = <DetailHeader title={D.title} onBack={goBack} />;
+  // Phones: a header with back and the screen's name, in place of the link,
+  // and Edit beside it.
+  const header = (
+    <DetailHeader
+      title={D.title}
+      onBack={goBack}
+      compactRight={
+        order && (
+          <N1IconButton
+            icon="edit"
+            variant="tile"
+            accessibilityLabel={ORDER_STRINGS.a11y.edit(order.id)}
+            onPress={edit}
+            testID="edit-order"
+          />
+        )
+      }
+    />
+  );
 
   if (!order) {
     return (
@@ -315,6 +367,20 @@ export function OrderDetailsScreen({
       </AdminScreen>
     );
   }
+
+  const createJobCardButton = (
+    <N1Button
+      title={D.createJobCard}
+      leftIcon="plus"
+      variant="secondary"
+      size="sm"
+      loading={jobCards.saving}
+      // Wait for the job cards, so an existing one is never made twice.
+      disabled={jobCards.status !== 'succeeded'}
+      onPress={createJobCard}
+      testID="order-create-job-card"
+    />
+  );
 
   const top = (
     <View style={styles.top}>
@@ -331,29 +397,23 @@ export function OrderDetailsScreen({
           <PriorityBadge priority={order.priority} suffix="priority" />
           <OrderStatusBadge status={order.status} />
         </View>
-        <View style={styles.spacer} />
-        <View style={styles.actions}>
-          {!jobCard && (
-            <N1Button
-              title={D.createJobCard}
-              leftIcon="plus"
-              variant="secondary"
-              size="sm"
-              loading={jobCards.saving}
-              // Wait for the job cards, so an existing one is never made twice.
-              disabled={jobCards.status !== 'succeeded'}
-              onPress={createJobCard}
-              testID="order-create-job-card"
-            />
-          )}
-          <N1Button
-            title={D.edit}
-            leftIcon="edit"
-            size="sm"
-            onPress={edit}
-            testID="edit-order"
-          />
-        </View>
+        {/* Phones: Edit is in the header and Create job card on the Job
+            card tab. */}
+        {!isCompact && (
+          <>
+            <View style={styles.spacer} />
+            <View style={styles.actions}>
+              {!jobCard && createJobCardButton}
+              <N1Button
+                title={D.edit}
+                leftIcon="edit"
+                size="sm"
+                onPress={edit}
+                testID="edit-order"
+              />
+            </View>
+          </>
+        )}
       </View>
     </View>
   );
@@ -423,6 +483,13 @@ export function OrderDetailsScreen({
           columns={isCompact ? 2 : DETAIL_COLUMNS}
           items={[
             { label: F.poNumber, value: orDash(order.poNumber) },
+            {
+              label: F.poAmount,
+              value:
+                order.poAmount == null
+                  ? COMMON_STRINGS.dash
+                  : formatCurrency(order.poAmount),
+            },
             { label: F.partName, value: orDash(order.partName) },
             { label: F.partNumber, value: orDash(order.partNumber) },
             { label: F.drawingNumber, value: orDash(order.drawingNumber) },
@@ -596,6 +663,7 @@ export function OrderDetailsScreen({
           <N1Text variant="small" color="secondary" align="center">
             {D.noJobCardHelp}
           </N1Text>
+          {isCompact && createJobCardButton}
           {jobCards.saveError && (
             <N1Text variant="small" color="danger">
               {jobCards.saveError}
@@ -606,20 +674,20 @@ export function OrderDetailsScreen({
     </View>
   );
 
-  const content = {
+  const tabContent: Record<Tab, ReactNode> = {
     details: detailsTab,
     material: materialTab,
     documents: documentsTab,
     jobCard: jobCardTab,
-  }[tab];
+  };
+  const content = tabContent[tab];
 
   const tabs = (
     <N1Tabs
       tabs={TABS}
       value={tab}
       onChange={setTab}
-      variant={isCompact ? 'segmented' : 'underline'}
-      scrollable={isCompact}
+      variant="underline"
       testID="order-tab"
     />
   );
@@ -643,18 +711,44 @@ export function OrderDetailsScreen({
     />
   );
 
-  // Phones: the page scrolls as one.
+  // Phones: like Employee and Customer details. The header's back and
+  // Edit, the order on top, then swipeable tabs over a white page.
   if (isCompact) {
     return (
-      <AdminScreen header={header} testID="order-details-screen">
-        <N1Card padding="lg" radius="sm" style={styles.card}>
-          {top}
-          {tabs}
-          <View style={styles.compactContent}>{content}</View>
-        </N1Card>
-        {rawMaterialDialog}
-        {viewer}
-      </AdminScreen>
+      <AdminScreenBackground.Provider value="surface">
+        <View style={styles.compactRoot} testID="order-details-screen">
+          {header}
+          <View style={styles.compactHero}>{top}</View>
+          <OrderTabs.Navigator
+            initialRouteName={tab}
+            screenOptions={sectionTabsOptions}
+            screenListeners={({ route: page }) => ({
+              focus: () => setTab(page.name),
+            })}
+          >
+            {TABS.map(({ key, label }) => (
+              <OrderTabs.Screen
+                key={key}
+                name={key}
+                options={{
+                  title: label,
+                  tabBarAccessibilityLabel: label,
+                  tabBarButtonTestID: `order-tab-${key}`,
+                  tabBarLabel: sectionTabLabel(label),
+                }}
+              >
+                {() => (
+                  <AdminScreen testID={`order-tab-page-${key}`}>
+                    <View style={styles.compactContent}>{tabContent[key]}</View>
+                  </AdminScreen>
+                )}
+              </OrderTabs.Screen>
+            ))}
+          </OrderTabs.Navigator>
+          {rawMaterialDialog}
+          {viewer}
+        </View>
+      </AdminScreenBackground.Provider>
     );
   }
 

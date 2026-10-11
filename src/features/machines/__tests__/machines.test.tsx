@@ -168,14 +168,48 @@ test('unknown machine shows not found', async () => {
   expect(allText(h.root)).toContain('This machine could not be found.');
 });
 
-test('phone shows cards with current work and edit buttons', async () => {
+test('phone lists machine cards with titled values and an edit button', async () => {
   mockWidth = 390;
   const { root } = await renderAdmin('Machines');
-  expect(hasTestId(root, 'machine-card-MCH-1')).toBe(true);
-  expect(allText(byTestId(root, 'stat-maintenance'))).toContain('Maintenance');
+  expect(hasTestId(root, 'machine-stats')).toBe(false);
+  const row = allText(byTestId(root, 'machine-card-MCH-1'));
+  expect(row).toContain('Turning Center 1');
+  expect(row).toContain('CNC-01');
+  expect(row).toContain('CNC Lathe');
+  expect(row).toContain('Bay 1');
+  expect(row).toContain('Running');
+  expect(row).toContain('WO #1036 · Coupling — Job G');
+  expect(row).toContain('Divya Ramesh');
+  // Each value carries its title.
+  ['Type', 'Location', 'Current work', 'Operator'].forEach(title =>
+    expect(row).toContain(title),
+  );
+  // The pencil opens the Edit dialog, not the details.
   await press(byLabel(root, 'Edit Turning Center 1'));
   expect(allText(root)).toContain('Edit machine');
   expect(hasTestId(root, 'machine-details-screen')).toBe(false);
+});
+
+test('phone details sit on a white page; the header Edit slides up the edit sheet', async () => {
+  mockWidth = 390;
+  const { root, store } = await renderAdmin('Machines');
+  await press(byText(root, 'Milling Center 1'));
+  expect(hasTestId(root, 'machine-details-screen')).toBe(true);
+  expect(hasTestId(root, 'machine-form')).toBe(false);
+  // One Edit, in the header; none on the Machine info section.
+  expect(allText(byTestId(root, 'machine-details-form'))).not.toContain('Edit');
+  await press(byTestId(root, 'edit-machine'));
+  const sheet = byTestId(root, 'machine-form');
+  expect(allText(sheet)).toContain("Update Milling Center 1's details.");
+  await choose(sheet, 'machine-form-status', 'Idle');
+  await press(byTestId(sheet, 'machine-form-submit'));
+  expect(store.getState().machines.entities['MCH-3']).toMatchObject({
+    code: 'CNC-03',
+    status: 'idle',
+  });
+  // Saved: the sheet closes, back on the details.
+  expect(hasTestId(root, 'machine-form')).toBe(false);
+  expect(hasTestId(root, 'machine-details-screen')).toBe(true);
 });
 
 test('search finds the machine running a work order', async () => {

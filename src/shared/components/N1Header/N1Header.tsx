@@ -1,21 +1,38 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import type { ReactNode } from 'react';
-import { View, type StyleProp, type ViewStyle } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  Platform,
+  StatusBar,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
+import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import type { N1IconName } from '../N1Icon/N1Icon';
-import { createN1Styles, useN1Styles } from '../../../theme/N1ThemeProvider';
-import { N1IconButton } from '../N1IconButton/N1IconButton';
+import {
+  createN1Styles,
+  useN1Styles,
+  useN1Theme,
+} from '../../../theme/N1ThemeProvider';
+import {
+  N1IconButton,
+  type N1IconButtonVariant,
+} from '../N1IconButton/N1IconButton';
 import { N1Logo } from '../N1Logo/N1Logo';
 import { N1Text } from '../N1Text/N1Text';
 
 export type N1HeaderProps = {
   title?: string;
+  /** default variant: a line under the title, as on form sheets. */
+  subtitle?: string;
   /**
    * default: white bar, left button + title (Order, Job card, Edit Profile)
    * brand: black bar with the N1 logo (home screens)
    * dark: title centred on a dark screen (Scan QR Code)
+   * inverse: black bar with light tiles and title, like the admin phone
+   * top bar (admin detail screens)
    */
-  variant?: 'default' | 'brand' | 'dark';
+  variant?: 'default' | 'brand' | 'dark' | 'inverse';
   /** Usually 'chevron-left' (back) or 'close'. */
   leftIcon?: N1IconName;
   onLeftPress?: () => void;
@@ -26,6 +43,16 @@ export type N1HeaderProps = {
   safeArea?: boolean;
   style?: StyleProp<ViewStyle>;
   testID?: string;
+};
+
+const LEFT_BUTTON: Record<
+  NonNullable<N1HeaderProps['variant']>,
+  N1IconButtonVariant
+> = {
+  default: 'secondary',
+  brand: 'secondary',
+  dark: 'overlay',
+  inverse: 'tile',
 };
 
 const makeStyles = createN1Styles(t => ({
@@ -43,8 +70,14 @@ const makeStyles = createN1Styles(t => ({
     borderBottomColor: t.colors.border,
   },
   brand: { backgroundColor: t.colors.surfaceInverse },
+  inverse: { backgroundColor: t.colors.surfaceInverse },
+  // Matches the admin phone top bar's spacing.
+  inverseBase: { paddingVertical: t.spacing.md },
   dark: { backgroundColor: t.colors.scannerBackground },
   title: { flex: 1 },
+  titles: { flex: 1, gap: t.spacing.xxs },
+  // With a subtitle: the same spacing as an N1Modal form sheet's header.
+  sheetBase: { paddingVertical: t.spacing.lg },
   side: {
     minWidth: t.controlHeight.sm,
     alignItems: 'center',
@@ -56,6 +89,7 @@ const makeStyles = createN1Styles(t => ({
 /** Top bar for a screen. */
 export const N1Header = React.memo(function N1HeaderComponent({
   title,
+  subtitle,
   variant = 'default',
   leftIcon,
   onLeftPress,
@@ -66,15 +100,17 @@ export const N1Header = React.memo(function N1HeaderComponent({
   testID,
 }: N1HeaderProps) {
   const styles = useN1Styles(makeStyles);
+  const theme = useN1Theme();
+  const topInset = useContext(SafeAreaInsetsContext)?.top ?? 0;
   const label =
     leftAccessibilityLabel ?? (leftIcon === 'close' ? 'Close' : 'Back');
   const leftButton = leftIcon && onLeftPress && (
     <N1IconButton
       icon={leftIcon}
-      size="sm"
+      size={variant === 'inverse' ? 'md' : 'sm'}
       accessibilityLabel={label}
       onPress={onLeftPress}
-      variant={variant === 'dark' ? 'overlay' : 'secondary'}
+      variant={LEFT_BUTTON[variant]}
     />
   );
 
@@ -102,12 +138,13 @@ export const N1Header = React.memo(function N1HeaderComponent({
         <View style={styles.side}>{right}</View>
       </>
     );
-  } else {
+  } else if (variant === 'inverse') {
     content = (
       <>
         {leftButton}
         <N1Text
-          variant="h2"
+          variant="h3"
+          color="inverse"
           style={styles.title}
           numberOfLines={1}
           accessibilityRole="header"
@@ -117,17 +154,65 @@ export const N1Header = React.memo(function N1HeaderComponent({
         {right}
       </>
     );
+  } else {
+    const heading = (
+      <N1Text
+        variant="h2"
+        style={!subtitle && styles.title}
+        numberOfLines={1}
+        accessibilityRole="header"
+      >
+        {title}
+      </N1Text>
+    );
+    content = (
+      <>
+        {leftButton}
+        {subtitle ? (
+          <View style={styles.titles}>
+            {heading}
+            <N1Text variant="small" color="secondary" numberOfLines={1}>
+              {subtitle}
+            </N1Text>
+          </View>
+        ) : (
+          heading
+        )}
+        {right}
+      </>
+    );
   }
 
-  const Container = safeArea ? SafeAreaView : View;
   return (
-    <Container
-      edges={safeArea ? ['top'] : undefined}
-      style={[styles[variant], style]}
+    <View
+      // The top inset from context, like the phone top bar: a SafeAreaView
+      // measures 0 inside an iOS full-screen modal (Create / Edit order),
+      // leaving the title under the status bar. No provider (isolated
+      // renders) means no inset.
+      style={[styles[variant], safeArea && { paddingTop: topInset }, style]}
       testID={testID}
     >
-      <View style={styles.base}>{content}</View>
-    </Container>
+      {/* Light status bar text over the black; dark over a white form
+          sheet, which may slide up over a black header (web has no status
+          bar). */}
+      {variant === 'inverse' && Platform.OS !== 'web' && (
+        <StatusBar barStyle="light-content" />
+      )}
+      {variant === 'default' && subtitle && Platform.OS !== 'web' && (
+        <StatusBar
+          barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'}
+        />
+      )}
+      <View
+        style={[
+          styles.base,
+          variant === 'inverse' && styles.inverseBase,
+          variant === 'default' && subtitle && styles.sheetBase,
+        ]}
+      >
+        {content}
+      </View>
+    </View>
   );
 });
 N1Header.displayName = 'N1Header';

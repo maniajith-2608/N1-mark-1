@@ -24,6 +24,7 @@ import type { OrdersScreenProps } from '../types';
 import { pickDocument } from '../../../services/files/pickDocument';
 import {
   AdminScreen,
+  AdminScreenBackground,
   AsyncContent,
   FormFooter,
   FormRow,
@@ -265,9 +266,15 @@ export function OrderFormScreen({
 
   const isLast = step === STEP_COUNT;
   const backLinkLabel = fromDetails ? F.backToOrder : F.backToOrders;
-  // Phones: a header with back and the form's name, in place of the link.
+  // Phones: the form slides up as a sheet, with the same white header as
+  // Edit machine: back, the form's name and what it does.
   const header = (
-    <DetailHeader title={isEdit ? F.editTitle : F.createTitle} onBack={leave} />
+    <DetailHeader
+      sheet
+      title={isEdit ? F.editTitle : F.createTitle}
+      subtitle={isEdit && orderId ? F.editSubtitle(orderId) : F.createSubtitle}
+      onBack={leave}
+    />
   );
   const busy = saving || jobCards.saving;
   const submitLabel = isEdit
@@ -451,10 +458,14 @@ export function OrderFormScreen({
         {text('poNumber', F.poNumber, F.poNumberPlaceholder, {
           testID: 'order-form-po-number',
         })}
-        {text('dcNo', F.dcNo, F.dcNoPlaceholder, {
-          testID: 'order-form-dc-no',
+        {text('poAmount', F.poAmount, F.poAmountPlaceholder, {
+          keyboardType: 'decimal-pad',
+          testID: 'order-form-po-amount',
         })}
       </FormRow>
+      {text('dcNo', F.dcNo, F.dcNoPlaceholder, {
+        testID: 'order-form-dc-no',
+      })}
       {text('description', F.description, F.descriptionPlaceholder, {
         multiline: true,
         testID: 'order-form-description',
@@ -588,19 +599,22 @@ export function OrderFormScreen({
     </>
   );
 
-  // Phones: the page scrolls and the buttons sit in the bottom bar.
+  // Phones: a white sheet like Edit machine; the page scrolls and the
+  // buttons sit in the bottom bar.
   if (isCompact) {
     return (
-      <AdminScreen
-        header={header}
-        compactFooter={compactFooter}
-        testID="order-form-screen"
-      >
-        <View style={styles.compact}>
-          {top}
-          {fields}
-        </View>
-      </AdminScreen>
+      <AdminScreenBackground.Provider value="surface">
+        <AdminScreen
+          header={header}
+          compactFooter={compactFooter}
+          testID="order-form-screen"
+        >
+          <View style={styles.compact}>
+            {top}
+            {fields}
+          </View>
+        </AdminScreen>
+      </AdminScreenBackground.Provider>
     );
   }
 

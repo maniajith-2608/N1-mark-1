@@ -15,24 +15,17 @@ export const MACHINE_STRINGS = {
     s: { running: number; idle: number; maintenance: number },
   ) =>
     `${showing} · ${s.running} running · ${s.idle} idle · ${s.maintenance} under maintenance`,
-  stats: {
-    total: 'Total machines',
-    running: 'Running',
-    idle: 'Idle',
-    maintenance: 'Under maintenance',
-    maintenanceShort: 'Maintenance',
-  },
   columns: {
     code: 'Code',
     name: 'Machine name',
     type: 'Type',
     location: 'Location',
     work: 'Current work',
+    operator: 'Operator',
     status: 'Status',
     actions: 'Actions',
   },
   workOrder: (id: string) => `WO #${id}`,
-  edit: 'Edit',
   form: {
     addTitle: 'Add machine',
     addSubtitle: 'Register a new machine on the shop floor.',

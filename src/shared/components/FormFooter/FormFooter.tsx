@@ -43,11 +43,7 @@ export function FormFooter({
 }: FormFooterProps) {
   const styles = useN1Styles(makeStyles);
   const inBottomBar = useInBottomBar();
-  const grow = compact
-    ? undefined
-    : inBottomBar
-    ? styles.share
-    : styles.grow;
+  const grow = compact ? undefined : inBottomBar ? styles.share : styles.grow;
   const buttons = (
     <>
       {onCancel && (

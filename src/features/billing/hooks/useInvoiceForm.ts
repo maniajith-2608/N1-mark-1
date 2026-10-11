@@ -5,12 +5,9 @@ import { BILLING_STRINGS } from '../constants';
 import type { Invoice, InvoiceInput, InvoiceStatus } from '../types';
 import { useLineItems } from './useLineItems';
 
-const poText = (invoice: Invoice | undefined) =>
-  invoice?.poAmount == null ? '' : String(invoice.poAmount);
-
 type InvoiceChanges = Pick<
   InvoiceInput,
-  'status' | 'lineItems' | 'discount' | 'gstRate' | 'poAmount' | 'notes'
+  'status' | 'lineItems' | 'discount' | 'gstRate' | 'notes'
 >;
 
 /** Blank, or a number that isn't negative. */
@@ -19,7 +16,8 @@ const isBadAmount = (text: string) =>
 
 /**
  * The editable parts of an invoice (operations, status, discount, GST rate,
- * PO amount, notes), edited in place on the invoice page.
+ * notes), edited in place on the invoice page. The PO amount comes from the
+ * order and isn't edited here.
  */
 export function useInvoiceForm(invoice: Invoice | undefined) {
   const lines = useLineItems(invoice?.lineItems ?? []);
@@ -28,10 +26,8 @@ export function useInvoiceForm(invoice: Invoice | undefined) {
     invoice ? String(invoice.discount) : '0',
   );
   const [gstRate, setGstRate] = useState(invoice?.gstRate ?? 0);
-  const [poAmount, setPoAmount] = useState(poText(invoice));
   const [notes, setNotes] = useState(invoice?.notes ?? '');
   const [discountError, setDiscountError] = useState<string>();
-  const [poAmountError, setPoAmountError] = useState<string>();
   const [linesError, setLinesError] = useState<string>();
 
   /** Back to the saved invoice: on Edit, and on Cancel. */
@@ -44,35 +40,37 @@ export function useInvoiceForm(invoice: Invoice | undefined) {
     setStatus(invoice.status);
     setDiscount(String(invoice.discount));
     setGstRate(invoice.gstRate);
-    setPoAmount(poText(invoice));
     setNotes(invoice.notes);
     setDiscountError(undefined);
-    setPoAmountError(undefined);
     setLinesError(undefined);
   }, [invoice, resetLines]);
 
-  /** The changes to save, or null (with the errors shown) when invalid. */
-  const validate = useCallback((): InvoiceChanges | null => {
-    const badDiscount = isBadAmount(discount);
-    const badPoAmount = isBadAmount(poAmount);
-    setDiscountError(badDiscount ? COMMON_STRINGS.invalidNumber : undefined);
-    setPoAmountError(badPoAmount ? COMMON_STRINGS.invalidNumber : undefined);
-    setLinesError(
-      lines.items.length === 0 ? BILLING_STRINGS.lineItems.needsOne : undefined,
-    );
-    if (badDiscount || badPoAmount || lines.items.length === 0) {
-      return null;
-    }
-    return {
-      status,
-      lineItems: lines.items,
-      discount: toNumber(discount),
-      gstRate,
-      // Blank means not entered yet.
-      poAmount: poAmount.trim() === '' ? null : toNumber(poAmount),
-      notes: notes.trim(),
-    };
-  }, [discount, poAmount, lines.items, status, gstRate, notes]);
+  /**
+   * The changes to save, or null (with the errors shown) when invalid.
+   * `withLines: false` (phones) leaves the operations out: they're edited
+   * and saved on their own screen.
+   */
+  const validate = useCallback(
+    (
+      { withLines }: { withLines: boolean } = { withLines: true },
+    ): Partial<InvoiceChanges> | null => {
+      const badDiscount = isBadAmount(discount);
+      const noLines = withLines && lines.items.length === 0;
+      setDiscountError(badDiscount ? COMMON_STRINGS.invalidNumber : undefined);
+      setLinesError(noLines ? BILLING_STRINGS.lineItems.needsOne : undefined);
+      if (badDiscount || noLines) {
+        return null;
+      }
+      return {
+        status,
+        ...(withLines && { lineItems: lines.items }),
+        discount: toNumber(discount),
+        gstRate,
+        notes: notes.trim(),
+      };
+    },
+    [discount, lines.items, status, gstRate, notes],
+  );
 
   return {
     lines,
@@ -82,9 +80,6 @@ export function useInvoiceForm(invoice: Invoice | undefined) {
     setDiscount,
     gstRate,
     setGstRate,
-    poAmount,
-    setPoAmount,
-    poAmountError,
     notes,
     setNotes,
     discountError,

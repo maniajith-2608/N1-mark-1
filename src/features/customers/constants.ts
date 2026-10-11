@@ -80,7 +80,11 @@ export const CUSTOMER_STRINGS = {
     outstanding: 'Outstanding balance',
     notFound: 'This customer no longer exists.',
     backToCustomers: 'Back to customers',
-    backTo: { dashboard: 'Back to dashboard', orders: 'Back to orders' },
+    backTo: {
+      dashboard: 'Back to dashboard',
+      orders: 'Back to orders',
+      order: 'Back to order',
+    },
     tabs: {
       info: 'Customer info',
       address: 'Address info',

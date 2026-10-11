@@ -392,16 +392,70 @@ describe('Job Cards list', () => {
     );
   });
 
-  test('phone shows stats and cards with View and flow buttons', async () => {
+  test('phone shows cards with the table details, drawing thumbnail and actions', async () => {
     mockWidth = 390;
     const h = await renderAdmin('JobCards');
-    expect(allText(byTestId(h.root, 'stat-active'))).toContain('9');
-    expect(allText(byTestId(h.root, 'stat-completed'))).toContain('1');
+    // No stat tiles on phones.
+    expect(hasTestId(h.root, 'stat-active')).toBe(false);
     const card = byTestId(h.root, 'job-card-1042');
-    expect(allText(card)).toContain('Turning (Lathe) · CNC-02');
-    expect(allText(card)).toContain('Operator: Arun Prakash');
-    await press(byLabel(card, 'View job card WO #1042'));
-    expect(h.currentRoute()).toBe('JobCardDetails');
+    const text = allText(card);
+    [
+      '#JOB1',
+      'Bracket — Job A',
+      'WO #1042',
+      'Assigned machine',
+      'CNC-02',
+      'Operator',
+      'Arun Prakash',
+      'Progress',
+      '42%',
+      'Turning (Lathe)',
+      'High',
+    ].forEach(part => expect(text).toContain(part));
+    // RM QC failed shows once: it's the status itself.
+    const failed = allText(byTestId(h.root, 'job-card-1041'));
+    expect(failed.split('RM QC failed').length - 1).toBe(1);
+    // No View button: the card opens it; flow and Delete as in the table.
+    expect(() => byLabel(card, 'View job card WO #1042')).toThrow();
+    expect(byLabel(card, 'Edit flow for WO #1042')).toBeTruthy();
+    expect(byLabel(card, 'Delete job card WO #1042')).toBeTruthy();
+    // The thumbnail opens the drawing.
+    await press(byLabel(card, 'Open drawing for WO #1042'));
+    expect(h.currentRoute()).toBe('JobCards');
+    await press(card);
+    expect(hasTestId(h.root, 'job-card-details-screen')).toBe(true);
+  });
+
+  test('phone details: tabs, Dispatch in the header, sticky operation bar', async () => {
+    mockWidth = 390;
+    const h = await renderAdmin('JobCards');
+    await h.navigate('JobCardDetails', { jobCardId: '1042' });
+    const screen = byTestId(h.root, 'job-card-details-screen');
+    // Swipeable tabs, Machining first.
+    expect(h.currentRoute()).toBe('machining');
+    expect(hasTestId(screen, 'job-card-tab-qc')).toBe(true);
+    expect(hasTestId(screen, 'job-card-tab-order')).toBe(true);
+    // The bottom bar, not the tab, holds two buttons: Pause while a step
+    // runs (Start otherwise), and Complete.
+    const bar = () => byTestId(screen, 'job-card-operation-bar');
+    expect(allText(bar())).toBe('Pause|Complete');
+    const machining = byTestId(screen, 'job-card-tab-page-machining');
+    expect(hasTestId(machining, 'pause-operation')).toBe(false);
+    await press(byTestId(bar(), 'pause-operation'));
+    expect(
+      h.store
+        .getState()
+        .jobCards.entities['1042'].operations.some(o => o.status === 'paused'),
+    ).toBe(true);
+    expect(allText(bar())).toBe('Start|Complete');
+    // Generate Dispatch is the header's only action.
+    const dispatch = screen.findAll(
+      n => typeof n.type === 'string' && n.props.testID === 'generate-dispatch',
+    );
+    expect(dispatch).toHaveLength(1);
+    expect(dispatch[0].props.accessibilityLabel).toBe('Generate Dispatch');
+    await press(byTestId(h.root, 'job-card-tab-qc'));
+    expect(h.currentRoute()).toBe('qc');
   });
 });
 
@@ -738,7 +792,10 @@ describe('Job card details', () => {
       quoteId: null,
       status: 'new',
       quantity: 200,
+      // The order's PO amount, fixed on the invoice.
+      poAmount: h.store.getState().orders.entities['1042'].poAmount,
     });
+    expect(billed()?.poAmount).not.toBeNull();
     expect(billed()?.lineItems.length).toBeGreaterThan(0);
     // No quote is attached to the order.
     expect(
@@ -883,6 +940,19 @@ describe('Back returns to where the job card was opened from', () => {
     await press(byTestId(h.root, 'job-card-tab-order'));
     await press(byLabel(h.root, 'Open order WO #1042'));
     expect(h.currentRoute()).toBe('OrderDetails');
+    // Slid in on the Job Cards stack: no jump to Orders.
+    const stack = () =>
+      h
+        .navState()
+        .routes.find(r => r.name === 'JobCards')
+        ?.state?.routes.map(r => r.name);
+    expect(stack()).toEqual(['JobCardsList', 'JobCardDetails', 'OrderDetails']);
+    // Its job card link steps back rather than stacking another copy.
+    await press(byTestId(h.root, 'order-tab-jobCard'));
+    await press(byTestId(h.root, 'order-job-card-1042'));
+    expect(stack()).toEqual(['JobCardsList', 'JobCardDetails']);
+    await press(byTestId(h.root, 'job-card-tab-order'));
+    await press(byLabel(h.root, 'Open order WO #1042'));
     const orderBack = byTestId(h.root, 'order-details-back');
     expect(allText(orderBack)).toBe('Back to job card');
     await press(orderBack);
@@ -1034,12 +1104,46 @@ describe('Create / Edit flow, in place on the job card', () => {
     expect(hasTestId(scroll(), 'flow-step-7')).toBe(true);
   });
 
-  test('phone: Save stays at the top of the editor', async () => {
+  test('phone: + on the list slides up the flow sheet right there', async () => {
     mockWidth = 390;
-    const { screen } = await openEditor('1042');
-    expect(allText(byTestId(screen(), 'job-card-machining'))).toMatch(
-      /^Edit flow\|Cancel\|Save changes\|/,
+    const h = await renderAdmin('JobCards');
+    expect(hasTestId(h.root, 'flow-sheet')).toBe(false);
+    await press(byLabel(h.root, 'Create flow for WO #1036'));
+    // Still on the list: only the flow editor, under the job card in small.
+    expect(h.currentRoute()).toBe('JobCards');
+    const sheet = () => byTestId(h.root, 'flow-sheet');
+    expect(allText(sheet())).toMatch(/^Create flow\|WO #1036\|/);
+    expect(allText(byTestId(sheet(), 'flow-sheet-job-card'))).toBe(
+      '#JOB7|Coupling — Job G|WO #1036|Medium',
     );
+    expect(hasTestId(sheet(), 'route-card')).toBe(false);
+    // Every step needs an operation; then Create saves and closes it.
+    await press(byLabel(sheet(), 'Remove step 3'));
+    await press(byLabel(sheet(), 'Remove step 2'));
+    await choose(h.root, 'flow-step-1-operation', 'Cutting');
+    await press(byTestId(sheet(), 'flow-submit'));
+    expect(
+      h.store.getState().jobCards.entities['1036'].operations.map(o => o.name),
+    ).toEqual(['Cutting']);
+    expect(hasTestId(h.root, 'flow-sheet')).toBe(false);
+  });
+
+  test('phone: Edit flow on the job card opens the same sheet', async () => {
+    mockWidth = 390;
+    const { h, screen } = await openEditor('1042');
+    // The page stays as it is; the editor is in the sheet over it.
+    expect(allText(byTestId(screen(), 'job-card-machining'))).toMatch(
+      /^Route card & progress/,
+    );
+    const sheet = byTestId(h.root, 'flow-sheet');
+    expect(allText(sheet)).toMatch(/^Edit flow\|WO #1042\|/);
+    // Cancel closes it without saving.
+    const cancel = sheet.findAll(
+      n =>
+        typeof n.type === 'string' && n.props.accessibilityLabel === 'Cancel',
+    );
+    await press(cancel[cancel.length - 1]);
+    expect(hasTestId(h.root, 'flow-sheet')).toBe(false);
   });
 });
 

@@ -8,24 +8,30 @@ import {
 } from 'react';
 import { Pressable, View, type ScrollViewInstance } from 'react-native';
 import { StackActions } from '@react-navigation/native';
+import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import {
   AdminScreen,
+  AdminScreenBackground,
   KeyboardScrollView,
   AsyncContent,
   DetailHeader,
   ComingSoon,
+  N1BottomBar,
   N1Button,
   N1ConfirmDialog,
   N1Card,
   N1DetailGrid,
   N1Divider,
   N1Icon,
+  N1IconButton,
   N1KeyValueList,
   N1Tabs,
   N1Text,
   createN1Styles,
   useN1Breakpoint,
   useN1Styles,
+  sectionTabLabel,
+  useSectionTabsOptions,
   type N1Tab,
 } from '../../../shared/components';
 import { useOnSettled, useToggle } from '../../../shared/hooks';
@@ -46,6 +52,7 @@ import {
   FlowEditor,
   useFlowEditor,
 } from '../components/FlowEditor';
+import { FlowEditorSheet } from '../components/FlowEditorSheet';
 import { JobCardStatusBadge, MetaBadge } from '../components/JobCardBadges';
 import { LinkedOrderCard } from '../components/LinkedOrderCard';
 import {
@@ -101,7 +108,13 @@ const TABS: N1Tab<Tab>[] = [
   { key: 'order', label: D.tabs.order, icon: 'file' },
 ];
 
+/** Phones: one swipeable page per tab, like Order and Customer details. */
+const JobCardTabs = createMaterialTopTabNavigator<Record<Tab, undefined>>();
+
 const makeStyles = createN1Styles(t => ({
+  // Phones: the job card above the swipeable tabs, on white.
+  compactRoot: { flex: 1, backgroundColor: t.colors.surface },
+  compactHero: { padding: t.spacing.lg },
   top: { gap: t.spacing.lg },
   backLink: {
     flexDirection: 'row',
@@ -278,6 +291,7 @@ export function JobCardDetailsScreen({
   navigation,
 }: JobCardsScreenProps<'JobCardDetails'>) {
   const styles = useN1Styles(makeStyles);
+  const sectionTabsOptions = useSectionTabsOptions();
   const { isCompact } = useN1Breakpoint();
   const { jobCardId } = route.params;
   const { jobCard, status, error, reload, update, saving, saveError } =
@@ -358,20 +372,35 @@ export function JobCardDetailsScreen({
     () => notifyUnavailable(ORDER_STRINGS.details.downloadAction),
     [],
   );
-  // Admin: the order opens in Orders, and its Back returns here. Shop-floor
-  // roles have no Orders screen, so the card is just shown.
-  const canOpenOrder = Boolean(
-    navigation.getParent()?.getState()?.routeNames.includes('Orders'),
-  );
-  const openOrder = useCallback(
-    () =>
+  // Admin: the order slides in on this stack (Job Cards, Orders, Customers)
+  // and its Back returns here; opened from that order already, it goes back
+  // to it. A stack without Order details (Dashboard, Users) opens it in
+  // Orders. Shop-floor roles have neither, so the card is just shown.
+  const stackHasOrder = navigation
+    .getState()
+    .routeNames.includes('OrderDetails');
+  const canOpenOrder =
+    stackHasOrder ||
+    Boolean(navigation.getParent()?.getState()?.routeNames.includes('Orders'));
+  const openOrder = useCallback(() => {
+    const state = navigation.getState();
+    const below = state.routes[state.index - 1];
+    const belowParams = below?.params as { orderId?: string } | undefined;
+    if (below?.name === 'OrderDetails' && belowParams?.orderId === jobCardId) {
+      navigation.goBack();
+    } else if (state.routeNames.includes('OrderDetails')) {
+      navigation.push('OrderDetails', {
+        orderId: jobCardId,
+        fromJobCardId: jobCardId,
+      });
+    } else {
       navigation.navigate('Orders', {
         screen: 'OrderDetails',
         params: { orderId: jobCardId, fromJobCardId: jobCardId },
         initial: false,
-      }),
-    [navigation, jobCardId],
-  );
+      });
+    }
+  }, [navigation, jobCardId]);
   // QC reports: pick a file for a check, or open one (web opens files picked
   // this session; the rest explain it isn't available yet).
   const [uploadingId, setUploadingId] = useState<string | null>(null);
@@ -423,8 +452,25 @@ export function JobCardDetailsScreen({
     </Pressable>
   );
 
-  // Phones: a header with back and the screen's name, in place of the link.
-  const header = <DetailHeader title={D.title} onBack={back.goBack} />;
+  // Phones: a header with back and the screen's name, in place of the link,
+  // and Generate Dispatch beside it.
+  const header = (
+    <DetailHeader
+      title={D.title}
+      onBack={back.goBack}
+      compactRight={
+        jobCard && (
+          <N1IconButton
+            icon="package"
+            variant="tile"
+            accessibilityLabel={D.dispatch}
+            onPress={openDispatch}
+            testID="generate-dispatch"
+          />
+        )
+      }
+    />
+  );
 
   if (!jobCard) {
     return (
@@ -466,6 +512,49 @@ export function JobCardDetailsScreen({
     </N1Text>
   );
 
+  // Start / Pause / Complete: small, above the route card on wide screens;
+  // on phones the sticky bottom bar shows large Start or Pause, and Complete.
+  const startButton = (
+    <N1Button
+      key="start"
+      title={isCompact ? D.startShort : D.start}
+      leftIcon="play"
+      size={isCompact ? 'lg' : 'sm'}
+      fullWidth={isCompact}
+      onPress={start}
+      disabled={saving || !canStart(jobCard)}
+      accessibilityLabel={D.start}
+      testID="start-operation"
+    />
+  );
+  const pauseButton = (
+    <N1Button
+      key="pause"
+      title={D.pause}
+      leftIcon="pause"
+      variant="secondary"
+      size={isCompact ? 'lg' : 'sm'}
+      fullWidth={isCompact}
+      onPress={pause}
+      disabled={saving || !running}
+      testID="pause-operation"
+    />
+  );
+  const completeButton = (
+    <N1Button
+      key="complete"
+      title={D.complete}
+      leftIcon="check-circle"
+      variant="secondary"
+      size={isCompact ? 'lg' : 'sm'}
+      fullWidth={isCompact}
+      onPress={openComplete}
+      disabled={saving || !canCompleteFlow(jobCard)}
+      testID="complete-operation"
+    />
+  );
+  const operationButtons = [startButton, pauseButton, completeButton];
+
   const top = (
     <View style={styles.top}>
       {!isCompact && backLink}
@@ -482,16 +571,21 @@ export function JobCardDetailsScreen({
           <PriorityBadge priority={jobCard.priority} suffix="priority" />
           <JobCardStatusBadge jobCard={jobCard} />
         </View>
-        <View style={styles.spacer} />
-        <View style={styles.actions}>
-          <N1Button
-            title={D.dispatch}
-            leftIcon="package"
-            size="sm"
-            onPress={openDispatch}
-            testID="generate-dispatch"
-          />
-        </View>
+        {/* Phones: Generate Dispatch is in the header. */}
+        {!isCompact && (
+          <>
+            <View style={styles.spacer} />
+            <View style={styles.actions}>
+              <N1Button
+                title={D.dispatch}
+                leftIcon="package"
+                size="sm"
+                onPress={openDispatch}
+                testID="generate-dispatch"
+              />
+            </View>
+          </>
+        )}
       </View>
     </View>
   );
@@ -544,96 +638,75 @@ export function JobCardDetailsScreen({
     </View>
   );
 
-  const machiningTab = editingFlow ? (
-    <InlineFlowEditor
-      jobCard={jobCard}
-      saving={saving}
-      saveError={saveError}
-      onCancel={closeFlow}
-      onSave={saveFlow}
-      sticky={!isCompact}
-    />
-  ) : (
-    // The whole tab scrolls as one: drawing, QR and facts, then the route card.
-    <View style={styles.machining}>
-      {overview}
-      <N1Divider />
-      <StickyHeadPane
-        sticky={false}
-        testID="job-card-machining"
-        head={
-          <View style={styles.sectionHead}>
-            {heading(D.routeCard)}
-            <N1Button
-              title={
-                hasFlow
-                  ? isCompact
-                    ? D.editFlowShort
-                    : D.editFlow
-                  : D.createFlow
-              }
-              leftIcon={hasFlow ? 'edit' : 'plus'}
-              variant="secondary"
-              size="sm"
-              onPress={openFlow}
-              testID="open-flow"
-            />
-          </View>
-        }
-      >
-        {hasFlow && (
-          <View style={styles.actions}>
-            <N1Button
-              title={D.start}
-              leftIcon="play"
-              size="sm"
-              onPress={start}
-              disabled={saving || !canStart(jobCard)}
-              testID="start-operation"
-            />
-            <N1Button
-              title={D.pause}
-              leftIcon="pause"
-              variant="secondary"
-              size="sm"
-              onPress={pause}
-              disabled={saving || !running}
-              testID="pause-operation"
-            />
-            <N1Button
-              title={D.complete}
-              leftIcon="check-circle"
-              variant="secondary"
-              size="sm"
-              onPress={openComplete}
-              disabled={saving || !canCompleteFlow(jobCard)}
-              testID="complete-operation"
-            />
-            {failedStep && (
+  // Phones: the flow editor slides up as a sheet over this page instead.
+  const machiningTab =
+    editingFlow && !isCompact ? (
+      <InlineFlowEditor
+        jobCard={jobCard}
+        saving={saving}
+        saveError={saveError}
+        onCancel={closeFlow}
+        onSave={saveFlow}
+        sticky={!isCompact}
+      />
+    ) : (
+      // The whole tab scrolls as one: drawing, QR and facts, then the route card.
+      <View style={styles.machining}>
+        {overview}
+        <N1Divider />
+        <StickyHeadPane
+          sticky={false}
+          testID="job-card-machining"
+          head={
+            <View style={styles.sectionHead}>
+              {heading(D.routeCard)}
               <N1Button
-                title={S.stages.redo(failedStep.name)}
-                leftIcon="refresh"
-                variant="danger"
+                title={
+                  hasFlow
+                    ? isCompact
+                      ? D.editFlowShort
+                      : D.editFlow
+                    : D.createFlow
+                }
+                leftIcon={hasFlow ? 'edit' : 'plus'}
+                variant="secondary"
                 size="sm"
-                onPress={redo}
-                disabled={saving}
-                testID="redo-operation"
+                onPress={openFlow}
+                testID="open-flow"
               />
-            )}
-          </View>
-        )}
-        {hasFlow && blocked && !failedStep && (
-          <N1Text variant="small" color="secondary" testID="start-blocked">
-            {blocked}
-          </N1Text>
-        )}
-        <RouteCard
-          operations={jobCard.operations}
-          progress={jobProgress(jobCard)}
-        />
-      </StickyHeadPane>
-    </View>
-  );
+            </View>
+          }
+        >
+          {/* Phones: Start, Pause and Complete sit in the sticky bottom
+              bar. */}
+          {hasFlow && (!isCompact || failedStep) && (
+            <View style={styles.actions}>
+              {!isCompact && operationButtons}
+              {failedStep && (
+                <N1Button
+                  title={S.stages.redo(failedStep.name)}
+                  leftIcon="refresh"
+                  variant="danger"
+                  size="sm"
+                  onPress={redo}
+                  disabled={saving}
+                  testID="redo-operation"
+                />
+              )}
+            </View>
+          )}
+          {hasFlow && blocked && !failedStep && (
+            <N1Text variant="small" color="secondary" testID="start-blocked">
+              {blocked}
+            </N1Text>
+          )}
+          <RouteCard
+            operations={jobCard.operations}
+            progress={jobProgress(jobCard)}
+          />
+        </StickyHeadPane>
+      </View>
+    );
 
   const rejection = materialRejection(jobCard);
   const qcTab = (
@@ -677,14 +750,19 @@ export function JobCardDetailsScreen({
     </>
   );
 
-  const content = { order: orderTab, machining: machiningTab, qc: qcTab }[tab];
+  const tabContent: Record<Tab, ReactNode> = {
+    order: orderTab,
+    machining: machiningTab,
+    qc: qcTab,
+  };
+  const content = tabContent[tab];
 
   const tabs = (
     <N1Tabs
       tabs={TABS}
       value={tab}
       onChange={setTab}
-      variant={isCompact ? 'segmented' : 'underline'}
+      variant="underline"
       testID="job-card-tab"
     />
   );
@@ -721,19 +799,60 @@ export function JobCardDetailsScreen({
     />
   );
 
-  // Phones: the page scrolls as one.
+  // Phones: like Order and Customer details. The header's back and
+  // Generate Dispatch, the job card on top, swipeable tabs over a white
+  // page, and Start / Pause / Complete pinned to the bottom. Create / Edit
+  // flow slides up over it.
   if (isCompact) {
     return (
-      <AdminScreen header={header} testID="job-card-details-screen">
-        <N1Card padding="lg" radius="sm" style={styles.card}>
-          {top}
-          {tabs}
-          <View style={styles.compactContent}>{content}</View>
-        </N1Card>
+      <AdminScreenBackground.Provider value="surface">
+        <View style={styles.compactRoot} testID="job-card-details-screen">
+          {header}
+          <View style={styles.compactHero}>{top}</View>
+          <JobCardTabs.Navigator
+            initialRouteName={tab}
+            screenOptions={sectionTabsOptions}
+            screenListeners={({ route: page }) => ({
+              focus: () => setTab(page.name),
+            })}
+          >
+            {TABS.map(({ key, label }) => (
+              <JobCardTabs.Screen
+                key={key}
+                name={key}
+                options={{
+                  title: label,
+                  tabBarAccessibilityLabel: label,
+                  tabBarButtonTestID: `job-card-tab-${key}`,
+                  tabBarLabel: sectionTabLabel(label),
+                }}
+              >
+                {() => (
+                  <AdminScreen testID={`job-card-tab-page-${key}`}>
+                    <View style={styles.compactContent}>{tabContent[key]}</View>
+                  </AdminScreen>
+                )}
+              </JobCardTabs.Screen>
+            ))}
+          </JobCardTabs.Navigator>
+          {/* Two buttons: Start (Pause while a step runs) and Complete. */}
+          {hasFlow && (
+            <N1BottomBar testID="job-card-operation-bar">
+              {running ? pauseButton : startButton}
+              {completeButton}
+            </N1BottomBar>
+          )}
+        </View>
+        <FlowEditorSheet
+          visible={editingFlow}
+          jobCard={jobCard}
+          drawingNumber={drawingNumber}
+          onClose={closeFlow}
+        />
         {dispatchModal}
         {completeDialog}
         {viewer}
-      </AdminScreen>
+      </AdminScreenBackground.Provider>
     );
   }
 

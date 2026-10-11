@@ -12,7 +12,6 @@ import {
   N1Table,
   N1Text,
   FilterMenu,
-  StatGrid,
   createN1Styles,
   useN1Breakpoint,
   useN1Styles,
@@ -33,11 +32,12 @@ import {
 import { ORDER_STRINGS } from '../../orders/constants';
 import { useOrders } from '../../orders/hooks/useOrders';
 import { FlowActionButton } from '../components/FlowActionButton';
+import { FlowEditorSheet } from '../components/FlowEditorSheet';
 import { JobCardStatusBadge } from '../components/JobCardBadges';
-import { JobCardCard } from '../components/JobCardCard';
+import { JobCardListCard } from '../components/JobCardListCard';
 import { JobProgress } from '../components/JobProgress';
 import { INITIAL_JOB_CARD_FILTERS, JOB_CARD_STRINGS as S } from '../constants';
-import { useJobCardStats, useJobCards } from '../hooks/useJobCards';
+import { useJobCards } from '../hooks/useJobCards';
 import type { JobCard, JobCardFilters, JobCardsNavigation } from '../types';
 import {
   currentOperation,
@@ -64,7 +64,6 @@ export function JobCardsListScreen() {
     useJobCards();
   const deletion = useConfirmDelete<JobCard>(remove, deletingId, deleteError);
   const requestDelete = deletion.request;
-  const stats = useJobCardStats();
 
   const { query, setQuery, filters, setFilter, filtered } = useListFilter(
     items,
@@ -121,28 +120,36 @@ export function JobCardsListScreen() {
     (c: JobCard) => navigation.navigate('JobCardDetails', { jobCardId: c.id }),
     [navigation],
   );
+  // Create / Edit flow: phones slide up the flow sheet right here; wide
+  // screens open the job card with its editor.
+  const [flowId, setFlowId] = useState<string | null>(null);
+  const closeFlow = useCallback(() => setFlowId(null), []);
   const openFlow = useCallback(
     (c: JobCard) =>
-      navigation.navigate('JobCardDetails', {
-        jobCardId: c.id,
-        editFlow: true,
-      }),
-    [navigation],
+      isCompact
+        ? setFlowId(c.id)
+        : navigation.navigate('JobCardDetails', {
+            jobCardId: c.id,
+            editFlow: true,
+          }),
+    [navigation, isCompact],
   );
+  const flowJobCard = items.find(c => c.id === flowId);
   // The diagram opens full size, numbered by its order's drawing number.
   const { items: orders } = useOrders();
   const [viewing, setViewing] = useState<ViewerTarget | null>(null);
   const closeViewer = useCallback(() => setViewing(null), []);
+  const drawingNumberOf = useCallback(
+    (c: JobCard) =>
+      orders.find(o => o.id === c.id)?.drawingNumber ||
+      c.designFile?.name ||
+      S.details.noDrawing,
+    [orders],
+  );
   const openDrawing = useCallback(
     (c: JobCard) =>
-      setViewing({
-        type: 'drawing',
-        drawingNumber:
-          orders.find(o => o.id === c.id)?.drawingNumber ||
-          c.designFile?.name ||
-          S.details.noDrawing,
-      }),
-    [orders],
+      setViewing({ type: 'drawing', drawingNumber: drawingNumberOf(c) }),
+    [drawingNumberOf],
   );
 
   const columns = useMemo<N1TableColumn<JobCard>[]>(
@@ -232,19 +239,18 @@ export function JobCardsListScreen() {
     [styles, openFlow, requestDelete, openDrawing],
   );
 
+  // Clicking a card opens the job card; the thumbnail opens its drawing.
   const renderCompactItem = useCallback(
     (c: JobCard) => (
-      <JobCardCard jobCard={c} onView={openDetails} onFlow={openFlow} />
+      <JobCardListCard
+        jobCard={c}
+        drawingNumber={drawingNumberOf(c)}
+        onOpenDrawing={openDrawing}
+        onFlow={openFlow}
+        onDelete={requestDelete}
+      />
     ),
-    [openDetails, openFlow],
-  );
-
-  const statItems = useMemo(
-    () => [
-      { key: 'active', label: S.stats.active, value: stats.active },
-      { key: 'completed', label: S.stats.completed, value: stats.completed },
-    ],
-    [stats],
+    [drawingNumberOf, openDrawing, openFlow, requestDelete],
   );
 
   const firstLoad =
@@ -293,9 +299,6 @@ export function JobCardsListScreen() {
       fixed
     >
       {/* Wide screens: the title lives in the table's toolbar. */}
-      {isCompact && (
-        <StatGrid items={statItems} variant="muted" testID="job-card-stats" />
-      )}
       {/* The table shows its own loading state; AsyncContent only takes over
           when the first load fails. */}
       <AsyncContent
@@ -348,6 +351,12 @@ export function JobCardsListScreen() {
         onConfirm={deletion.confirm}
         onCancel={deletion.cancel}
         testID="delete-job-card-dialog"
+      />
+      <FlowEditorSheet
+        visible={flowJobCard !== undefined}
+        jobCard={flowJobCard}
+        drawingNumber={flowJobCard ? drawingNumberOf(flowJobCard) : ''}
+        onClose={closeFlow}
       />
       <DocumentViewer
         target={viewing}

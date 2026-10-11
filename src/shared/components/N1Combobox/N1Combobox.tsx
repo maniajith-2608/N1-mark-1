@@ -1,7 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { createN1Styles, useN1Styles } from '../../../theme/N1ThemeProvider';
+import { COMMON_STRINGS } from '../../constants';
+import { useN1Breakpoint } from '../../hooks/useN1Breakpoint';
+import { N1BottomSheet } from '../N1BottomSheet/N1BottomSheet';
 import type { N1DropDownOption } from '../N1DropDown/N1DropDown';
+import { N1FieldHelper, N1FieldLabel } from '../N1FieldLabel/N1FieldLabel';
+import { N1Icon } from '../N1Icon/N1Icon';
 import { N1Text } from '../N1Text/N1Text';
 import { N1TextInput, type N1TextInputProps } from '../N1TextInput/N1TextInput';
 
@@ -43,7 +48,41 @@ const makeStyles = createN1Styles(t => ({
     borderRadius: t.radius.xs,
   },
   optionActive: { backgroundColor: t.colors.surfaceMuted },
+  // Phones: the field opens a sheet. Matches N1DropDown's field.
+  field: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: t.spacing.sm,
+    height: t.fieldHeight.compact,
+    paddingHorizontal: t.spacing.md,
+    borderRadius: t.radius.sm,
+    borderWidth: t.borderWidth.hairline,
+    borderColor: t.colors.border,
+    backgroundColor: t.colors.surface,
+  },
+  fieldError: { borderColor: t.colors.danger },
+  fieldValue: { flex: 1 },
+  sheetBody: { gap: t.spacing.md },
+  // Sheet rows: taller for thumbs, with a tick on the chosen one.
+  sheetOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: t.spacing.sm,
+    minHeight: t.controlHeight.lg,
+    paddingHorizontal: t.spacing.md,
+    borderRadius: t.radius.sm,
+  },
+  typedRow: { flexDirection: 'row', alignItems: 'center', gap: t.spacing.sm },
 }));
+
+/** Options whose label contains the text, ignoring case. */
+const filterOptions = (options: N1DropDownOption<string>[], text: string) => {
+  const query = text.trim().toLowerCase();
+  return query
+    ? options.filter(o => o.label.toLowerCase().includes(query))
+    : options;
+};
 
 /** Matches an option's label, ignoring case and outer spaces. */
 export const findOptionByLabel = (
@@ -58,9 +97,153 @@ export const findOptionByLabel = (
 
 /**
  * Text field that suggests matching options as you type. Pick one, or keep
- * typing a value that isn't in the list.
+ * typing a value that isn't in the list. On phones the field opens a bottom
+ * sheet with a search box instead.
  */
-export function N1Combobox({
+export function N1Combobox(props: N1ComboboxProps) {
+  const { isCompact } = useN1Breakpoint();
+  return isCompact ? (
+    <ComboboxSheet {...props} />
+  ) : (
+    <InlineCombobox {...props} />
+  );
+}
+
+/**
+ * Phones: the field shows the value; tapping it slides up a sheet with a
+ * search box over the options. Pick one, or "Use" the typed text when it
+ * matches none.
+ */
+function ComboboxSheet({
+  options,
+  value,
+  onChangeText,
+  onSelect,
+  label,
+  required,
+  placeholder,
+  leftIcon,
+  helperText,
+  errorText,
+  testID,
+}: N1ComboboxProps) {
+  const styles = useN1Styles(makeStyles);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const matches = useMemo(
+    () => filterOptions(options, query),
+    [options, query],
+  );
+  const typed = query.trim();
+  const exact = findOptionByLabel(options, typed);
+  const chosen = findOptionByLabel(options, value);
+
+  const show = () => {
+    setQuery('');
+    setOpen(true);
+  };
+  const choose = (option: N1DropDownOption<string>) => {
+    setOpen(false);
+    onSelect(option);
+  };
+  const keepTyped = () => {
+    setOpen(false);
+    onChangeText(typed);
+  };
+
+  return (
+    <View style={styles.root}>
+      {label && <N1FieldLabel label={label} required={required} />}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        aria-valuetext={value || placeholder}
+        aria-expanded={open}
+        onPress={show}
+        style={[styles.field, Boolean(errorText) && styles.fieldError]}
+        testID={testID}
+      >
+        {leftIcon && <N1Icon name={leftIcon} size="sm" color="textSecondary" />}
+        <N1Text
+          variant="small"
+          color={value ? 'primary' : 'tertiary'}
+          numberOfLines={1}
+          style={styles.fieldValue}
+        >
+          {value || placeholder}
+        </N1Text>
+        <N1Icon name="chevron-down" size="sm" />
+      </Pressable>
+      <N1FieldHelper helperText={helperText} errorText={errorText} />
+
+      <N1BottomSheet
+        open={open}
+        onClose={() => setOpen(false)}
+        title={label}
+        // Stays the same height as the results narrow.
+        fixedHeight
+        testID={testID && `${testID}-sheet`}
+      >
+        <View style={styles.sheetBody}>
+          <N1TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder={placeholder}
+            leftIcon="search"
+            autoFocus
+            autoCorrect={false}
+            autoComplete="off"
+            accessibilityLabel={placeholder ?? label}
+            testID={testID && `${testID}-search`}
+          />
+          <View accessibilityRole="list">
+            {typed !== '' && !exact && (
+              <Pressable
+                accessibilityRole="menuitem"
+                onPress={keepTyped}
+                style={({ pressed }) => [
+                  styles.sheetOption,
+                  pressed && styles.optionActive,
+                ]}
+                testID={testID && `${testID}-use-typed`}
+              >
+                <View style={styles.typedRow}>
+                  <N1Icon name="plus" size="sm" />
+                  <N1Text weight="semiBold">
+                    {COMMON_STRINGS.keepTyped(typed)}
+                  </N1Text>
+                </View>
+              </Pressable>
+            )}
+            {matches.map(option => {
+              const isSelected = option.value === chosen?.value;
+              return (
+                <Pressable
+                  key={option.value}
+                  accessibilityRole="menuitem"
+                  aria-selected={isSelected}
+                  onPress={() => choose(option)}
+                  style={({ pressed }) => [
+                    styles.sheetOption,
+                    (isSelected || pressed) && styles.optionActive,
+                  ]}
+                >
+                  <N1Text weight={isSelected ? 'semiBold' : 'regular'}>
+                    {option.label}
+                  </N1Text>
+                  {isSelected ? <N1Icon name="check" size="md" /> : null}
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      </N1BottomSheet>
+    </View>
+  );
+}
+
+/** Wide screens: type in the field; matches list right under it. */
+function InlineCombobox({
   options,
   value,
   onChangeText,
@@ -81,12 +264,10 @@ export function N1Combobox({
     [],
   );
 
-  const matches = useMemo(() => {
-    const query = value.trim().toLowerCase();
-    return query
-      ? options.filter(o => o.label.toLowerCase().includes(query))
-      : options;
-  }, [options, value]);
+  const matches = useMemo(
+    () => filterOptions(options, value),
+    [options, value],
+  );
 
   const focus = () => {
     if (blurTimer.current) {

@@ -1,3 +1,5 @@
+import type { BillingStackParamList } from '../billing/types';
+import type { CustomersStackParamList } from '../customers/types';
 import type { JobCardsStackParamList } from '../jobCards/types';
 import type { DrawerScreenProps } from '@react-navigation/drawer';
 import type { CompositeScreenProps } from '@react-navigation/native';
@@ -44,6 +46,8 @@ export type WorkOrder = {
   status: OrderStatus;
   dueDate: ISODateString;
   poNumber: string;
+  /** The customer's PO value; null until entered. Invoices bill against it. */
+  poAmount: number | null;
   routeCardNo: string;
   dcNo: string;
   dcDate: ISODateString;
@@ -83,6 +87,15 @@ export type OrdersStackParamList = {
   OrdersList: undefined;
   /** An order's job card; Back returns to the order or the list. */
   JobCardDetails: JobCardsStackParamList['JobCardDetails'];
+  /**
+   * An order's customer ("View customer"), pushed here so Back returns to
+   * the order. Same screen as in Customers.
+   */
+  CustomerDetails: CustomersStackParamList['CustomerDetails'];
+  /** A quote opened from that customer. Same screen as in Billing. */
+  QuoteDetails: BillingStackParamList['QuoteDetails'];
+  QuoteEdit: BillingStackParamList['QuoteEdit'];
+  QuoteOperations: BillingStackParamList['QuoteOperations'];
   OrderDetails: {
     orderId: string;
     /** Opened from this customer's details: Back returns there. */

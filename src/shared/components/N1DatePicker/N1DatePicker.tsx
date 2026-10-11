@@ -1,6 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import {
   Modal,
+  Platform,
   Pressable,
   View,
   useWindowDimensions,
@@ -12,6 +13,7 @@ import { createN1Styles, useN1Styles } from '../../../theme/N1ThemeProvider';
 import { N1FieldHelper, N1FieldLabel } from '../N1FieldLabel/N1FieldLabel';
 import { useN1Breakpoint } from '../../hooks/useN1Breakpoint';
 import { N1Text } from '../N1Text/N1Text';
+import { HAS_NATIVE_DATE_PICKER, NativeDatePicker } from './NativeDatePicker';
 
 export type N1DatePickerProps = {
   /** DD/MM/YYYY, or '' for no date. */
@@ -159,8 +161,9 @@ const makeStyles = createN1Styles(t => ({
 }));
 
 /**
- * Date field: shows DD/MM/YYYY and opens a month calendar under the field.
- * Today is ringed, the chosen day filled; Today / Clear sit underneath.
+ * Date field: shows DD/MM/YYYY. On the web it opens a month calendar under
+ * the field (today ringed, the chosen day filled; Today / Clear underneath);
+ * on iOS and Android, the platform's own date picker.
  */
 export function N1DatePicker({
   value,
@@ -191,7 +194,14 @@ export function N1DatePicker({
     [month.year, month.month],
   );
 
+  const native = HAS_NATIVE_DATE_PICKER && Platform.OS !== 'web';
+  const [nativeOpen, setNativeOpen] = useState(false);
+
   const show = () => {
+    if (native) {
+      setNativeOpen(true);
+      return;
+    }
     // Open on the chosen date's month, else this month.
     const start = selected ?? today;
     setMonth({ year: start.getFullYear(), month: start.getMonth() });
@@ -242,14 +252,14 @@ export function N1DatePicker({
         accessibilityRole="button"
         accessibilityLabel={label}
         aria-valuetext={value || placeholder}
-        aria-expanded={open}
+        aria-expanded={open || nativeOpen}
         aria-disabled={disabled}
         disabled={disabled}
         onPress={show}
         style={[
           styles.field,
           isCompact && styles.fieldCompact,
-          open && styles.fieldOpen,
+          (open || nativeOpen) && styles.fieldOpen,
           Boolean(errorText) && styles.fieldError,
         ]}
       >
@@ -264,6 +274,24 @@ export function N1DatePicker({
         </N1Text>
       </Pressable>
       <N1FieldHelper helperText={helperText} errorText={errorText} />
+
+      {native && (
+        <NativeDatePicker
+          open={nativeOpen}
+          initial={selected ?? today}
+          title={label}
+          onPick={d => {
+            onChange(toText(d));
+            setNativeOpen(false);
+          }}
+          onClear={() => {
+            onChange('');
+            setNativeOpen(false);
+          }}
+          onClose={() => setNativeOpen(false)}
+          testID={testID}
+        />
+      )}
 
       <Modal visible={open} transparent onRequestClose={close}>
         <Pressable

@@ -29,7 +29,6 @@ export const JOB_CARD_STRINGS = {
     progress: 'Progress',
     actions: 'Actions',
   },
-  stats: { active: 'Active jobs', completed: 'Completed' },
   workOrder: (id: string) => `WO #${id}`,
   /** The job card's status (jobCardStage): RM, each operation and its QC, dispatch. */
   stages: {
@@ -89,6 +88,8 @@ export const JOB_CARD_STRINGS = {
       materialQc: 'Material QC',
     },
     start: 'Start Operation',
+    /** Phones: the sticky bottom bar shares its width three ways. */
+    startShort: 'Start',
     pause: 'Pause',
     complete: 'Complete',
     completeFlow: {

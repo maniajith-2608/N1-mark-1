@@ -10,6 +10,7 @@ import {
   N1Button,
   N1DetailGrid,
   N1DropDown,
+  N1IconButton,
   N1Text,
   N1TextInput,
   createN1Styles,
@@ -30,6 +31,7 @@ import {
 import { BillingSection } from '../components/BillingSection';
 import { LineItemsEditor } from '../components/LineItemsEditor';
 import { LineItemsTable } from '../components/LineItemsTable';
+import { QuoteOverview } from '../components/QuoteOverview';
 import { TotalsSummary } from '../components/TotalsSummary';
 import { BILLING_STRINGS, QUOTE_STATUS_OPTIONS } from '../constants';
 import { useQuote } from '../hooks/useBilling';
@@ -55,7 +57,7 @@ const makeStyles = createN1Styles(t => ({
   fields: { gap: t.spacing.md },
   fieldRow: { flexDirection: 'row', gap: t.spacing.md },
   // Phones: Preview and PDF side by side.
-  compactActions: { flex: 1, flexDirection: 'row', gap: t.spacing.sm },
+  compactActions: { flexDirection: 'row', gap: t.spacing.sm },
   grow: { flex: 1 },
 }));
 
@@ -101,13 +103,28 @@ export function QuoteDetailsScreen({
     }
   }, [form, update, quoteId]);
   useOnSettled(saving, saveError, () => setEditing(false));
-  // Opened with edit (the Quotes list's Edit).
+  // Phones: Edit quote slides up as its own screen, and the operations
+  // open on theirs.
+  const openEdit = useCallback(
+    () => navigation.navigate('QuoteEdit', { quoteId }),
+    [navigation, quoteId],
+  );
+  const openOperations = useCallback(
+    () => navigation.navigate('QuoteOperations', { quoteId }),
+    [navigation, quoteId],
+  );
+  // Opened with edit (the Quotes list's Edit): phones slide up Edit quote
+  // over it.
   useEffect(() => {
     if (editRequested && quote) {
-      startEdit();
       navigation.setParams({ edit: undefined });
+      if (isCompact) {
+        openEdit();
+      } else {
+        startEdit();
+      }
     }
-  }, [editRequested, quote, startEdit, navigation]);
+  }, [editRequested, quote, startEdit, openEdit, isCompact, navigation]);
 
   // Back to the customer the quote was opened from, else the Quotes list.
   const goBack = useCallback(() => {
@@ -186,27 +203,95 @@ export function QuoteDetailsScreen({
     );
   }
 
+  const previewModal = (
+    <InvoicePreviewModal
+      doc={preview}
+      onClose={closePreview}
+      onPrint={print}
+      onDownload={downloadPdf}
+    />
+  );
+
+  // Phones: the quote at a glance in small cards, like the invoice. The
+  // header's Edit slides up Edit quote; Preview and Download PDF are pinned
+  // to the bottom.
+  if (isCompact) {
+    return (
+      <>
+        <AdminScreen
+          header={
+            <DetailHeader
+              title={Q.title}
+              onBack={goBack}
+              compactRight={
+                <N1IconButton
+                  icon="edit"
+                  variant="tile"
+                  accessibilityLabel={COMMON_STRINGS.edit}
+                  onPress={openEdit}
+                  testID="edit-quote"
+                />
+              }
+            />
+          }
+          compactFooter={
+            <View style={styles.compactActions}>
+              <View style={styles.grow}>
+                <N1Button
+                  title={Q.preview}
+                  leftIcon="eye"
+                  variant="soft"
+                  fullWidth
+                  onPress={() =>
+                    setPreview(quoteDocument(quote, totals, organization))
+                  }
+                  testID="preview-quote"
+                />
+              </View>
+              <View style={styles.grow}>
+                <N1Button
+                  title={Q.downloadPdf}
+                  leftIcon="download"
+                  variant="soft"
+                  fullWidth
+                  onPress={downloadPdf}
+                />
+              </View>
+            </View>
+          }
+          testID="quote-details-screen"
+        >
+          <QuoteOverview
+            quote={quote}
+            totals={totals}
+            onOpenOrder={() => toOrder.convert(quote)}
+            onOpenOperations={openOperations}
+          />
+        </AdminScreen>
+        {previewModal}
+      </>
+    );
+  }
+
   const previewButton = (
     <N1Button
-      title={isCompact ? Q.previewShort : Q.preview}
+      title={Q.preview}
       leftIcon="eye"
       variant="secondary"
       onPress={() =>
         totals && setPreview(quoteDocument(quote, totals, organization))
       }
-      fullWidth={!isCompact}
-      style={isCompact && styles.grow}
+      fullWidth
       testID="preview-quote"
     />
   );
   const pdfButton = (
     <N1Button
-      title={isCompact ? Q.pdfShort : Q.downloadPdf}
+      title={Q.downloadPdf}
       leftIcon="download"
       variant="secondary"
       onPress={downloadPdf}
-      fullWidth={!isCompact}
-      style={isCompact && styles.grow}
+      fullWidth
     />
   );
   const saveFooter = (
@@ -215,12 +300,12 @@ export function QuoteDetailsScreen({
       submitLabel={COMMON_STRINGS.save}
       onSubmit={save}
       loading={saving}
-      compact={!isCompact}
+      compact
       submitTestID="save-quote"
     />
   );
   const headerRight = editing ? (
-    !isCompact && saveFooter
+    saveFooter
   ) : (
     <N1Button
       title={COMMON_STRINGS.edit}
@@ -266,7 +351,7 @@ export function QuoteDetailsScreen({
     </FormRow>
   ) : (
     <N1DetailGrid
-      columns={isCompact ? 2 : quote.orderId ? 4 : 3}
+      columns={quote.orderId ? 4 : 3}
       items={[
         { label: Q.customer, value: quote.customerName },
         { label: Q.partName, value: quote.partName },
@@ -304,13 +389,13 @@ export function QuoteDetailsScreen({
         <LineItemsEditor
           controller={form.lines}
           quantity={quantity}
-          scrollable={!isCompact}
+          scrollable
         />
       ) : (
         <LineItemsTable
           items={quote.lineItems}
           quantity={quote.quantity}
-          scrollable={!isCompact}
+          scrollable
         />
       )}
       {editing && form.linesError && (
@@ -357,12 +442,10 @@ export function QuoteDetailsScreen({
           )}
         </View>
       ) : (
-        !isCompact && (
-          <View style={styles.asideActions}>
-            {previewButton}
-            {pdfButton}
-          </View>
-        )
+        <View style={styles.asideActions}>
+          {previewButton}
+          {pdfButton}
+        </View>
       )}
     </>
   );
@@ -372,7 +455,7 @@ export function QuoteDetailsScreen({
       <BillingDetailLayout
         testID="quote-details-screen"
         header={header}
-        back={!isCompact && backLink}
+        back={backLink}
         title={Q.heading}
         badge={<QuoteStatusBadge status={quote.status} />}
         subtitle={quote.id}
@@ -380,23 +463,8 @@ export function QuoteDetailsScreen({
         summary={summary}
         operations={operations}
         amounts={amounts}
-        compactFooter={
-          editing ? (
-            saveFooter
-          ) : (
-            <View style={styles.compactActions}>
-              {previewButton}
-              {pdfButton}
-            </View>
-          )
-        }
       />
-      <InvoicePreviewModal
-        doc={preview}
-        onClose={closePreview}
-        onPrint={print}
-        onDownload={downloadPdf}
-      />
+      {previewModal}
     </>
   );
 }
