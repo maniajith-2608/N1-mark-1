@@ -96,6 +96,7 @@ export const CustomerRow = memo(function CustomerRowComponent({
       <View style={styles.divider} />
       <View style={styles.footer}>
         <RowActions
+          appearance="card"
           onEdit={() => onEdit(c)}
           onDelete={() => onDelete(c)}
           editLabel={S.a11y.edit(c.name)}

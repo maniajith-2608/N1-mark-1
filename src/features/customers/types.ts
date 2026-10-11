@@ -68,7 +68,8 @@ export type CustomerShare = {
 };
 
 /** Drawer items that open a customer; Back on the customer returns there. */
-export type CustomerDetailsOrigin = 'dashboard' | 'orders';
+/** 'order': pushed over an order (Back returns to it). */
+export type CustomerDetailsOrigin = 'dashboard' | 'orders' | 'order';
 
 // Stack nested inside the admin drawer's "Customers" item.
 export type CustomersStackParamList = {
@@ -86,6 +87,8 @@ export type CustomersStackParamList = {
   OrderForm: OrdersStackParamList['OrderForm'];
   JobCardDetails: JobCardsStackParamList['JobCardDetails'];
   QuoteDetails: BillingStackParamList['QuoteDetails'];
+  QuoteEdit: BillingStackParamList['QuoteEdit'];
+  QuoteOperations: BillingStackParamList['QuoteOperations'];
 };
 
 export type CustomersNavigation =

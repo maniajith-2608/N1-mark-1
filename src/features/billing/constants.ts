@@ -10,11 +10,14 @@ export const BILLING_STRINGS = {
   edit: 'Edit',
   a11y: {
     view: (id: string) => `View ${id}`,
+    download: (id: string) => `Download ${id}`,
     edit: (id: string) => `Edit ${id}`,
     delete: (id: string) => `Delete ${id}`,
   },
   invoices: {
     title: 'Invoices',
+    /** Phone cards: the main action. */
+    viewCard: 'View invoice',
     search: 'Search by invoice, customer or WO #',
     noun: 'invoices',
     /** Pagination bar: "Showing 10 of 13 invoices · 8 paid · 3 new · …". */
@@ -24,13 +27,6 @@ export const BILLING_STRINGS = {
       thisMonth: string,
     ) =>
       `${showing} · ${s.new} new · ${s.overdue} overdue · ${s.paid} paid · ${thisMonth} this month`,
-    stats: {
-      total: 'Total Invoices',
-      new: 'New',
-      overdue: 'Overdue',
-      paid: 'Paid',
-      month: 'This Month',
-    },
     columns: {
       invoice: 'Invoice',
       customer: 'Customer',
@@ -40,9 +36,10 @@ export const BILLING_STRINGS = {
       status: 'Status',
       actions: 'Actions',
     },
-    clientReference: 'Client reference',
   },
   quotes: {
+    /** Phone cards: the main action and the date. */
+    viewCard: 'View quote',
     create: 'Create Quote',
     createA11y: 'Create quote',
     title: 'Quotes',
@@ -51,11 +48,6 @@ export const BILLING_STRINGS = {
     /** Pagination bar: "Showing 8 of 8 quotes · 1 draft · 7 sent". */
     summary: (showing: string, s: { draft: number; sent: number }) =>
       `${showing} · ${s.draft} draft · ${s.sent} sent`,
-    stats: {
-      total: 'Total Quotes',
-      draft: 'Draft',
-      sent: 'Sent',
-    },
     columns: {
       id: 'Quote ID',
       customer: 'Customer',
@@ -103,18 +95,37 @@ export const BILLING_STRINGS = {
     amount: 'Amount details',
     discount: 'Discount',
     poAmount: 'PO amount',
-    poAmountPlaceholder: 'Enter PO amount',
     notes: 'Notes',
     send: 'Send Invoice',
-    sendShort: 'Send',
     sendAction: 'Sending invoices',
     preview: 'Preview Invoice',
-    previewShort: 'Preview',
     downloadPdf: 'Download PDF',
-    pdfShort: 'PDF',
     downloadAction: 'Downloading PDFs',
     markPaid: 'Mark as Paid',
     notFound: 'This invoice no longer exists.',
+    /** Phones: the invoice at a glance. */
+    billedTo: 'Billed to',
+    jobDetails: 'Job details',
+    operationsSummary: (count: number, amount: string) =>
+      `${count} ${count === 1 ? 'operation' : 'operations'} · ${amount}`,
+    openOperations: 'Open process operations',
+    editTitle: 'Edit invoice',
+    editOperations: 'Edit process operations',
+    /** Phones: the operations as a bill, edited one at a time. */
+    doneEditing: 'Done',
+    editOperation: 'Edit operation',
+    editOperationOf: (name: string) => `Edit ${name}`,
+    addOperation: 'Add operation',
+    saveOperation: 'Save operation',
+    deleteOperationOf: (name: string) => `Delete ${name}`,
+    deleteOperationTitle: 'Delete operation?',
+    deleteOperationMessage: (name: string, doc: string) =>
+      `${name} will be removed from this ${doc}.`,
+    docLabel: 'invoice',
+    operationRequired: 'Enter the operation name',
+    subtotal: (count: number) =>
+      `Subtotal · ${count} ${count === 1 ? 'operation' : 'operations'}`,
+    subtotalNote: 'Before discount and GST',
   },
   quote: {
     title: 'Quote Detail',
@@ -127,9 +138,7 @@ export const BILLING_STRINGS = {
     order: 'Order',
     orderValue: (orderId: string) => `WO #${orderId}`,
     preview: 'Preview Quote',
-    previewShort: 'Preview',
     downloadPdf: 'Download PDF',
-    pdfShort: 'PDF',
     customer: 'Customer',
     customerPlaceholder: 'Enter customer name',
     partName: 'Part name',
@@ -137,6 +146,13 @@ export const BILLING_STRINGS = {
     quantity: 'Quantity',
     quantityPlaceholder: 'Enter quantity',
     notFound: 'This quote no longer exists.',
+    /** Phones: the quote at a glance, and Edit quote. */
+    docLabel: 'quote',
+    partDetails: 'Part details',
+    editTitle: 'Edit quote',
+    details: 'Quote details',
+    amount: 'Amount details',
+    openOperations: 'Open process operations',
   },
   lineItems: {
     title: 'Process operations',

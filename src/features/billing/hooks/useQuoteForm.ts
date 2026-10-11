@@ -74,24 +74,34 @@ export function useQuoteForm(quote: Quote | undefined) {
     setLinesError(undefined);
   }, [quote, resetValues, resetLines]);
 
-  /** The changes to save, or null (with the errors shown) when invalid. */
-  const validate = useCallback((): QuoteChanges | null => {
-    const valid = validateValues();
-    const noLines = lines.items.length === 0;
-    setLinesError(noLines ? BILLING_STRINGS.lineItems.needsOne : undefined);
-    if (!valid || noLines) {
-      return null;
-    }
-    return {
-      customerName: values.customerName.trim(),
-      partName: values.partName.trim(),
-      quantity: toNumber(values.quantity),
-      material: values.material.trim(),
-      status: values.status,
-      lineItems: lines.items,
-      gstRate,
-    };
-  }, [validateValues, values, lines.items, gstRate]);
+  /**
+   * The changes to save, or null (with the errors shown) when invalid.
+   * `withLines: false` (phones' Edit quote) leaves the operations out:
+   * they're edited from their own screen.
+   */
+  const validate = useCallback(
+    ({ withLines = true }: { withLines?: boolean } = {}):
+      | QuoteChanges
+      | Omit<QuoteChanges, 'lineItems'>
+      | null => {
+      const valid = validateValues();
+      const noLines = withLines && lines.items.length === 0;
+      setLinesError(noLines ? BILLING_STRINGS.lineItems.needsOne : undefined);
+      if (!valid || noLines) {
+        return null;
+      }
+      const changes = {
+        customerName: values.customerName.trim(),
+        partName: values.partName.trim(),
+        quantity: toNumber(values.quantity),
+        material: values.material.trim(),
+        status: values.status,
+        gstRate,
+      };
+      return withLines ? { ...changes, lineItems: lines.items } : changes;
+    },
+    [validateValues, values, lines.items, gstRate],
+  );
 
   return {
     values,

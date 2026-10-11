@@ -3,6 +3,7 @@ import { Pressable, View } from 'react-native';
 import {
   KeyboardScrollView,
   AdminScreen,
+  AdminScreenBackground,
   AsyncContent,
   DetailHeader,
   ComingSoon,
@@ -10,6 +11,7 @@ import {
   N1Card,
   N1Divider,
   N1Icon,
+  N1IconButton,
   N1Text,
   createN1Styles,
   useN1Breakpoint,
@@ -20,6 +22,7 @@ import { CurrentWork } from '../components/CurrentWork';
 import { MachineStatusBadge } from '../components/MachineBadge';
 import { MachineFields } from '../components/MachineFields';
 import {
+  MachineFormModal,
   makeMachineValidator,
   toMachineValues,
   trimMachine,
@@ -58,7 +61,8 @@ const makeStyles = createN1Styles(t => ({
 
 /**
  * One machine: what it's working on, then its details — locked fields that
- * Edit unlocks in place (no dialog).
+ * Edit unlocks in place on wide screens. Phones show it on a white page and
+ * the header's Edit slides up the same Edit machine sheet as the list.
  */
 export function MachineDetailsScreen({
   route,
@@ -71,6 +75,9 @@ export function MachineDetailsScreen({
   const [editing, setEditing] = useState(false);
   const startEdit = useCallback(() => setEditing(true), []);
   const stopEdit = useCallback(() => setEditing(false), []);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const openEditor = useCallback(() => setEditorOpen(true), []);
+  const closeEditor = useCallback(() => setEditorOpen(false), []);
   const goBack = useCallback(
     () => navigation.popTo('MachinesList'),
     [navigation],
@@ -117,7 +124,24 @@ export function MachineDetailsScreen({
   );
 
   // Phones: a header with back and the screen's name, in place of the link.
-  const header = <DetailHeader title={D.title} onBack={goBack} />;
+  const header = (
+    <DetailHeader
+      title={D.title}
+      onBack={goBack}
+      // Phones: Edit sits in the header, beside the screen's name.
+      compactRight={
+        machine && (
+          <N1IconButton
+            icon="edit"
+            variant="tile"
+            accessibilityLabel={MACHINE_STRINGS.a11y.edit(machine.name)}
+            onPress={openEditor}
+            testID="edit-machine"
+          />
+        )
+      }
+    />
+  );
 
   if (!machine) {
     return (
@@ -161,9 +185,11 @@ export function MachineDetailsScreen({
       <View style={styles.section} testID="machine-details-form">
         <EditableSectionHeader
           title={D.section}
-          editing={editing}
+          editing={!isCompact && editing}
           saving={saving}
           onEdit={startEdit}
+          // Phones: Edit is in the header instead.
+          actionsInFooter={isCompact}
           onCancel={stopEdit}
           onSave={form.submit(save)}
           editLabel={MACHINE_STRINGS.a11y.edit(machine.name)}
@@ -174,7 +200,7 @@ export function MachineDetailsScreen({
           values={values}
           errors={errors}
           bind={bind}
-          locked={!editing}
+          locked={isCompact || !editing}
         />
         {editing && saveError && (
           <N1Text variant="small" color="danger">
@@ -185,14 +211,22 @@ export function MachineDetailsScreen({
     </View>
   );
 
+  // Phones: straight on a white page, like Employee and Customer details.
   if (isCompact) {
     return (
-      <AdminScreen header={header} testID="machine-details-screen">
-        <N1Card radius="sm" style={styles.card}>
-          {heading}
-          {content}
-        </N1Card>
-      </AdminScreen>
+      <AdminScreenBackground.Provider value="surface">
+        <AdminScreen header={header} testID="machine-details-screen">
+          <View style={styles.card}>
+            {heading}
+            {content}
+          </View>
+        </AdminScreen>
+        <MachineFormModal
+          visible={editorOpen}
+          machine={machine}
+          onClose={closeEditor}
+        />
+      </AdminScreenBackground.Provider>
     );
   }
 

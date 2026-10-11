@@ -19,7 +19,6 @@ import {
   AsyncContent,
   FilterMenu,
   ListToolbar,
-  StatGrid,
   type FilterValues,
 } from '../../../shared/components';
 import { COMMON_STRINGS } from '../../../shared/constants';
@@ -33,7 +32,7 @@ import {
   ORDER_STRINGS as S,
   PRIORITY_OPTIONS,
 } from '../constants';
-import { useOrderStats, useOrders } from '../hooks/useOrders';
+import { useOrders } from '../hooks/useOrders';
 import type { OrderFilters, WorkOrder } from '../types';
 import {
   INITIAL_ORDER_FILTERS,
@@ -107,8 +106,6 @@ const COLUMNS: N1TableColumn<WorkOrder>[] = [
 /** Below this the columns get cramped, so the table scrolls sideways. */
 const TABLE_MIN_WIDTH = 1100;
 
-const renderCompactItem = (o: WorkOrder) => <OrderCard order={o} />;
-
 type Navigation = OrdersScreenProps<'OrdersList'>['navigation'];
 
 export function OrdersListScreen() {
@@ -117,7 +114,6 @@ export function OrdersListScreen() {
   const jobCards = useJobCards();
   const { isCompact } = useN1Breakpoint();
   const { items, status, error, reload } = useOrders();
-  const stats = useOrderStats();
 
   const { query, setQuery, filters, setFilter, filtered } = useListFilter(
     items,
@@ -174,9 +170,23 @@ export function OrdersListScreen() {
       }),
     [navigation],
   );
-  const jobCardFor = useCallback(
-    (o: WorkOrder) => jobCards.items.find(c => c.id === o.id),
-    [jobCards.items],
+  // Only orders that have a job card get the clipboard: Open, or Create
+  // when it has no route yet.
+  const jobCardAction = useCallback(
+    (o: WorkOrder) => {
+      const card = jobCards.items.find(c => c.id === o.id);
+      if (!card) {
+        return undefined;
+      }
+      const createFlow = !card.operations.length;
+      return {
+        label: createFlow
+          ? S.a11y.createJobCard(o.id)
+          : S.a11y.openJobCard(o.id),
+        onPress: () => openJobCard(o.id, createFlow),
+      };
+    },
+    [jobCards.items, openJobCard],
   );
 
   const columns = useMemo<N1TableColumn<WorkOrder>[]>(
@@ -189,20 +199,15 @@ export function OrdersListScreen() {
         align: 'right',
         interactive: true,
         render: o => {
-          const card = jobCardFor(o);
+          const jobCard = jobCardAction(o);
           return (
             <View style={styles.actions}>
-              {/* Only orders that have a job card show the clipboard. */}
-              {card && (
+              {jobCard && (
                 <N1IconButton
                   icon="clipboard"
                   size="sm"
-                  accessibilityLabel={
-                    card.operations.length
-                      ? S.a11y.openJobCard(o.id)
-                      : S.a11y.createJobCard(o.id)
-                  }
-                  onPress={() => openJobCard(o.id, !card.operations.length)}
+                  accessibilityLabel={jobCard.label}
+                  onPress={jobCard.onPress}
                   testID={`job-card-${o.id}`}
                 />
               )}
@@ -219,15 +224,16 @@ export function OrdersListScreen() {
         },
       },
     ],
-    [styles, jobCardFor, openJobCard, openEdit],
+    [styles, jobCardAction, openEdit],
   );
 
-  const statItems = useMemo(
-    () => [
-      { key: 'open', label: S.stats.open, value: stats.open },
-      { key: 'high', label: S.stats.high, value: stats.highPriority },
-    ],
-    [stats],
+  // Clicking a card opens the order; the clipboard and pencil open the job
+  // card and Edit order.
+  const renderCompactItem = useCallback(
+    (o: WorkOrder) => (
+      <OrderCard order={o} onEdit={openEdit} jobCard={jobCardAction(o)} />
+    ),
+    [openEdit, jobCardAction],
   );
 
   const createButton = (
@@ -302,7 +308,6 @@ export function OrdersListScreen() {
       fixed
     >
       {/* Wide screens: the title and Create live in the table's toolbar. */}
-      {isCompact && <StatGrid items={statItems} variant="muted" />}
       {/* The table shows its own loading state; AsyncContent only takes over
           when the first load fails. */}
       <AsyncContent

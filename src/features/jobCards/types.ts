@@ -5,7 +5,13 @@ import type {
   NativeStackScreenProps,
 } from '@react-navigation/native-stack';
 import type { AdminDrawerParamList } from '../dashboard/types';
-import type { MaterialSource, OrderPriority } from '../orders/types';
+import type { BillingStackParamList } from '../billing/types';
+import type { CustomersStackParamList } from '../customers/types';
+import type {
+  MaterialSource,
+  OrderPriority,
+  OrdersStackParamList,
+} from '../orders/types';
 import type { Attachment, ISODateString } from '../../shared/types';
 
 export type JobCardStatus =
@@ -117,6 +123,17 @@ export type JobCardsStackParamList = {
     /** Opens with Create / Edit flow already open on the Machining tab. */
     editFlow?: boolean;
   } & JobCardOriginParams;
+  /**
+   * A job card's work order, pushed here so Back returns to the job card;
+   * with its Edit, customer and that customer's quotes. Same screens as in
+   * Orders.
+   */
+  OrderDetails: OrdersStackParamList['OrderDetails'];
+  OrderForm: OrdersStackParamList['OrderForm'];
+  CustomerDetails: CustomersStackParamList['CustomerDetails'];
+  QuoteDetails: BillingStackParamList['QuoteDetails'];
+  QuoteEdit: BillingStackParamList['QuoteEdit'];
+  QuoteOperations: BillingStackParamList['QuoteOperations'];
 };
 
 export type JobCardsNavigation =

@@ -18,6 +18,8 @@ import { N1Text, type N1TextColor } from '../N1Text/N1Text';
 export type N1ButtonVariant =
   | 'primary'
   | 'secondary'
+  /** Grey fill, no border: a card's main action (View invoice). */
+  | 'soft'
   | 'danger'
   | 'dangerOutline'
   | 'success'
@@ -48,6 +50,7 @@ export type N1ButtonProps = Omit<PressableProps, 'style' | 'children'> & {
 const textColor: Record<N1ButtonVariant, N1TextColor> = {
   primary: 'onPrimary',
   secondary: 'primary',
+  soft: 'primary',
   danger: 'onPrimary',
   dangerOutline: 'danger',
   success: 'onPrimary',
@@ -58,6 +61,7 @@ const textColor: Record<N1ButtonVariant, N1TextColor> = {
 const iconColor: Record<N1ButtonVariant, N1IconColor> = {
   primary: 'onPrimary',
   secondary: 'textPrimary',
+  soft: 'textPrimary',
   danger: 'onPrimary',
   dangerOutline: 'danger',
   success: 'onPrimary',
@@ -84,6 +88,7 @@ const makeStyles = createN1Styles(t => ({
     backgroundColor: t.colors.surface,
     borderColor: t.colors.border,
   },
+  soft: { backgroundColor: t.colors.surfaceMuted },
   danger: { backgroundColor: t.colors.danger },
   dangerOutline: {
     backgroundColor: t.colors.surface,

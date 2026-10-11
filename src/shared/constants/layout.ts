@@ -35,6 +35,9 @@ export const DRAWING_PREVIEW_HEIGHT = 150;
 /** Small drawing thumbnail beside its number and QR (5:3, like the drawing). */
 export const DRAWING_THUMB = { width: 260, height: 156 } as const;
 
+/** Phone list cards: the drawing as a small 5:3 thumbnail beside the title. */
+export const DRAWING_CARD_THUMB = { width: 96, height: 58 } as const;
+
 /**
  * The order's QR code beside its drawing: 4px per module for a 21-module
  * code plus its quiet zone, so edges stay crisp.

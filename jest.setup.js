@@ -77,3 +77,17 @@ jest.mock('react-native-vision-camera', () => {
 jest.mock('react-native-vision-camera-barcode-scanner', () => ({
   useBarcodeScannerOutput: options => options,
 }));
+
+// The native date picker: the mock renders a View carrying its props, so
+// tests can turn the wheels with `onValueChange(event, date)`.
+jest.mock('@react-native-community/datetimepicker', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  const DateTimePicker = props =>
+    React.createElement(View, { ...props, testID: props.testID });
+  return {
+    __esModule: true,
+    default: DateTimePicker,
+    DateTimePickerAndroid: { open: jest.fn(), dismiss: jest.fn() },
+  };
+});

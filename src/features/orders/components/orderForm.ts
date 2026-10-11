@@ -27,6 +27,8 @@ export type OrderFormValues = {
   customerName: string;
   customerEmail: string;
   poNumber: string;
+  /** Rupees, as typed; blank when not known yet. */
+  poAmount: string;
   quantity: string;
   description: string;
   priority: OrderPriority | '';
@@ -55,6 +57,7 @@ export const EMPTY_ORDER_FORM: OrderFormValues = {
   customerName: '',
   customerEmail: '',
   poNumber: '',
+  poAmount: '',
   quantity: '',
   description: '',
   priority: 'low',
@@ -95,6 +98,7 @@ export function orderToFormValues(order?: WorkOrder): OrderFormValues {
     customerName: order.customerName,
     customerEmail: order.customerEmail,
     poNumber: order.poNumber,
+    poAmount: order.poAmount == null ? '' : String(order.poAmount),
     quantity: order.quantity ? String(order.quantity) : '',
     description: order.description,
     priority: order.priority,
@@ -127,6 +131,7 @@ export const ORDER_FORM_STEPS: (keyof OrderFormValues)[][] = [
   ],
   [
     'poNumber',
+    'poAmount',
     'quantity',
     'partName',
     'partNumber',
@@ -181,6 +186,12 @@ export function validateOrderForm(
   ) {
     errors.quantity = COMMON_STRINGS.invalidNumber;
   }
+  if (
+    !isBlank(v.poAmount) &&
+    (!isNumeric(v.poAmount) || Number(v.poAmount) < 0)
+  ) {
+    errors.poAmount = COMMON_STRINGS.invalidNumber;
+  }
   if (!isBlank(v.deliveryDate) && !isDisplayDate(v.deliveryDate)) {
     errors.deliveryDate = ORDER_STRINGS.form.invalidDate;
   }
@@ -229,6 +240,8 @@ export function formValuesToOrderInput(
     priority: v.priority || DEFAULT_PRIORITY,
     dueDate: parseDisplayDate(v.deliveryDate) ?? '',
     poNumber: v.poNumber.trim(),
+    // Blank means not known yet.
+    poAmount: isNumeric(v.poAmount) ? Number(v.poAmount) : null,
     routeCardNo: v.routeCardNo.trim(),
     dcNo: v.dcNo.trim(),
     dcDate: parseDisplayDate(v.dcDate) ?? '',

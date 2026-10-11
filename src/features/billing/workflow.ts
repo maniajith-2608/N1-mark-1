@@ -24,6 +24,7 @@ export function orderFromQuote(
     priority: 'medium',
     dueDate: '',
     poNumber: '',
+    poAmount: null,
     routeCardNo: '',
     dcNo: '',
     dcDate: '',
@@ -75,7 +76,8 @@ export function invoiceForDispatch(
     discount: 0,
     gstRate: quote ? quote.gstRate : defaultGstRate,
     quoteId: quote?.id ?? null,
-    poAmount: null,
+    // Fixed from the order's PO; not edited on the invoice.
+    poAmount: order?.poAmount ?? null,
     notes: '',
   };
 }

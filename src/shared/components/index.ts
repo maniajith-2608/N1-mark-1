@@ -179,6 +179,9 @@ export * from './FormScope';
 export * from './EditableSectionHeader';
 export * from './PasswordSetForm';
 export * from './RowActions';
+export * from './LabeledValue';
+export * from './SectionTabs';
+export * from './HeaderTabs';
 export * from './FormFooter';
 export {
   KeyboardScrollView,

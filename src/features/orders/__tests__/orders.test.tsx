@@ -57,39 +57,33 @@ beforeEach(() => {
 });
 afterEach(() => jest.restoreAllMocks());
 
-/** Opens a date field's calendar, goes to the month and taps the day. */
+const MONTHS = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
+
+/** Opens a date field's native picker, turns the wheels and taps Done. */
 async function pickDate(
   form: ReactTestInstance,
   testID: string,
   [day, month, year]: [number, string, number],
 ) {
   await press(byTestId(form, testID));
-  const shown = () => allText(byTestId(form, `${testID}-month`));
-  const target = `${month} ${year}`;
-  const months = [
-    'January',
-    'February',
-    'March',
-    'April',
-    'May',
-    'June',
-    'July',
-    'August',
-    'September',
-    'October',
-    'November',
-    'December',
-  ];
-  const index = (text: string) => {
-    const [m, y] = text.split(' ');
-    return Number(y) * 12 + months.indexOf(m);
-  };
-  while (shown() !== target) {
-    const label =
-      index(shown()) < index(target) ? 'Next month' : 'Previous month';
-    await press(byLabel(byTestId(form, `${testID}-calendar`), label));
-  }
-  await press(byLabel(form, `${day} ${month} ${year}`));
+  const wheels = byTestId(form, `${testID}-wheels`);
+  await ReactTestRenderer.act(() =>
+    wheels.props.onValueChange({}, new Date(year, MONTHS.indexOf(month), day)),
+  );
+  await press(byTestId(form, `${testID}-done`));
 }
 
 /** Fills Order details' required fields (step 2 must be open). */
@@ -329,6 +323,29 @@ test('wide screens: the page stays put and only the order rows scroll', async ()
   expect(byTestId(table, 'create-order')).toBeTruthy();
 });
 
+test('phone details: the order over swipeable tabs, Edit in the header', async () => {
+  mockWidth = 390;
+  const h = await renderAdmin('Orders');
+  await press(byTestId(h.root, 'order-card-1043'));
+  const screen = byTestId(h.root, 'order-details-screen');
+  expect(allText(screen)).toContain('WO #1043');
+  // The tabs swipe between pages; 1043 has no job card, so its tab offers
+  // Create job card.
+  const details = byTestId(h.root, 'order-tab-page-details');
+  expect(allText(details)).toContain('Customer details');
+  await press(byTestId(h.root, 'order-tab-jobCard'));
+  const jobCardPage = byTestId(h.root, 'order-tab-page-jobCard');
+  expect(hasTestId(jobCardPage, 'order-create-job-card')).toBe(true);
+  // Edit sits in the header (only there) and opens the form.
+  expect(
+    screen.findAll(
+      n => n.props.testID === 'edit-order' && typeof n.type === 'string',
+    ).length,
+  ).toBe(1);
+  await press(byLabel(screen, 'Edit order WO #1043'));
+  expect(h.currentRoute()).toBe('OrderForm');
+});
+
 test('details show the full work order', async () => {
   const h = await renderAdmin('Orders');
   await press(byText(h.root, 'WO #1042'));
@@ -376,6 +393,27 @@ test('details show the full work order', async () => {
   await press(byTestId(screen, 'order-tab-details'));
   await press(byTestId(screen, 'order-view-customer'));
   expect(h.currentRoute()).toBe('CustomerDetails');
+});
+
+test('View customer slides the customer in on Orders; Back returns to the order', async () => {
+  const h = await renderAdmin('Orders');
+  await press(byText(h.root, 'WO #1042'));
+  await press(byTestId(h.root, 'order-view-customer'));
+  expect(h.currentRoute()).toBe('CustomerDetails');
+  // Still in the Orders drawer item: the customer was pushed on its stack.
+  const stack = h.navState().routes.find(r => r.name === 'Orders')?.state;
+  expect(stack?.routes.map(r => r.name)).toEqual([
+    'OrdersList',
+    'OrderDetails',
+    'CustomerDetails',
+  ]);
+  const back = byTestId(h.root, 'customer-details-back');
+  expect(allText(back)).toBe('Back to order');
+  await press(back);
+  expect(h.currentRoute()).toBe('OrderDetails');
+  expect(allText(byTestId(h.root, 'order-details-screen'))).toContain(
+    'WO #1042',
+  );
 });
 
 test('Back on an order returns to the customer or the list it came from', async () => {
@@ -643,12 +681,13 @@ test('creates an order over three steps', async () => {
   expect(onStep(2)).toBe(true);
 
   await typeInto(byTestId(form, 'order-form-quantity'), 'ten');
+  await typeInto(byTestId(form, 'order-form-po-amount'), '-5');
   await press(byTestId(form, 'order-form-next'));
-  expect(allText(form)).toContain('Enter a number');
+  expect(allText(form).split('Enter a number').length - 1).toBe(2);
 
   // Required fields come first; PO number and DC no sit at the bottom.
   expect(allText(byTestId(form, 'order-form-step-2'))).toMatch(
-    /Part name.*Drawing number.*Route card no.*DC date.*Delivery date.*Priority.*Quantity.*PO number.*DC no.*Part \/ job description/,
+    /Part name.*Drawing number.*Route card no.*DC date.*Delivery date.*Priority.*Quantity.*PO number.*PO amount.*DC no.*Part \/ job description/,
   );
   // Priority starts at Low.
   expect(allText(byTestId(form, 'order-form-priority'))).toBe('Low');
@@ -657,6 +696,7 @@ test('creates an order over three steps', async () => {
   expect(allText(form).split('This field is required').length - 1).toBe(5);
 
   await typeInto(byTestId(form, 'order-form-quantity'), '25');
+  await typeInto(byTestId(form, 'order-form-po-amount'), '125000');
   await fillOrderDetails(form);
   await typeInto(byTestId(form, 'order-form-description'), 'Spacer ring');
   await typeInto(byTestId(form, 'order-form-part-number'), 'PN-40001');
@@ -696,8 +736,14 @@ test('creates an order over three steps', async () => {
     dcDate: '2026-10-15',
     rmPartNumber: 'RM-77',
     materialSource: 'in_house',
+    poAmount: 125000,
   });
   expect(created.designFile?.name).toBe('bracket-drawing.pdf');
+  // The order's details show it.
+  await h.navigate('OrderDetails', { orderId: '1045' });
+  expect(allText(byTestId(h.root, 'order-overview'))).toContain(
+    'PO amount|₹1,25,000',
+  );
 });
 
 test('edits an existing order and keeps its names', async () => {
@@ -904,9 +950,9 @@ test('saving an edit with a bad earlier step opens that step', async () => {
   await h.navigate('OrderForm', { orderId: '1040' });
   const form = byTestId(h.root, 'order-form-screen');
   await press(byTestId(form, 'order-step-2'));
-  // Clear the delivery date from its calendar.
+  // Clear the delivery date from its picker.
   await press(byTestId(form, 'order-form-delivery'));
-  await press(byText(byTestId(form, 'order-form-delivery-calendar'), 'Clear'));
+  await press(byTestId(form, 'order-form-delivery-clear'));
   expect(allText(byTestId(form, 'order-form-delivery'))).toBe('DD/MM/YYYY');
   // Going back never checks; jumping straight to the end skips step 2.
   await press(byTestId(form, 'order-step-1'));
@@ -927,14 +973,34 @@ test('unknown order shows not found on details and form', async () => {
   );
 });
 
-test('phone: stat tiles, cards and step footer', async () => {
+test('phone: cards with the table details, actions and step footer', async () => {
   mockWidth = 390;
   const h = await renderAdmin('Orders');
-  expect(allText(h.root)).toContain('Open orders');
-  // 12 open: all but 1035, whose invoice is paid; 5 of them high.
-  expect(allText(byTestId(h.root, 'stat-open'))).toContain('12');
-  expect(allText(byTestId(h.root, 'stat-high'))).toContain('5');
-  expect(hasTestId(h.root, 'order-card-1042')).toBe(true);
+  // No stat tiles on phones.
+  expect(hasTestId(h.root, 'stat-open')).toBe(false);
+  const card = byTestId(h.root, 'order-card-1042');
+  const text = allText(card);
+  [
+    'WO #1042',
+    'Bracket — Job A',
+    'Customer',
+    'Acme Metalworks',
+    'Due date',
+    '02 Oct',
+    'PO number',
+    'PO-8842',
+    'RC number',
+    'RC-2210',
+    'High',
+    'In progress',
+  ].forEach(part => expect(text).toContain(part));
+  // Job card and Edit sit on the card, like the table's actions.
+  expect(hasTestId(card, 'job-card-1042')).toBe(true);
+  expect(hasTestId(card, 'edit-order-1042')).toBe(true);
+  // 1043 has no job card yet: Edit only.
+  const noJobCard = byTestId(h.root, 'order-card-1043');
+  expect(hasTestId(noJobCard, 'job-card-1043')).toBe(false);
+  expect(hasTestId(noJobCard, 'edit-order-1043')).toBe(true);
   await press(byTestId(h.root, 'order-card-1042'));
   expect(allText(byTestId(h.root, 'order-details-screen'))).toContain(
     'Order details',
@@ -942,7 +1008,30 @@ test('phone: stat tiles, cards and step footer', async () => {
   await h.navigate('OrderForm');
   const form = byTestId(h.root, 'order-form-screen');
   expect(allText(form)).toContain('Step 1 of 3 · Customer');
-  await typeInto(byTestId(form, 'order-form-customer'), 'Zenith Tools');
+  // Phones: Customer opens a sheet with a search box.
+  await press(byTestId(form, 'order-form-customer'));
+  const sheet = () => byTestId(form, 'order-form-customer-sheet');
+  await typeInto(byTestId(sheet(), 'order-form-customer-search'), 'nova');
+  expect(allText(sheet())).toContain('Nova Fabrication');
+  expect(allText(sheet())).not.toContain('Acme Metalworks');
+  await press(byText(sheet(), 'Nova Fabrication'));
+  expect(allText(byTestId(form, 'order-form-customer'))).toBe(
+    'Nova Fabrication',
+  );
+  expect(byTestId(form, 'order-form-email').props.value).toBe(
+    'orders@novafab.co.in',
+  );
+  // A name that matches none is kept as typed.
+  await press(byTestId(form, 'order-form-customer'));
+  await typeInto(
+    byTestId(sheet(), 'order-form-customer-search'),
+    'Zenith Tools',
+  );
+  await press(byTestId(sheet(), 'order-form-customer-use-typed'));
+  expect(allText(byTestId(form, 'order-form-customer'))).toBe('Zenith Tools');
+  expect(allText(form)).toContain(
+    'Not in your customers — this name will be used as typed.',
+  );
   await press(byTestId(form, 'order-form-design'));
   await press(byTestId(form, 'order-form-next'));
   expect(allText(form)).toContain('Step 2 of 3 · Order details');

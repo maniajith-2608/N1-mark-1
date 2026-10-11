@@ -10,6 +10,8 @@ export const COMMON_STRINGS = {
   view: 'View',
   back: 'Back',
   close: 'Close',
+  /** A search sheet's row that keeps text that matches nothing. */
+  keepTyped: (text: string) => `Use "${text}"`,
   filter: 'Filter',
   filters: 'Filters',
   apply: 'Apply',

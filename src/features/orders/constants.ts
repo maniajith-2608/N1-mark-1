@@ -27,7 +27,6 @@ export const ORDER_STRINGS = {
     createJobCard: (id: string) => `Create job card for WO #${id}`,
     openJobCard: (id: string) => `Open job card for WO #${id}`,
   },
-  stats: { open: 'Open orders', high: 'High priority' },
   workOrder: (id: string) => `WO #${id}`,
   /** Labels for the order details encoded under the WO number in its QR code. */
   qr: {
@@ -126,7 +125,9 @@ export const ORDER_STRINGS = {
   },
   form: {
     createTitle: 'Create order',
+    createSubtitle: 'Add a new work order for the shop floor.',
     editTitle: 'Edit order',
+    editSubtitle: (id: string) => `Update WO #${id}'s details.`,
     /** The stepper, in order. */
     steps: ['Customer', 'Order details', 'Raw material'],
     stepOf: (n: number, total: number, label: string) =>
@@ -169,6 +170,8 @@ export const ORDER_STRINGS = {
     customerEmailPlaceholder: 'accounts@company.com',
     poNumber: 'PO number',
     poNumberPlaceholder: 'e.g. PO-8842',
+    poAmount: 'PO amount',
+    poAmountPlaceholder: 'e.g. 120000',
     quantity: 'Quantity',
     quantityPlaceholder: 'e.g. 200',
     description: 'Part / job description',

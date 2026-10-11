@@ -17,11 +17,7 @@ import {
   type N1TableColumn,
 } from '../../../shared/components';
 import type { BillingNavigation } from '../types';
-import {
-  AsyncContent,
-  ListToolbar,
-  StatGrid,
-} from '../../../shared/components';
+import { AsyncContent, ListToolbar } from '../../../shared/components';
 import { COMMON_STRINGS } from '../../../shared/constants';
 import {
   useConfirmDelete,
@@ -42,7 +38,6 @@ import {
 import { QuoteStatusBadge } from './BillingBadges';
 import { QuoteCard } from './BillingCards';
 import { useBillingHeader } from './BillingHeaderSlot';
-import { useTopBarAction } from '../../dashboard/hooks/useTopBarAction';
 
 const S = BILLING_STRINGS.quotes;
 
@@ -106,24 +101,6 @@ export function QuotesTab({ toolbarStart }: Props) {
     [navigation],
   );
 
-  const statItems = useMemo(
-    () => [
-      { key: 'total', label: S.stats.total, value: stats.total },
-      {
-        key: 'draft',
-        label: S.stats.draft,
-        value: stats.draft,
-      },
-      {
-        key: 'sent',
-        label: S.stats.sent,
-        value: stats.sent,
-        tone: 'info' as const,
-      },
-    ],
-    [stats],
-  );
-
   const columns = useMemo<N1TableColumn<Quote>[]>(
     () => [
       {
@@ -182,8 +159,16 @@ export function QuotesTab({ toolbarStart }: Props) {
   );
 
   const renderCompactItem = useCallback(
-    (q: Quote) => <QuoteCard quote={q} onView={view} />,
-    [view],
+    (q: Quote) => (
+      <QuoteCard
+        quote={q}
+        onView={view}
+        onEdit={edit}
+        onDelete={requestDelete}
+        deleteLocked={isQuoteMapped(q, invoices)}
+      />
+    ),
+    [view, edit, requestDelete, invoices],
   );
 
   const firstLoad =
@@ -209,22 +194,10 @@ export function QuotesTab({ toolbarStart }: Props) {
     ),
     [query, setQuery, filterGroups, filters, applyFilters],
   );
-  useBillingHeader(headerBar, isCompact);
+  useBillingHeader('quotes', headerBar, isCompact);
 
-  // Phones: Add sits in the top bar, in place of the user's initials.
-  const addAction = useMemo(
-    () =>
-      isCompact
-        ? {
-            icon: 'plus' as const,
-            label: S.createA11y,
-            onPress: createQuote,
-            testID: 'create-quote',
-          }
-        : undefined,
-    [isCompact, createQuote],
-  );
-  useTopBarAction(addAction);
+  // Phones: Create quote is the top bar's + (set by BillingScreen, which
+  // the top bar belongs to, while Quotes is open).
 
   const toolbar = (
     <ListToolbar
@@ -264,11 +237,6 @@ export function QuotesTab({ toolbarStart }: Props) {
       onRetry={reload}
       hasData={items.length > 0}
     >
-      {/* Phones keep the stat tiles; wide screens show the totals in the
-          pagination bar instead. */}
-      {isCompact && (
-        <StatGrid items={statItems} variant="muted" testID="quote-stats" />
-      )}
       <N1Table
         loading={firstLoad}
         columns={columns}

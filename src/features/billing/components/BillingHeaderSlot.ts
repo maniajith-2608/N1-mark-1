@@ -1,21 +1,27 @@
 import { createContext, useContext, useEffect, type ReactNode } from 'react';
+import type { BillingTab } from '../types';
 
 /**
- * Phones: the open tab (Invoices / Quotes) puts its search and filter into
- * the Billing screen's header, where its search state can't reach.
+ * Phones: each tab (Invoices / Quotes) puts its search and filter into the
+ * Billing screen's header, where its search state can't reach. Kept per
+ * tab: both tab pages stay mounted, and the header shows the open one's.
  */
 export const BillingHeaderSlot = createContext<
-  ((header: ReactNode) => void) | null
+  ((tab: BillingTab, header: ReactNode) => void) | null
 >(null);
 
-/** Shows `header` in the Billing screen's header while mounted. */
-export function useBillingHeader(header: ReactNode, enabled: boolean) {
+/** Offers `header` as this tab's header in Billing while mounted. */
+export function useBillingHeader(
+  tab: BillingTab,
+  header: ReactNode,
+  enabled: boolean,
+) {
   const setHeader = useContext(BillingHeaderSlot);
   useEffect(() => {
     if (!setHeader || !enabled) {
       return undefined;
     }
-    setHeader(header);
-    return () => setHeader(null);
-  }, [setHeader, enabled, header]);
+    setHeader(tab, header);
+    return () => setHeader(tab, null);
+  }, [setHeader, enabled, tab, header]);
 }

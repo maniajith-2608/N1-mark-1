@@ -17,6 +17,7 @@ import {
   useN1Breakpoint,
   useN1Styles,
   useN1Theme,
+  useSectionTabsOptions,
 } from '../../../shared/components';
 import { SECTION_NAV_WIDTH } from '../../../shared/constants';
 import { useOnSettled } from '../../../shared/hooks';
@@ -131,18 +132,6 @@ const makeStyles = createN1Styles(t => ({
   compactRoot: { flex: 1, backgroundColor: t.colors.surface },
   compactHero: { padding: t.spacing.lg },
   compactBadges: { flexDirection: 'row', flexWrap: 'wrap', gap: t.spacing.sm },
-  tabBar: {
-    backgroundColor: t.colors.surface,
-    elevation: 0,
-    shadowOpacity: 0,
-    borderBottomWidth: t.borderWidth.hairline,
-    borderBottomColor: t.colors.border,
-  },
-  tabItem: { width: 'auto', paddingHorizontal: t.spacing.lg },
-  tabIndicator: {
-    height: t.borderWidth.thick,
-    backgroundColor: t.colors.primary,
-  },
 }));
 
 /**
@@ -153,6 +142,7 @@ const makeStyles = createN1Styles(t => ({
 export function OrganizationScreen() {
   const styles = useN1Styles(makeStyles);
   const theme = useN1Theme();
+  const sectionTabsOptions = useSectionTabsOptions();
   const { isCompact } = useN1Breakpoint();
   const { organization, status, error, reload, updateOrganization, saving } =
     useSession();
@@ -261,13 +251,7 @@ export function OrganizationScreen() {
             </View>
           )}
           <SectionTabs.Navigator
-            screenOptions={{
-              tabBarScrollEnabled: true,
-              tabBarStyle: styles.tabBar,
-              tabBarItemStyle: styles.tabItem,
-              tabBarIndicatorStyle: styles.tabIndicator,
-              tabBarPressColor: theme.colors.surfaceMuted,
-            }}
+            screenOptions={sectionTabsOptions}
             // Leaving a section drops its unsaved edits.
             screenListeners={({ route }) => ({
               focus: () => changeTab(route.name),

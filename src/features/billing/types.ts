@@ -52,7 +52,7 @@ export type Invoice = {
   gstRate: number;
   /** The quote this was billed against, if any (to compare). */
   quoteId: string | null;
-  /** The customer's purchase order value, entered by hand; null until then. */
+  /** The customer's PO value, from the order at dispatch; null if none. */
   poAmount: number | null;
   notes: string;
   issuedAt: ISODateString;
@@ -103,6 +103,10 @@ export type BillingStackParamList = {
    * edit: open with the invoice already in edit mode.
    */
   InvoiceDetails: { invoiceId: string; fromJobCardId?: string; edit?: boolean };
+  /** Phones: Edit invoice, sliding up over the invoice. */
+  InvoiceEdit: { invoiceId: string };
+  /** Phones: an invoice's process operations, opened from the invoice. */
+  InvoiceOperations: { invoiceId: string; edit?: boolean };
   /** Opened from a customer: Back returns there. */
   QuoteDetails: {
     quoteId: string;
@@ -110,6 +114,10 @@ export type BillingStackParamList = {
     edit?: boolean;
     fromCustomerId?: string;
   };
+  /** Phones: Edit quote, sliding up over the quote. */
+  QuoteEdit: { quoteId: string };
+  /** Phones: a quote's process operations, opened from the quote. */
+  QuoteOperations: { quoteId: string; edit?: boolean };
   /** Without an id the form creates a new quote. */
   QuoteForm: { quoteId?: string } | undefined;
 };

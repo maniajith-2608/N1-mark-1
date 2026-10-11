@@ -37,6 +37,13 @@ const makeStyles = createN1Styles(t => ({
     gap: t.spacing.lg,
   },
   thumb: { ...DRAWING_THUMB },
+  // Phones: the drawing spans the screen's width, keeping its 5:3 shape.
+  compactThumbButton: { width: '100%' },
+  compactThumb: {
+    width: '100%',
+    height: undefined,
+    aspectRatio: DRAWING_THUMB.width / DRAWING_THUMB.height,
+  },
   info: { flexShrink: 1, gap: t.spacing.sm },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: t.spacing.sm },
   pressed: { opacity: t.opacity.pressed },
@@ -90,12 +97,15 @@ export const DrawingQrSection = memo(function DrawingQrSectionComponent({
               accessibilityRole="button"
               accessibilityLabel={D.viewDrawingOf(drawingNumber)}
               onPress={onViewDrawing}
-              style={({ pressed }) => pressed && styles.pressed}
+              style={({ pressed }) => [
+                isCompact && styles.compactThumbButton,
+                pressed && styles.pressed,
+              ]}
               testID={`${testID}-drawing`}
             >
               <DrawingPreview
                 drawingNumber={drawingNumber}
-                style={styles.thumb}
+                style={isCompact ? styles.compactThumb : styles.thumb}
               />
             </Pressable>
             <View style={styles.info}>

@@ -14,11 +14,7 @@ import {
   type FilterValues,
   type N1TableColumn,
 } from '../../../shared/components';
-import {
-  AdminScreen,
-  AsyncContent,
-  StatGrid,
-} from '../../../shared/components';
+import { AdminScreen, AsyncContent } from '../../../shared/components';
 import { COMMON_STRINGS } from '../../../shared/constants';
 import { useListFilter, usePagination } from '../../../shared/hooks';
 import { CurrentWork } from '../components/CurrentWork';
@@ -82,31 +78,6 @@ export function MachinesListScreen() {
   const openDetails = useCallback(
     (m: Machine) => navigation.navigate('MachineDetails', { machineId: m.id }),
     [navigation],
-  );
-
-  const statItems = useMemo(
-    () => [
-      { key: 'total', label: S.stats.total, value: stats.total },
-      {
-        key: 'running',
-        label: S.stats.running,
-        value: stats.running,
-        tone: 'info' as const,
-      },
-      {
-        key: 'idle',
-        label: S.stats.idle,
-        value: stats.idle,
-        tone: 'neutral' as const,
-      },
-      {
-        key: 'maintenance',
-        label: isCompact ? S.stats.maintenanceShort : S.stats.maintenance,
-        value: stats.maintenance,
-        tone: 'warning' as const,
-      },
-    ],
-    [stats, isCompact],
   );
 
   const columns = useMemo<N1TableColumn<Machine>[]>(
@@ -252,11 +223,6 @@ export function MachinesListScreen() {
         onRetry={reload}
         hasData={items.length > 0}
       >
-        {/* Phones keep the stat tiles; wide screens show the totals in the
-            pagination bar instead. */}
-        {isCompact && (
-          <StatGrid items={statItems} variant="muted" testID="machine-stats" />
-        )}
         <N1Table
           loading={firstLoad}
           columns={columns}

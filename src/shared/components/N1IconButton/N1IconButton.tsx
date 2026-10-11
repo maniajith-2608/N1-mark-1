@@ -21,7 +21,10 @@ export type N1IconButtonVariant =
   | 'overlay'
   | 'ghost'
   | 'ghostDanger'
-  | 'inverse';
+  | 'inverse'
+  | 'tile'
+  | 'card'
+  | 'cardDanger';
 
 export type N1IconButtonProps = Omit<PressableProps, 'style' | 'children'> & {
   icon: N1IconName;
@@ -36,6 +39,9 @@ export type N1IconButtonProps = Omit<PressableProps, 'style' | 'children'> & {
    * ghost: icon only, no circle (row actions such as edit)
    * ghostDanger: red icon only, no circle (row delete)
    * inverse: outlined circle with a light icon, for dark surfaces (sidebar)
+   * tile: dark rounded square with a light icon, on the black phone header
+   * card: grey rounded square, the actions on a phone list card (Edit…)
+   * cardDanger: the same with a red icon (Delete)
    */
   variant?: N1IconButtonVariant;
   size?: N1Size;
@@ -51,6 +57,9 @@ const iconColor: Record<N1IconButtonVariant, N1IconColor> = {
   ghost: 'textPrimary',
   ghostDanger: 'danger',
   inverse: 'textInverse',
+  tile: 'textInverse',
+  card: 'textPrimary',
+  cardDanger: 'danger',
 };
 
 const makeStyles = createN1Styles(t => ({
@@ -77,6 +86,20 @@ const makeStyles = createN1Styles(t => ({
   inverse: {
     backgroundColor: 'transparent',
     borderColor: t.colors.surfaceInverseActive,
+  },
+  // Like the menu / profile tiles on the phone top bar.
+  tile: {
+    borderRadius: t.radius.md,
+    backgroundColor: t.colors.surfaceInverseActive,
+  },
+  // Beside a card's grey View button (soft N1Button), same corners.
+  card: {
+    borderRadius: t.radius.sm,
+    backgroundColor: t.colors.surfaceMuted,
+  },
+  cardDanger: {
+    borderRadius: t.radius.sm,
+    backgroundColor: t.colors.surfaceMuted,
   },
   pressed: { opacity: t.opacity.pressed },
   disabled: { opacity: t.opacity.disabled },

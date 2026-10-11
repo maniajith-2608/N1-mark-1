@@ -159,7 +159,15 @@ export type AdminHarness = {
   navigate: (route: string, params?: object) => Promise<void>;
   /** The focused screen; a stack's first screen is named by its drawer item. */
   currentRoute: () => string | undefined;
+  /** The drawer's navigation state, with each stack's routes nested. */
+  navState: () => ReturnType<typeof navigationState>;
 };
+
+type NavState = {
+  routes: { name: string; state?: NavState }[];
+};
+const navigationState = (ref: { getRootState: () => unknown }) =>
+  ref.getRootState() as NavState;
 
 /** Renders the whole admin module (drawer + feature stacks) with a fresh store. */
 export async function renderAdmin(
@@ -199,6 +207,7 @@ export async function renderAdmin(
     root: renderer.root,
     store,
     navigate,
+    navState: () => navigationState(navRef),
     currentRoute: () => {
       const name = navRef.getCurrentRoute()?.name;
       return name ? STACK_HOME_NAMES[name] ?? name : name;
