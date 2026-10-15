@@ -7,19 +7,19 @@ import {
 import type { JobsScreenProps, JobsStackParamList } from '../types';
 
 type Navigation = JobsScreenProps<'ScanJob'>['navigation'];
-/** The role navigator's tab host (see RoleNavigation). */
-const TABS = 'Tabs';
+/** The role navigator's home, My Jobs (see RoleNavigation). */
+const TABS = 'Home';
 type JobRoute = 'JobCardDetails' | 'OperatorJob' | 'QcCheck';
 
 /**
- * Replaces the history with the host's tabs (on My Jobs) plus one job screen,
+ * Replaces the history with the role's home (My Jobs) plus one job screen,
  * so the import screens drop out and Back returns to My Jobs.
  */
 export function useOpenOverTabs() {
   const navigation = useNavigation<Navigation>();
   return useCallback(
     <R extends JobRoute>(name: R, params: JobsStackParamList[R]) => {
-      // Tabs isn't in the history when a job screen was opened by URL.
+      // Home isn't in the history when a job screen was opened by URL.
       const tabs = navigation
         .getState()
         .routes.find(route => (route.name as string) === TABS);

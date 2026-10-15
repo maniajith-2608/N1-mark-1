@@ -65,7 +65,6 @@ export const JOB_CARD_STRINGS = {
     editFlow: (id: string) => `Edit flow for WO #${id}`,
     diagram: (id: string) => `Open drawing for WO #${id}`,
   },
-  openDrawing: 'Opening drawings',
   details: {
     title: 'Job card',
     back: 'Back',
@@ -145,6 +144,9 @@ export const JOB_CARD_STRINGS = {
       sample: 'qc-report.pdf',
       accept: '.pdf,.doc,.docx,.xls,.xlsx,image/*',
       open: 'Opening QC reports',
+      /** Phones: the report's details sheet. */
+      title: 'QC report',
+      openFile: 'Open file',
       a11y: {
         upload: (stage: string) => `Upload QC report for ${stage}`,
         open: (name: string) => `Open ${name}`,

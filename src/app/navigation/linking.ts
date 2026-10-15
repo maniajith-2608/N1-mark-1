@@ -2,16 +2,10 @@ import type { LinkingOptions } from '@react-navigation/native';
 import type { RootStackParamList } from './types';
 
 // Same paths for every non-admin role: /dashboard/qc (Jobs),
-// /dashboard/qc/profile and /dashboard/qc/profile/edit.
-const USER_TAB_SCREENS = {
-  Tabs: {
-    path: '',
-    screens: {
-      Jobs: '',
-      Profile: 'profile',
-    },
-  },
-  EditProfile: 'profile/edit',
+// and /dashboard/qc/profile.
+const ROLE_PATHS = {
+  Home: '',
+  Profile: 'profile',
 };
 
 // Maps every screen to a URL path. On web this drives the browser address bar
@@ -129,41 +123,44 @@ export const linking: LinkingOptions<RootStackParamList> = {
               },
             },
           },
-          // Non-admin roles (see USER_TAB_SCREENS).
+          // Non-admin roles (see ROLE_PATHS).
           // /dashboard/supervisor/orders/1042, …/job-cards/1042/flow
           Supervisor: {
             path: 'supervisor',
             screens: {
-              ...USER_TAB_SCREENS,
+              ...ROLE_PATHS,
               ScanJob: 'scan',
               EnterJobCode: 'job-code',
               ImportOrder: 'orders/:orderId',
               RawMaterial: 'orders/:orderId/raw-material',
               JobCardDetails: 'job-cards/:jobCardId',
+              Drawing: 'orders/:orderId/drawing',
             },
           },
           // /dashboard/operator/jobs/1042, …/jobs/1042/machine
           Operator: {
             path: 'operator',
             screens: {
-              ...USER_TAB_SCREENS,
+              ...ROLE_PATHS,
               ScanJob: 'scan',
               EnterJobCode: 'job-code',
               OperatorJob: 'jobs/:jobCardId',
               AssignMachine: 'jobs/:jobCardId/machine',
               OrderDetails: 'orders/:orderId',
+              Drawing: 'orders/:orderId/drawing',
             },
           },
           // /dashboard/qc/checks/rm/1042, …/checks/machine/1042/fail
           Qc: {
             path: 'qc',
             screens: {
-              ...USER_TAB_SCREENS,
+              ...ROLE_PATHS,
               ScanJob: 'scan',
               EnterJobCode: 'job-code',
               QcCheck: 'checks/:kind/:jobCardId',
               QcFail: 'checks/:kind/:jobCardId/fail',
               OrderDetails: 'orders/:orderId',
+              Drawing: 'orders/:orderId/drawing',
             },
           },
         },

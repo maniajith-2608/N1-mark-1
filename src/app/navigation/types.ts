@@ -3,18 +3,12 @@ import type { AuthStackParamList } from '../../features/auth/types';
 import type { AdminDrawerParamList } from '../../features/dashboard/types';
 import type { JobsStackParamList } from '../../features/jobs/types';
 
-// Bottom tabs for the non-admin roles. Every tab any role can have is listed
-// here; each role picks its own subset in userTabs.ts.
-export type UserTabParamList = {
-  Jobs: undefined;
-  Profile: undefined;
-};
-
-// Each non-admin role: its tabs, with Edit Profile and the role's own
-// screens (e.g. the Supervisor's job import flow) opening over them.
+// Each non-admin role: its jobs home (no tab bar), with Profile (from the
+// header's initials; read-only) and the role's own screens (e.g. the
+// Supervisor's job import flow) opening over it.
 export type RoleStackParamList = {
-  Tabs: NavigatorScreenParams<UserTabParamList>;
-  EditProfile: undefined;
+  Home: undefined;
+  Profile: undefined;
 } & JobsStackParamList;
 
 // Dashboard stack (nested inside the root "Dashboard" screen)

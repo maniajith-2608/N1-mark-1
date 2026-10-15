@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { View } from 'react-native';
+import { Platform, View } from 'react-native';
 import { N1Text, createN1Styles, useN1Styles } from '..';
 
 export type LabeledValueProps = {
@@ -14,8 +14,17 @@ export type LabeledValueProps = {
 
 const makeStyles = createN1Styles(t => ({
   field: { flex: 1, gap: t.spacing.xxs },
-  // Up to half the row, so a long value on the left has space.
-  end: { flex: 0, maxWidth: '50%', alignItems: 'flex-end' },
+  // As wide as its content, up to half the row, so a long value on the left
+  // has space. On the web `flex: 0` is a zero-width basis that hides the
+  // one-line value, so there it's spelled out: sized by its content.
+  end: {
+    ...Platform.select({
+      web: { flexGrow: 0, flexShrink: 0, flexBasis: 'auto' },
+      default: { flex: 0 },
+    }),
+    maxWidth: '50%',
+    alignItems: 'flex-end',
+  },
 }));
 
 /**

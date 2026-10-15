@@ -8,12 +8,17 @@ export type UserScreenProps = {
   header?: ReactNode;
   /** Buttons pinned to the bottom (Save changes, Create Job Card). */
   footer?: ReactNode;
+  /** 'muted': light grey page, e.g. under white cards. */
+  background?: 'surface' | 'muted';
+  /** Edge to edge: no padding or gap around the content (e.g. a cover). */
+  flush?: boolean;
   children: ReactNode;
   testID?: string;
 };
 
 const makeStyles = createN1Styles(t => ({
   root: { flex: 1, backgroundColor: t.colors.surface },
+  muted: { backgroundColor: t.colors.background },
   scroll: { flex: 1 },
   content: {
     width: '100%',
@@ -23,16 +28,28 @@ const makeStyles = createN1Styles(t => ({
     gap: t.spacing.lg,
     padding: t.spacing.lg,
   },
+  flush: { gap: 0, padding: 0 },
 }));
 
 /** Scrolling page body for the shop-floor (non-admin) screens. */
-export function UserScreen({ footer, children, testID }: UserScreenProps) {
+export function UserScreen({
+  header,
+  footer,
+  background = 'surface',
+  flush = false,
+  children,
+  testID,
+}: UserScreenProps) {
   const styles = useN1Styles(makeStyles);
   return (
-    <View style={styles.root} testID={testID}>
+    <View
+      style={[styles.root, background === 'muted' && styles.muted]}
+      testID={testID}
+    >
+      {header}
       <KeyboardScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, flush && styles.flush]}
       >
         {children}
       </KeyboardScrollView>

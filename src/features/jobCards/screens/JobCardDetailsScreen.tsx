@@ -6,7 +6,12 @@ import {
   type ReactNode,
   type Ref,
 } from 'react';
-import { Pressable, View, type ScrollViewInstance } from 'react-native';
+import {
+  Platform,
+  Pressable,
+  View,
+  type ScrollViewInstance,
+} from 'react-native';
 import { StackActions } from '@react-navigation/native';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import {
@@ -35,7 +40,6 @@ import {
   type N1Tab,
 } from '../../../shared/components';
 import { useOnSettled, useToggle } from '../../../shared/hooks';
-import type { Attachment } from '../../../shared/types';
 import { pickDocument } from '../../../services/files/pickDocument';
 import { openDocument } from '../../../services/files/viewDocument';
 import {
@@ -66,6 +70,7 @@ import { drawingPrintHtml } from '../../orders/printing';
 import { orderHeading, orderQrValue } from '../../orders/utils';
 import { COMMON_STRINGS } from '../../../shared/constants';
 import { QcHistory } from '../components/QcHistory';
+import { QcReportSheet } from '../components/QcReportSheet';
 import { RouteCard } from '../components/RouteCard';
 import { JOB_CARD_STRINGS, MATERIAL_QC_META } from '../constants';
 import { useJobCardBack } from '../hooks/useJobCardBack';
@@ -310,7 +315,15 @@ export function JobCardDetailsScreen({
     setTab('machining');
     setEditingFlow(true);
   }, []);
+  // Opened from a list just to edit the flow: closing it (Cancel or Save)
+  // returns straight to that list.
+  const openedToEdit = useRef(Boolean(route.params.editFlow));
   const closeFlow = useCallback(() => {
+    if (openedToEdit.current && navigation.canGoBack()) {
+      openedToEdit.current = false;
+      navigation.goBack();
+      return;
+    }
     setEditingFlow(false);
     navigation.setParams({ editFlow: undefined });
   }, [navigation]);
@@ -421,11 +434,18 @@ export function JobCardDetailsScreen({
     },
     [jobCard, update],
   );
-  const openReport = useCallback((report: Attachment) => {
-    if (!openDocument(report)) {
+  // Phones: the report's details in a sheet. Wide screens open the file.
+  const [reportEntry, setReportEntry] = useState<QcEntry | null>(null);
+  const closeReport = useCallback(() => setReportEntry(null), []);
+  const openFile = useCallback((entry: QcEntry) => {
+    if (!entry.report || !openDocument(entry.report)) {
       notifyUnavailable(R.open);
     }
   }, []);
+  const openReport = useCallback(
+    (entry: QcEntry) => (isCompact ? setReportEntry(entry) : openFile(entry)),
+    [isCompact, openFile],
+  );
   // Supervisor only: enter the replacement material so RM QC checks it again.
   // RawMaterial lives in the role's stack, not the admin Job Cards stack.
   const canReinitiate = useOptionalEmployeeRole() === 'supervisor';
@@ -798,6 +818,14 @@ export function JobCardDetailsScreen({
       onOpen={null}
     />
   );
+  // Phones: a QC report's details. Web can also open the file itself.
+  const reportSheet = (
+    <QcReportSheet
+      entry={reportEntry}
+      onClose={closeReport}
+      onOpen={Platform.OS === 'web' ? openFile : undefined}
+    />
+  );
 
   // Phones: like Order and Customer details. The header's back and
   // Generate Dispatch, the job card on top, swipeable tabs over a white
@@ -852,6 +880,7 @@ export function JobCardDetailsScreen({
         {dispatchModal}
         {completeDialog}
         {viewer}
+        {reportSheet}
       </AdminScreenBackground.Provider>
     );
   }

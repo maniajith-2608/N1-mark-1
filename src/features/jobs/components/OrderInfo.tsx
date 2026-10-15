@@ -1,58 +1,37 @@
-import { memo, useMemo } from 'react';
-import { View } from 'react-native';
-import {
-  N1DetailGrid,
-  N1KeyValueList,
-  N1Text,
-  createN1Styles,
-  useN1Styles,
-} from '../../../shared/components';
+import { memo } from 'react';
+import { N1DetailGrid, N1Divider } from '../../../shared/components';
 import { COMMON_STRINGS } from '../../../shared/constants';
-import { formatLongDate } from '../../../shared/utils';
-import { DrawingPreview, ORDER_STRINGS, type WorkOrder } from '../../orders';
+import { formatCurrency, formatLongDate } from '../../../shared/utils';
+import {
+  MATERIAL_SOURCE_OPTIONS,
+  ORDER_STRINGS,
+  type WorkOrder,
+} from '../../orders';
 
 const D = ORDER_STRINGS.details;
 const F = ORDER_STRINGS.form;
 const orDash = (v: string) => v || COMMON_STRINGS.dash;
 
-const makeStyles = createN1Styles(t => ({
-  section: { gap: t.spacing.md },
-}));
-
-/** Work order Details, Additional details and Drawing (Order, QC Check). */
+/**
+ * The work order's Overview, Dispatch and Raw material, two columns each
+ * like the admin order (Order, Order Details). The drawing sits in
+ * OrderSummaryTile above them.
+ */
 export const OrderInfo = memo(function OrderInfoComponent({
   order,
 }: {
   order: WorkOrder;
 }) {
-  const styles = useN1Styles(makeStyles);
-  const additional = useMemo(
-    () => [
-      { label: F.poNumber, value: orDash(order.poNumber) },
-      { label: F.routeCardNo, value: orDash(order.routeCardNo) },
-      { label: F.dcNo, value: orDash(order.dcNo) },
-      { label: F.dcDate, value: orDash(formatLongDate(order.dcDate)) },
-      { label: F.partNumber, value: orDash(order.partNumber) },
-      { label: F.drawingNumber, value: orDash(order.drawingNumber) },
-      { label: F.rmPartNumber, value: orDash(order.rmPartNumber) },
-      { label: F.shopOrderNumber, value: orDash(order.shopOrderNumber) },
-      { label: F.rawMaterialSize, value: orDash(order.rawMaterialSize) },
-      { label: F.heatNumber, value: orDash(order.heatNumber) },
-      { label: F.projectId, value: orDash(order.projectId) },
-      { label: F.rawMaterialGrade, value: orDash(order.rawMaterialGrade) },
-    ],
-    [order],
+  const source = MATERIAL_SOURCE_OPTIONS.find(
+    o => o.value === order.materialSource,
   );
-
   return (
     <>
-      <N1KeyValueList
-        title={D.details}
+      <N1DetailGrid
+        title={D.overview}
+        columns={2}
+        testID="order-info-overview"
         items={[
-          {
-            label: D.material,
-            value: orDash(order.material || order.rawMaterialGrade),
-          },
           {
             label: D.quantity,
             value: order.quantity
@@ -60,15 +39,45 @@ export const OrderInfo = memo(function OrderInfoComponent({
               : COMMON_STRINGS.dash,
           },
           { label: D.dueDate, value: orDash(formatLongDate(order.dueDate)) },
+          { label: F.partName, value: orDash(order.partName) },
+          { label: F.partNumber, value: orDash(order.partNumber) },
+          { label: F.drawingNumber, value: orDash(order.drawingNumber) },
+          { label: F.poNumber, value: orDash(order.poNumber) },
+          {
+            label: F.poAmount,
+            value:
+              order.poAmount == null
+                ? COMMON_STRINGS.dash
+                : formatCurrency(order.poAmount),
+          },
+          { label: F.projectId, value: orDash(order.projectId) },
+          { label: F.shopOrderNumber, value: orDash(order.shopOrderNumber) },
         ]}
       />
-      <N1DetailGrid title={D.additional} items={additional} />
-      <View style={styles.section}>
-        <N1Text variant="title" weight="bold">
-          {D.drawing}
-        </N1Text>
-        <DrawingPreview drawingNumber={orDash(order.drawingNumber)} />
-      </View>
+      <N1Divider />
+      <N1DetailGrid
+        title={D.dispatch}
+        columns={2}
+        testID="order-info-dispatch"
+        items={[
+          { label: F.routeCardNo, value: orDash(order.routeCardNo) },
+          { label: F.dcNo, value: orDash(order.dcNo) },
+          { label: F.dcDate, value: orDash(formatLongDate(order.dcDate)) },
+        ]}
+      />
+      <N1Divider />
+      <N1DetailGrid
+        title={D.tabs.material}
+        columns={2}
+        testID="order-info-material"
+        items={[
+          { label: F.materialSource, value: orDash(source?.label ?? '') },
+          { label: F.rmPartNumber, value: orDash(order.rmPartNumber) },
+          { label: F.rawMaterialGrade, value: orDash(order.rawMaterialGrade) },
+          { label: F.rawMaterialSize, value: orDash(order.rawMaterialSize) },
+          { label: F.heatNumber, value: orDash(order.heatNumber) },
+        ]}
+      />
     </>
   );
 });

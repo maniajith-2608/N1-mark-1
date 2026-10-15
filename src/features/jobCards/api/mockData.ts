@@ -193,7 +193,21 @@ const CARDS = [
         ['Packing', 'Pack Station 1', 'Suresh Babu'],
       ],
       1,
+      // Cutting is done and passed QC, so Welding is ready to start: the
+      // operator's Start opens Assign machine.
+      'pending',
     ),
+    qcHistory: [
+      {
+        id: 'qc1',
+        stage: 'Cutting - QC',
+        result: 'passed',
+        remark: '',
+        at: '2026-09-25',
+        inspector: 'Divya Rao',
+        operationId: '1037-op1',
+      },
+    ],
     quotation: 'pending',
   }),
   card({

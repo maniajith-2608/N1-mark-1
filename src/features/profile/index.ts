@@ -8,7 +8,7 @@ export { profileActions } from './store/profileSlice';
 
 // Profile screens shared by the non-admin roles.
 export { EmployeeProfileScreen } from './screens/EmployeeProfileScreen';
-export { EditEmployeeProfileScreen } from './screens/EditEmployeeProfileScreen';
+export { EmployeeHomeHeader } from './components/EmployeeHomeHeader';
 export { EmployeeRoleProvider } from './context/EmployeeRoleContext';
 export type {
   EmployeeProfileParamList,

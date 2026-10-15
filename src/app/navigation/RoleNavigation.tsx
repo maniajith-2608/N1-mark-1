@@ -1,45 +1,38 @@
-import React, { useCallback } from 'react';
+import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { AdminScreenBackground } from '../../shared/components';
 import {
-  EditEmployeeProfileScreen,
+  EmployeeProfileScreen,
   EmployeeRoleProvider,
   type EmployeeRole,
 } from '../../features/profile';
 import type { RoleScreen } from './roleScreens';
-import UserTabNavigation from './UserTabNavigation';
-import type { UserTab } from './userTabs';
 import type { RoleStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<RoleStackParamList>();
 
 type Props = {
   role: EmployeeRole;
-  tabs: UserTab[];
-  /** The role's own screens, opened over the tabs. */
+  /** The role's jobs screen, where it lands on login. */
+  home: React.ComponentType;
+  /** The role's own screens, opened over its home. */
   screens?: RoleScreen[];
 };
 
 /**
- * One non-admin role: its tab bar, with Edit Profile opening over it (no tab
- * bar). The shared profile screens read the role from EmployeeRoleProvider.
+ * One non-admin role: its jobs home (no tab bar; the header's initials open
+ * Profile), with Profile (read-only) and the role's own screens opening
+ * over it. The shared profile screens read the role from
+ * EmployeeRoleProvider.
  */
-function RoleNavigation({ role, tabs, screens = [] }: Props) {
-  const renderTabs = useCallback(
-    () => <UserTabNavigation tabs={tabs} />,
-    [tabs],
-  );
-
+function RoleNavigation({ role, home, screens = [] }: Props) {
   return (
     <EmployeeRoleProvider value={role}>
       {/* Admin screens reused here (job card, flow) sit on white. */}
       <AdminScreenBackground.Provider value="surface">
         <Stack.Navigator screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="Tabs">{renderTabs}</Stack.Screen>
-          <Stack.Screen
-            name="EditProfile"
-            component={EditEmployeeProfileScreen}
-          />
+          <Stack.Screen name="Home" component={home} />
+          <Stack.Screen name="Profile" component={EmployeeProfileScreen} />
           {screens.map(screen => (
             <Stack.Screen
               key={screen.name}

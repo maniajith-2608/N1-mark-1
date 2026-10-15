@@ -8,7 +8,7 @@ import {
   QC_SCREENS,
   SUPERVISOR_SCREENS,
 } from './roleScreens';
-import { OPERATOR_TABS, SUPERVISOR_TABS, QC_TABS } from './userTabs';
+import { OPERATOR_HOME, QC_HOME, SUPERVISOR_HOME } from './roleHomes';
 import type { MainStackParamList } from './types';
 
 // One navigator per non-admin role, defined once so screens stay stable.
@@ -17,7 +17,7 @@ const SupervisorNavigation = React.memo(
     return (
       <RoleNavigation
         role="supervisor"
-        tabs={SUPERVISOR_TABS}
+        home={SUPERVISOR_HOME}
         screens={SUPERVISOR_SCREENS}
       />
     );
@@ -27,13 +27,13 @@ const OperatorNavigation = React.memo(function OperatorNavigationComponent() {
   return (
     <RoleNavigation
       role="operator"
-      tabs={OPERATOR_TABS}
+      home={OPERATOR_HOME}
       screens={OPERATOR_SCREENS}
     />
   );
 });
 const QcNavigation = React.memo(function QcNavigationComponent() {
-  return <RoleNavigation role="qc" tabs={QC_TABS} screens={QC_SCREENS} />;
+  return <RoleNavigation role="qc" home={QC_HOME} screens={QC_SCREENS} />;
 });
 
 const Stack = createNativeStackNavigator<MainStackParamList>();

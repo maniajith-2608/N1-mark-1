@@ -500,10 +500,6 @@ export function OrderDetailsScreen({
                 : COMMON_STRINGS.dash,
             },
             {
-              label: D.material,
-              value: orDash(order.material || order.rawMaterialGrade),
-            },
-            {
               label: F.deliveryDate,
               value: orDash(formatLongDate(order.dueDate)),
             },

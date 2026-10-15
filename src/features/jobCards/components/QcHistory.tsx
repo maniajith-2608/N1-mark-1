@@ -11,7 +11,6 @@ import {
   type N1TableColumn,
 } from '../../../shared/components';
 import { COMMON_STRINGS } from '../../../shared/constants';
-import type { Attachment } from '../../../shared/types';
 import { formatDayMonth } from '../../../shared/utils';
 import { JOB_CARD_STRINGS, QC_RESULT_META } from '../constants';
 import type { QcEntry } from '../types';
@@ -54,7 +53,8 @@ type Props = {
   entries: QcEntry[];
   /** Picks a file and attaches it to this check. */
   onUpload: (entry: QcEntry) => void;
-  onOpenReport: (report: Attachment) => void;
+  /** The check whose report was tapped. */
+  onOpenReport: (entry: QcEntry) => void;
   /** The check whose report is uploading. */
   uploadingId?: string | null;
 };
@@ -77,7 +77,7 @@ export const QcHistory = memo(function QcHistoryComponent({
         <Pressable
           accessibilityRole="link"
           accessibilityLabel={R.a11y.open(e.report.name)}
-          onPress={() => e.report && onOpenReport(e.report)}
+          onPress={() => onOpenReport(e)}
           style={({ pressed }) => [styles.report, pressed && styles.pressed]}
           testID={`qc-report-${e.id}`}
         >

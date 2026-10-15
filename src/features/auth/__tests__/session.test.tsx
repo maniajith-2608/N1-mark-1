@@ -49,14 +49,14 @@ test('a shop-floor role only gets its own area, never the admin dashboard', asyn
 
 test('signing out shows the login screen again', async () => {
   app = await renderAppAs('operator@n1.com', 'Operator@123');
-  await press(byLabel(app.root, 'Profile'));
+  // The home header's initials open Profile.
+  await press(byTestId(app.root, 'open-profile'));
   await press(byTestId(app.root, 'employee-logout'));
-  const [, confirm] = app.root.findAll(
-    n => typeof n.type === 'string' && n.props.accessibilityLabel === 'Log out',
-  );
-  await press(confirm);
+  // The dialog's Log out confirms.
+  await press(byLabel(byTestId(app.root, 'employee-logout-dialog'), 'Log out'));
 
   expect(allText(app.root)).toContain('Welcome back');
+  expect(() => byTestId(app!.root, 'employee-home-header')).toThrow();
 });
 
 test('the session is saved on web and restored by a new store', async () => {

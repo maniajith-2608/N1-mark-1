@@ -164,5 +164,5 @@ export type EmployeeProfileInput = Pick<
 // Routes the employee profile screens navigate to. The role navigator that
 // hosts them must register these names.
 export type EmployeeProfileParamList = {
-  EditProfile: undefined;
+  Profile: undefined;
 };

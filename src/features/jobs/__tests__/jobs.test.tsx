@@ -73,16 +73,51 @@ test("My Jobs lists the user's jobs with counts and search", async () => {
   // Job cards that were never imported stay off the list.
   expect(hasTestId(root, 'job-card-1036')).toBe(false);
 
-  await press(byLabel(root, 'Search jobs'));
+  // The black header: the N1 logo, "My Jobs" in the middle and the initials,
+  // then the search, filter and QR scanner (Import Job).
+  const header = byTestId(root, 'employee-home-header');
+  expect(allText(header)).toMatch(/^My Jobs\|[A-Z]{1,2}$/);
+  expect(hasTestId(header, 'employee-home-logo')).toBe(true);
+  expect(hasTestId(header, 'my-jobs-search')).toBe(true);
+  expect(hasTestId(header, 'my-jobs-filter')).toBe(true);
+  expect(hasTestId(header, 'import-job')).toBe(true);
+
+  const settle = () =>
+    ReactTestRenderer.act(
+      () => new Promise(resolve => setTimeout(resolve, 400)),
+    );
   await typeInto(byTestId(root, 'my-jobs-search'), 'Housing');
-  await ReactTestRenderer.act(
-    () => new Promise(resolve => setTimeout(resolve, 400)),
-  );
+  await settle();
   expect(hasTestId(root, 'job-card-1034')).toBe(true);
   expect(hasTestId(root, 'job-card-1042')).toBe(false);
 
-  await press(byLabel(root, 'Close search'));
+  await typeInto(byTestId(root, 'my-jobs-search'), '');
+  await settle();
   expect(hasTestId(root, 'job-card-1042')).toBe(true);
+});
+
+test("My Jobs' filter shows only the jobs at the picked stage", async () => {
+  const root = await secondAdmin();
+  const stages = () =>
+    root
+      .findAll(
+        n =>
+          typeof n.type === 'string' &&
+          String(n.props.testID ?? '').startsWith('job-card-stage-'),
+      )
+      .map(n => allText(n));
+  const all = stages();
+  const picked = allText(byTestId(root, 'job-card-stage-1042'));
+  expect(new Set(all).size).toBeGreaterThan(1);
+
+  await press(byTestId(root, 'my-jobs-filter'));
+  const panel = byTestId(root, 'my-jobs-filter-panel');
+  await press(byLabel(panel, picked));
+  await press(byTestId(root, 'my-jobs-filter-apply'));
+
+  expect(hasTestId(root, 'job-card-1042')).toBe(true);
+  expect(stages().every(stage => stage === picked)).toBe(true);
+  expect(stages().length).toBeLessThan(all.length);
 });
 
 test('job codes that are blank or unknown show an error', async () => {
@@ -166,7 +201,7 @@ test('order → raw material modal → job added to My Jobs → job card', async
   let text = allText(root);
   expect(text).toContain('WO #1036 · Coupling — Job G');
   expect(text).toContain('Bright Steel Co.');
-  expect(text).toContain('Additional details');
+  expect(text).toContain('Shop order number');
   await press(byTestId(root, 'create-job-card'));
 
   // Raw Material Details: known values kept, every field required.
@@ -201,6 +236,36 @@ test('order → raw material modal → job added to My Jobs → job card', async
   expect(text.indexOf('WO #1036')).toBeLessThan(text.indexOf('WO #1041'));
 });
 
+test('the order keeps its heading and drawing pinned; the thumbnail opens the Drawing screen', async () => {
+  const root = await secondAdmin();
+  await importCode(root, '1043');
+
+  const tile = byTestId(root, 'order-summary-tile');
+  expect(allText(tile)).toContain('Drawing');
+  // Pinned above the scrolling details, not inside them.
+  const screen = byTestId(root, 'import-order-screen');
+  const [scroll] = screen.findAll(n => n.props.contentContainerStyle);
+  expect(() => byTestId(scroll, 'order-summary-tile')).toThrow();
+  expect(allText(scroll)).toContain('Shop order number');
+  // Overview, Dispatch and Raw material, the same fields as the admin order.
+  expect(allText(byTestId(scroll, 'order-info-overview'))).toMatch(
+    /^Overview\|Quantity\|150 pcs\|Due date\|.*\|Part name\|Spindle\|.*PO amount\|₹65,000/,
+  );
+  expect(allText(byTestId(scroll, 'order-info-dispatch'))).toContain('DC-5562');
+  expect(allText(byTestId(scroll, 'order-info-material'))).toContain(
+    'Material source',
+  );
+
+  // The thumbnail opens the Drawing screen; close returns to the order.
+  await press(byTestId(tile, 'order-drawing-thumb'));
+  const drawing = byTestId(root, 'drawing-screen');
+  expect(allText(drawing)).toContain('DRW-1188');
+  expect(hasTestId(drawing, 'drawing-print')).toBe(true);
+  await press(byLabel(drawing, 'Close'));
+  expect(hasTestId(root, 'drawing-screen')).toBe(false);
+  expect(hasTestId(root, 'import-order-screen')).toBe(true);
+});
+
 test('closing the raw material modal keeps the order open', async () => {
   const root = await secondAdmin();
   await importCode(root, '1039');
@@ -224,6 +289,19 @@ test('a job already on My Jobs opens its job card from the order', async () => {
   expect(allText(root)).toContain('Route card & progress');
   await press(byText(root, 'Edit'));
   expect(allText(root)).toContain('Edit flow');
+});
+
+test('the list’s pencil edits the flow in a sheet; closing it stays on the list', async () => {
+  const root = await secondAdmin();
+  await press(byTestId(root, 'flow-action-1042'));
+
+  expect(hasTestId(root, 'flow-sheet')).toBe(true);
+  expect(hasTestId(root, 'job-card-details-screen')).toBe(false);
+  await press(byText(byTestId(root, 'flow-sheet'), 'Cancel'));
+
+  expect(hasTestId(root, 'flow-sheet')).toBe(false);
+  expect(hasTestId(root, 'my-jobs-screen')).toBe(true);
+  expect(hasTestId(root, 'job-card-details-screen')).toBe(false);
 });
 
 test('an order without a job card gets one created', async () => {

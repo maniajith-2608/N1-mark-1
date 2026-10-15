@@ -1,5 +1,6 @@
 import { memo, type ReactNode } from 'react';
 import { View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import {
   N1Badge,
   N1Button,
@@ -10,11 +11,7 @@ import {
   useN1Styles,
 } from '../../../shared/components';
 import { COMMON_STRINGS } from '../../../shared/constants';
-import {
-  formatLongDate,
-  formatTime,
-  notifyUnavailable,
-} from '../../../shared/utils';
+import { formatLongDate, formatTime } from '../../../shared/utils';
 import {
   DashedTile,
   JOB_CARD_STRINGS,
@@ -33,6 +30,7 @@ import {
   QC_STRINGS,
 } from '../constants';
 import type { QcItem, QcKind } from '../qc';
+import type { JobsScreenProps } from '../types';
 
 const S = JOBS_STRINGS.operatorJob;
 const D = JOB_CARD_STRINGS.details;
@@ -114,8 +112,13 @@ function ActiveStation({ jobCard }: { jobCard: JobCard }) {
   );
 }
 
-/** The drawing file and the material QC badge, under a station panel. */
+/**
+ * The drawing file (opens the Drawing screen) and the material QC badge,
+ * under a station panel.
+ */
 function StationFooter({ jobCard }: { jobCard: JobCard }) {
+  const navigation =
+    useNavigation<JobsScreenProps<'OperatorJob'>['navigation']>();
   const meta = MATERIAL_QC_META[jobCard.materialQc];
   return (
     <>
@@ -123,7 +126,8 @@ function StationFooter({ jobCard }: { jobCard: JobCard }) {
         icon="file"
         label={jobCard.designFile?.name ?? D.noDrawing}
         layout="row"
-        onPress={() => notifyUnavailable(JOB_CARD_STRINGS.openDrawing)}
+        onPress={() => navigation.navigate('Drawing', { orderId: jobCard.id })}
+        testID="station-drawing"
       />
       <MetaBadge meta={meta} label={S.materialQc(meta.label)} />
     </>

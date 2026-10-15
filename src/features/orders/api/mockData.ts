@@ -8,13 +8,15 @@ type Seed = Pick<
   | 'customerName'
   | 'partName'
   | 'jobName'
-  | 'material'
   | 'quantity'
   | 'priority'
   | 'status'
   | 'dueDate'
 > &
-  Partial<WorkOrder>;
+  Partial<WorkOrder> & {
+    /** Seed only: picks the raw material grade. */
+    material: string;
+  };
 
 const CUSTOMER_EMAILS: Record<string, string> = {
   'CUS-1': 'accounts@acmemetalworks.com',
@@ -31,7 +33,7 @@ const GRADES: Record<string, string> = {
   'Aluminium Billet': 'AL6061',
 };
 
-function order(seed: Seed): WorkOrder {
+function order({ material, ...seed }: Seed): WorkOrder {
   const n = Number(seed.id);
   const createdAt = seed.createdAt ?? '2026-09-10T09:00:00';
   return {
@@ -49,7 +51,7 @@ function order(seed: Seed): WorkOrder {
     rawMaterialSize: '25mm dia x 200mm',
     heatNumber: `HT-${99171 + n - 1000}`,
     projectId: `PRJ-${76 + n - 1000}`,
-    rawMaterialGrade: GRADES[seed.material] ?? '',
+    rawMaterialGrade: GRADES[material] ?? '',
     materialSource: '',
     quoteId: '',
     notes: '',
