@@ -39,6 +39,8 @@ export type N1HeaderProps = {
   leftAccessibilityLabel?: string;
   /** Right-hand action, e.g. an edit or flash button. */
   right?: ReactNode;
+  /** inverse variant: title centred between the buttons (My profile). */
+  centerTitle?: boolean;
   /** Pads for the status bar / notch. Defaults to true. */
   safeArea?: boolean;
   style?: StyleProp<ViewStyle>;
@@ -82,6 +84,8 @@ const makeStyles = createN1Styles(t => ({
     minWidth: t.controlHeight.sm,
     alignItems: 'center',
   },
+  // Same width both sides, so the title sits in the middle of the bar.
+  sideMd: { width: t.controlHeight.md },
   darkTitle: { color: t.colors.scannerForeground },
   spacer: { flex: 1 },
 }));
@@ -95,6 +99,7 @@ export const N1Header = React.memo(function N1HeaderComponent({
   onLeftPress,
   leftAccessibilityLabel,
   right,
+  centerTitle = false,
   safeArea = true,
   style,
   testID,
@@ -136,6 +141,23 @@ export const N1Header = React.memo(function N1HeaderComponent({
           {title}
         </N1Text>
         <View style={styles.side}>{right}</View>
+      </>
+    );
+  } else if (variant === 'inverse' && centerTitle) {
+    content = (
+      <>
+        <View style={styles.sideMd}>{leftButton}</View>
+        <N1Text
+          variant="h3"
+          color="inverse"
+          align="center"
+          style={styles.title}
+          numberOfLines={1}
+          accessibilityRole="header"
+        >
+          {title}
+        </N1Text>
+        <View style={styles.sideMd}>{right}</View>
       </>
     );
   } else if (variant === 'inverse') {
@@ -192,13 +214,13 @@ export const N1Header = React.memo(function N1HeaderComponent({
       style={[styles[variant], safeArea && { paddingTop: topInset }, style]}
       testID={testID}
     >
-      {/* Light status bar text over the black; dark over a white form
-          sheet, which may slide up over a black header (web has no status
-          bar). */}
+      {/* Light status bar text over the black; dark over any white
+          header, which may follow a black one (a form sheet over a black
+          header, Enter Job Code after the scanner). Web has no status bar. */}
       {variant === 'inverse' && Platform.OS !== 'web' && (
         <StatusBar barStyle="light-content" />
       )}
-      {variant === 'default' && subtitle && Platform.OS !== 'web' && (
+      {variant === 'default' && Platform.OS !== 'web' && (
         <StatusBar
           barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'}
         />

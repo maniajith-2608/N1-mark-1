@@ -49,7 +49,6 @@ export const ORDER_STRINGS = {
     edit: 'Edit order',
     priority: (label: string) => `${label} priority`,
     details: 'Details',
-    material: 'Material',
     quantity: 'Quantity',
     dueDate: 'Due date',
     additional: 'Additional details',

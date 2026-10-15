@@ -40,15 +40,17 @@ async function importCode(root: Root, code: string) {
 const card = async (id: string) =>
   (await jobCardsApi.list()).find(c => c.id === id)!;
 
-test("My Jobs shows the operator's jobs as rows", async () => {
+test("My Jobs shows the operator's jobs as cards", async () => {
   const root = await operator();
 
-  const text = allText(root);
-  expect(text).toContain('4 in progress · 5 total');
-  expect(text).toContain('WO #1034 · Housing — Job I');
-  expect(text).toContain('Deburring · Bench 2');
-  // No progress cards on the shop floor.
-  expect(text).not.toContain('View');
+  expect(allText(root)).toContain('4 in progress · 5 total');
+  // The part's letter, name and customer, where it is, chips, then the
+  // operator and progress. The whole card opens the job.
+  expect(allText(byTestId(root, 'job-row-1034'))).toBe(
+    'H|Housing — Job I|Silverline Industries|Deburring · Bench 2|Deburring (paused)|WO #1034|#JOB8|Medium priority|55 pcs|Due 16 Oct 2026|RK|Ravi Kumar|Operator|70%|done',
+  );
+  // No View button or flow edit for operators.
+  expect(allText(root)).not.toContain('View');
   expect(hasTestId(root, 'job-row-1040')).toBe(false);
 
   await press(byTestId(root, 'job-row-1034'));
@@ -136,10 +138,33 @@ test('View Details opens the order full screen, and closes back to the job', asy
   const text = allText(modal);
   expect(text).toContain('Order Details');
   expect(text).toContain('Acme Metalworks');
-  expect(text).toContain('Additional details');
+  expect(text).toContain('Shop order number');
   expect(text).toContain('HT-99213');
 
   await press(byLabel(modal, 'Close'));
   expect(hasTestId(root, 'order-details-modal')).toBe(false);
   expect(allText(root)).toContain('Job Detail');
+});
+
+test('1037 is ready to start: Start opens Assign Machine', async () => {
+  const root = await operator();
+  await press(byTestId(root, 'job-row-1037'));
+
+  // Cutting passed its QC, so Welding can start right away.
+  const start = byTestId(root, 'start-operation');
+  expect(allText(start)).toBe('Start');
+  expect(start.props.accessibilityState).toMatchObject({ disabled: false });
+  await press(start);
+  expect(hasTestId(root, 'assign-machine-screen')).toBe(true);
+});
+
+test('the station’s drawing opens the Drawing screen', async () => {
+  const root = await operator();
+  await press(byTestId(root, 'job-row-1037'));
+  await press(byTestId(root, 'station-drawing'));
+
+  const drawing = byTestId(root, 'drawing-screen');
+  expect(allText(drawing)).toMatch(/^Drawing\|DRW-1182\|WO #1037/);
+  await press(byLabel(drawing, 'Close'));
+  expect(hasTestId(root, 'operator-job-screen')).toBe(true);
 });

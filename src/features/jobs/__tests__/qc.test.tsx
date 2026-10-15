@@ -95,7 +95,10 @@ test('QC list has Raw Material and Machine QC tabs', async () => {
   expect(rowText(root, '1039')).toContain('Pending');
   expect(rowText(root, '1041')).toContain('Failed');
 
-  await press(byText(root, 'Machine QC'));
+  // Swipeable tabs under the header, like Billing on phones.
+  expect(hasTestId(root, 'qc-tabs-rm')).toBe(true);
+  await press(byTestId(root, 'qc-tabs-machine'));
+  expect(hasTestId(root, 'qc-tab-page-machine')).toBe(true);
   text = allText(root);
   expect(rowText(root, '1042')).toContain('In-process QC');
   expect(rowText(root, '1042')).toContain('Passed');
@@ -114,7 +117,7 @@ test('passing raw material QC moves the item to Passed', async () => {
   expect(text).toContain('Route card & progress');
   expect(text).toContain('Material QC: Pending');
   expect(allText(byTestId(root, 'qc-station'))).toContain('Assigned QC');
-  expect(text).not.toContain('Additional details');
+  expect(text).not.toContain('Shop order number');
 
   await press(byTestId(root, 'qc-pass'));
 
@@ -162,6 +165,30 @@ test('failing needs remarks, then marks the item failed', async () => {
   await press(byTestId(root, 'qc-row-1039'));
   expect(allText(root)).toContain('Bore out of tolerance');
   expect(hasTestId(root, 'qc-pass')).toBe(false);
+});
+
+test('a supporting document can be attached to a fail, and is kept as its report', async () => {
+  const root = await qc();
+  await press(byText(root, 'Machine QC'));
+  await press(byTestId(root, 'qc-row-1039'));
+  await press(byTestId(root, 'qc-fail'));
+
+  // Optional: not attaching one doesn't block Submit Fail.
+  const upload = byTestId(root, 'qc-fail-document');
+  expect(allText(root)).toContain('Supporting document');
+  expect(allText(upload)).toBe('Upload a photo, PDF or report');
+  await press(upload);
+  expect(allText(byTestId(root, 'qc-fail-document'))).toMatch(
+    /^qc-fail-report\.pdf\|.+KB/,
+  );
+
+  await typeInto(byTestId(root, 'qc-remarks'), 'Surface defect');
+  await press(byTestId(root, 'qc-submit-fail'));
+  expect((await card('1039')).qcHistory.at(-1)).toMatchObject({
+    result: 'failed',
+    remark: 'Surface defect',
+    report: { name: 'qc-fail-report.pdf', kind: 'QC report' },
+  });
 });
 
 test('failing raw material QC also records the rejected material', async () => {
@@ -222,5 +249,5 @@ test('View Details opens the order behind a QC check', async () => {
 
   const text = allText(byTestId(root, 'order-details-modal'));
   expect(text).toContain('Order Details');
-  expect(text).toContain('Additional details');
+  expect(text).toContain('Shop order number');
 });

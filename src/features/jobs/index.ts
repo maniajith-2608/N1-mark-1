@@ -11,4 +11,5 @@ export { QcListScreen } from './screens/QcListScreen';
 export { QcCheckScreen } from './screens/QcCheckScreen';
 export { QcFailScreen } from './screens/QcFailScreen';
 export { OrderDetailsModalScreen } from './screens/OrderDetailsModalScreen';
+export { DrawingScreen } from './screens/DrawingScreen';
 export type { JobsStackParamList } from './types';

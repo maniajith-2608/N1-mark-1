@@ -39,7 +39,6 @@ export type WorkOrder = {
   /** e.g. "Job A". */
   jobName: string;
   description: string;
-  material: string;
   quantity: number;
   priority: OrderPriority;
   /** Set by the selectors from the job card and invoice; see orderStatus. */

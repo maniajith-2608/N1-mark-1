@@ -7,7 +7,7 @@ import { DIM_FONT, DIM_LABELS, PART, VIEW } from './components/DrawingPreview';
 import { qrPath } from './components/QrCode';
 import { ORDER_STRINGS } from './constants';
 import type { WorkOrder } from './types';
-import { materialLine, orderHeading, orderQrValue, orderTitle } from './utils';
+import { orderHeading, orderQrValue, orderTitle } from './utils';
 
 const P = ORDER_STRINGS.print;
 const { colors } = lightTheme;
@@ -70,7 +70,10 @@ const orderDetails = (order: WorkOrder) => {
     [Q.part, orderTitle(order)],
     [Q.partNumber, order.partNumber],
     [Q.poNumber, order.poNumber],
-    [ORDER_STRINGS.details.material, materialLine(order)],
+    [
+      ORDER_STRINGS.details.quantity,
+      order.quantity ? ORDER_STRINGS.quantity(order.quantity) : '',
+    ],
     [ORDER_STRINGS.details.dueDate, formatLongDate(order.dueDate)],
   ]);
 };

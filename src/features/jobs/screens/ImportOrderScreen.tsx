@@ -1,23 +1,14 @@
 import { useCallback } from 'react';
-import { View } from 'react-native';
 import {
   AsyncContent,
   ComingSoon,
   N1Button,
   N1Header,
-  N1Text,
   UserScreen,
-  createN1Styles,
-  useN1Styles,
 } from '../../../shared/components';
-import {
-  ORDER_STRINGS,
-  OrderStatusBadge,
-  PriorityBadge,
-  orderHeading,
-  useOrder,
-} from '../../orders';
+import { ORDER_STRINGS, useOrder } from '../../orders';
 import { OrderInfo } from '../components/OrderInfo';
+import { OrderSummaryTile } from '../components/OrderSummaryTile';
 import { JOBS_STRINGS } from '../constants';
 import { useMyJobs } from '../hooks/useMyJobs';
 import type { JobsScreenProps } from '../types';
@@ -25,17 +16,14 @@ import type { JobsScreenProps } from '../types';
 const S = JOBS_STRINGS.order;
 const D = ORDER_STRINGS.details;
 
-const makeStyles = createN1Styles(t => ({
-  summary: { gap: t.spacing.xs },
-  badges: { flexDirection: 'row', flexWrap: 'wrap', gap: t.spacing.sm },
-}));
-
-/** The scanned work order; Create Job Card asks for its raw material. */
+/**
+ * The scanned work order; Create Job Card asks for its raw material. Its
+ * heading and drawing stay pinned on top while the details scroll.
+ */
 export function ImportOrderScreen({
   route,
   navigation,
 }: JobsScreenProps<'ImportOrder'>) {
-  const styles = useN1Styles(makeStyles);
   const { orderId } = route.params;
   const { order, status, error, reload } = useOrder(orderId);
   const myJobs = useMyJobs();
@@ -81,19 +69,16 @@ export function ImportOrderScreen({
   );
 
   return (
-    <UserScreen header={header} footer={footer} testID="import-order-screen">
-      <View style={styles.summary}>
-        <View style={styles.badges}>
-          <PriorityBadge priority={order.priority} suffix="priority" />
-          <OrderStatusBadge status={order.status} />
-        </View>
-        <N1Text variant="h2">{orderHeading(order)}</N1Text>
-        {order.customerName !== '' && (
-          <N1Text weight="semiBold" color="secondary">
-            {order.customerName}
-          </N1Text>
-        )}
-      </View>
+    <UserScreen
+      header={
+        <>
+          {header}
+          <OrderSummaryTile order={order} />
+        </>
+      }
+      footer={footer}
+      testID="import-order-screen"
+    >
       <OrderInfo order={order} />
     </UserScreen>
   );

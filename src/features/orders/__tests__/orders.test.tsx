@@ -30,7 +30,6 @@ import { selectOrderById } from '../store/selectors';
 import type { WorkOrder } from '../types';
 import {
   compareOrders,
-  materialLine,
   orderQrValue,
   orderStatus,
   orderTitle,
@@ -1052,7 +1051,6 @@ test('order helpers', () => {
       description: 'Line one\nline two',
     }),
   ).toBe('Line one');
-  expect(materialLine({ ...first, material: '', quantity: 0 })).toBe('EN8');
   // The QR code holds the WO number first, then the entered details.
   const qr = orderQrValue(first);
   expect(qr.split('\n')).toEqual([

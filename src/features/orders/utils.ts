@@ -42,15 +42,6 @@ export function orderQrValue(o: WorkOrder): string {
   ].join('\n');
 }
 
-/** "MS Round Bar · 200 pcs" */
-export const materialLine = (o: WorkOrder) =>
-  [
-    o.material || o.rawMaterialGrade,
-    o.quantity ? ORDER_STRINGS.quantity(o.quantity) : '',
-  ]
-    .filter(Boolean)
-    .join(' · ');
-
 /** High before medium before low; then earliest due date; undated last. */
 export function compareOrders(a: WorkOrder, b: WorkOrder): number {
   const byPriority =
@@ -66,8 +57,8 @@ export function compareOrders(a: WorkOrder, b: WorkOrder): number {
 
 export const orderSearchText = (o: WorkOrder) =>
   `${workOrderSearchTerms(o.id)} ${o.partName} ${o.jobName} ${o.customerName} ${
-    o.material
-  } ${o.poNumber} ${o.routeCardNo} ${o.description}`;
+    o.poNumber
+  } ${o.routeCardNo} ${o.description}`;
 
 export const matchesOrderFilters = (o: WorkOrder, f: OrderFilters) =>
   matchesAny(f.priority, o.priority) && matchesAny(f.status, o.status);

@@ -235,7 +235,6 @@ export function formValuesToOrderInput(
       (keepNames ? existing.partName : description.split('\n')[0]),
     jobName: keepNames ? existing.jobName : '',
     description,
-    material: existing?.material || v.rawMaterialGrade.trim(),
     quantity: isNumeric(v.quantity) ? Number(v.quantity) : 0,
     priority: v.priority || DEFAULT_PRIORITY,
     dueDate: parseDisplayDate(v.deliveryDate) ?? '',

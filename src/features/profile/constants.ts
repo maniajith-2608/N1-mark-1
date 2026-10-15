@@ -1,4 +1,3 @@
-import type { N1DropDownOption } from '../../shared/components';
 import { ROLE_LABELS } from '../auth/constants';
 import type { EmployeeRole } from './types';
 
@@ -39,10 +38,7 @@ export const PROFILE_STRINGS = {
 } as const;
 
 export const EMPLOYEE_PROFILE_STRINGS = {
-  title: 'Profile',
-  editTitle: 'Edit Profile',
-  editProfile: 'Edit profile',
-  changePhoto: 'Change photo',
+  title: 'My profile',
   logout: 'Log out',
   logoutTitle: 'Log out?',
   logoutMessage: 'You’ll need to sign in again to use N1.',
@@ -52,14 +48,8 @@ export const EMPLOYEE_PROFILE_STRINGS = {
   joined: 'Joined',
   phone: 'Phone',
   email: 'Email',
-  fields: {
-    name: 'Full name',
-    role: 'Role',
-    department: 'Department',
-    shift: 'Shift',
-    phone: 'Phone',
-    email: 'Email',
-  },
+  work: 'Work details',
+  contact: 'Contact',
 } as const;
 
 export const EMPLOYEE_ROLE_LABELS: Record<EmployeeRole, string> = {
@@ -67,18 +57,3 @@ export const EMPLOYEE_ROLE_LABELS: Record<EmployeeRole, string> = {
   operator: ROLE_LABELS.operator,
   qc: ROLE_LABELS.qc,
 };
-
-export const DEPARTMENT_OPTIONS: N1DropDownOption<string>[] = [
-  'Machining',
-  'Quality Control',
-  'Production',
-  'Maintenance',
-  'Stores',
-].map(name => ({ label: name, value: name }));
-
-export const SHIFT_OPTIONS: N1DropDownOption<string>[] = [
-  'Morning (6 AM – 2 PM)',
-  'Afternoon (2 PM – 10 PM)',
-  'Night (10 PM – 6 AM)',
-  'General (9 AM – 6 PM)',
-].map(name => ({ label: name, value: name }));

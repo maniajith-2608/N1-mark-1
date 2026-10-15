@@ -9,13 +9,20 @@ import {
   N1Header,
   N1Text,
   N1TextInput,
+  N1UploadBox,
   UserScreen,
   createN1Styles,
   useN1Styles,
 } from '../../../shared/components';
 import { COMMON_STRINGS } from '../../../shared/constants';
 import { useOnSettled } from '../../../shared/hooks';
-import { isBlank, notifyUnavailable } from '../../../shared/utils';
+import {
+  formatFileSize,
+  isBlank,
+  notifyUnavailable,
+} from '../../../shared/utils';
+import type { Attachment } from '../../../shared/types';
+import { pickDocument } from '../../../services/files/pickDocument';
 import {
   JOB_CARD_STRINGS,
   jobHeading,
@@ -49,7 +56,8 @@ const NO_MATERIAL: RejectedMaterial = { grade: '', heatNumber: '', size: '' };
 
 /**
  * Why a QC check failed. Remarks are required, and an RM QC failure also
- * records the rejected material's grade, heat number and size. Submit Fail
+ * records the rejected material's grade, heat number and size. A supporting
+ * document is optional and kept as the check's report. Submit Fail
  * marks the item failed and returns to the QC list.
  */
 export function QcFailScreen({ route, navigation }: JobsScreenProps<'QcFail'>) {
@@ -65,6 +73,8 @@ export function QcFailScreen({ route, navigation }: JobsScreenProps<'QcFail'>) {
   const [missingMaterial, setMissingMaterial] = useState<
     (keyof RejectedMaterial)[]
   >([]);
+  const [report, setReport] = useState<Attachment | null>(null);
+  const [picking, setPicking] = useState(false);
   const isRm = kind === 'rm';
 
   // Close both Fail Remarks and the QC Check under it.
@@ -118,8 +128,24 @@ export function QcFailScreen({ route, navigation }: JobsScreenProps<'QcFail'>) {
               size: material.size.trim(),
             }
           : undefined,
+        report ?? undefined,
       ),
     );
+  };
+  const attach = async () => {
+    setPicking(true);
+    try {
+      const file = await pickDocument(
+        S.documentKind,
+        S.documentSample,
+        S.documentAccept,
+      );
+      if (file) {
+        setReport(file);
+      }
+    } finally {
+      setPicking(false);
+    }
   };
   const setField = (key: keyof RejectedMaterial) => (value: string) => {
     setMaterial(prev => ({ ...prev, [key]: value }));
@@ -203,6 +229,16 @@ export function QcFailScreen({ route, navigation }: JobsScreenProps<'QcFail'>) {
           testID="qc-remarks"
         />
       </View>
+      <N1UploadBox
+        label={S.document}
+        hint={S.documentHint}
+        onPress={attach}
+        fileName={report?.name}
+        fileSize={report ? formatFileSize(report.sizeBytes) : undefined}
+        onRemove={() => setReport(null)}
+        disabled={picking || saving}
+        testID="qc-fail-document"
+      />
       {saveError && (
         <N1Text variant="small" color="danger">
           {saveError}

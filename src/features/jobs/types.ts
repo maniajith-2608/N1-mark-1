@@ -17,6 +17,8 @@ export type JobsStackParamList = {
   RawMaterial: { orderId: string; retest?: boolean };
   /** Operator / QC: the job's work order, read only (full screen modal). */
   OrderDetails: { orderId: string };
+  /** The work order's drawing, full screen. */
+  Drawing: { orderId: string };
   // Reused from the Job Cards feature, under the same names.
   JobCardDetails: { jobCardId: string; editFlow?: boolean };
   /** Operator: the job they run (start, pause, complete). */

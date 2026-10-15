@@ -3,6 +3,7 @@ import type { NativeStackNavigationOptions } from '@react-navigation/native-stac
 import { JobCardDetailsScreen } from '../../features/jobCards';
 import {
   AssignMachineScreen,
+  DrawingScreen,
   EnterJobCodeScreen,
   ImportOrderScreen,
   OperatorJobScreen,
@@ -14,9 +15,9 @@ import {
 } from '../../features/jobs';
 import type { RoleStackParamList } from './types';
 
-/** A screen a role opens over its tabs. */
+/** A screen a role opens over its home. */
 export type RoleScreen = {
-  name: Exclude<keyof RoleStackParamList, 'Tabs' | 'EditProfile'>;
+  name: Exclude<keyof RoleStackParamList, 'Home' | 'Profile'>;
   // Screens come typed for the navigator they were built for; any stack that
   // registers the same route names and params can host them.
   component: React.ComponentType<any>;
@@ -35,6 +36,13 @@ const FULL_SCREEN_MODAL: NativeStackNavigationOptions = {
   animation: 'slide_from_bottom',
 };
 
+// The drawing opens full screen over the job or order it came from.
+const DRAWING: RoleScreen = {
+  name: 'Drawing',
+  component: DrawingScreen,
+  options: FULL_SCREEN_MODAL,
+};
+
 // Supervisor: import a job (scan / code → order → raw material modal →
 // job card) and manage its job card. Job card and flow reuse the admin screens' phone layouts.
 export const SUPERVISOR_SCREENS: RoleScreen[] = [
@@ -43,6 +51,7 @@ export const SUPERVISOR_SCREENS: RoleScreen[] = [
   { name: 'ImportOrder', component: ImportOrderScreen },
   { name: 'RawMaterial', component: RawMaterialScreen, options: MODAL },
   { name: 'JobCardDetails', component: JobCardDetailsScreen },
+  DRAWING,
 ];
 
 // Operator: import a job (scan / code) straight to its Job Detail,
@@ -57,6 +66,7 @@ export const OPERATOR_SCREENS: RoleScreen[] = [
     component: OrderDetailsModalScreen,
     options: FULL_SCREEN_MODAL,
   },
+  DRAWING,
 ];
 
 // QC: import a job (scan / code) into the open tab's QC Check, then pass it,
@@ -71,4 +81,5 @@ export const QC_SCREENS: RoleScreen[] = [
     component: OrderDetailsModalScreen,
     options: FULL_SCREEN_MODAL,
   },
+  DRAWING,
 ];

@@ -22,6 +22,7 @@ export const QC_STRINGS = {
   subtitle: (pending: number, total: number) =>
     `${pending} pending · ${total} total`,
   tabs: { rm: 'Raw Material QC', machine: 'Machine QC' },
+  statusFilter: 'QC status',
   kind: { rm: 'RM QC', machine: 'Machine QC' },
   stages: {
     incoming: 'Incoming inspection',
@@ -58,6 +59,12 @@ export const QC_STRINGS = {
     rejectedMaterial: 'Rejected material',
     rejectedHelp:
       'Record the grade, heat number and size of the material received.',
+    /** Optional: photos or a report backing up the failure. */
+    document: 'Supporting document',
+    documentHint: 'Upload a photo, PDF or report',
+    documentKind: 'QC report',
+    documentSample: 'qc-fail-report.pdf',
+    documentAccept: '.pdf,.doc,.docx,.xls,.xlsx,image/*',
   },
 } as const;
 
@@ -88,9 +95,19 @@ export const JOBS_STRINGS = {
       `${inProgress} in progress · ${total} total`,
     importJob: 'Import Job',
     search: 'Search jobs',
-    openSearch: 'Search jobs',
-    closeSearch: 'Close search',
     empty: 'No jobs yet. Import one to get started.',
+    stageFilter: 'Stage',
+    /** A job on the shop-floor home. */
+    card: {
+      priority: (label: string) => `${label} priority`,
+      quantity: (qty: number) => `${qty} pcs`,
+      due: (date: string) => `Due ${date}`,
+      operator: 'Operator',
+      noOperator: 'Not assigned',
+      done: 'done',
+    },
+    operationFilter: 'Operation',
+    machineFilter: 'Machine',
   },
   scan: {
     title: 'Scan QR Code',
@@ -116,6 +133,7 @@ export const JOBS_STRINGS = {
     title: 'Order',
     createJobCard: 'Create Job Card',
     viewJobCard: 'View Job Card',
+    openDrawing: (no: string) => `Open drawing ${no}`,
   },
   orderDetails: {
     title: 'Order Details',

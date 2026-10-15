@@ -642,6 +642,23 @@ describe('Job card details', () => {
     expect(hasTestId(screen(), 'qc-report-upload-qc2')).toBe(false);
   });
 
+  test('phone: tapping a QC report shows its details in a sheet', async () => {
+    mockWidth = 390;
+    const h = await renderAdmin('JobCards');
+    await h.navigate('JobCardDetails', { jobCardId: '1042' });
+    const screen = () => byTestId(h.root, 'job-card-details-screen');
+    await press(byTestId(screen(), 'job-card-tab-qc'));
+    await press(byTestId(screen(), 'qc-report-qc1'));
+
+    // The file, then the check it belongs to.
+    const sheet = byTestId(h.root, 'qc-report-sheet');
+    expect(allText(sheet)).toMatch(
+      /^QC report\|material-qc-report\.pdf\|QC report · .+\|Stage\|Material QC\|Result\|Accepted\|QC by\|Suresh Babu\|Date\|.+\|Remark\|Voice \+ text note$/,
+    );
+    // Phones can't open files yet, so there's no Open button.
+    expect(hasTestId(sheet, 'qc-report-open')).toBe(false);
+  });
+
   test('quick actions pause and resume the running step; Complete finishes the whole flow', async () => {
     const h = await renderAdmin('JobCards');
     await h.navigate('JobCardDetails', { jobCardId: '1042' });
@@ -1011,10 +1028,8 @@ describe('Create / Edit flow, in place on the job card', () => {
       'Packing',
     ]);
     expect(card.operations.every(o => o.status === 'pending')).toBe(true);
-    // Saved: back to the route card, still on the job card.
-    expect(h.currentRoute()).toBe('JobCardDetails');
-    expect(hasTestId(screen(), 'flow-editor')).toBe(false);
-    expect(allText(screen())).toContain('Route card & progress');
+    // Opened from the list to edit: saving returns straight to the list.
+    expect(h.currentRoute()).toBe('JobCards');
   });
 
   test('removing every step asks for at least one', async () => {
@@ -1056,13 +1071,23 @@ describe('Create / Edit flow, in place on the job card', () => {
     expect(hasTestId(screen(), 'flow-editor')).toBe(false);
   });
 
-  test('cancel leaves the flow unchanged and shows the route card again', async () => {
+  test('cancel leaves the flow unchanged and returns straight to the list', async () => {
     const { h, screen } = await openEditor('1042');
     await press(byLabel(screen(), 'Remove step 6'));
     await press(byTestId(screen(), 'flow-cancel'));
     expect(
       h.store.getState().jobCards.entities['1042'].operations,
     ).toHaveLength(6);
+    expect(h.currentRoute()).toBe('JobCards');
+  });
+
+  test('opened on the job card itself, cancel shows the route card again', async () => {
+    const h = await renderAdmin('JobCards');
+    await h.navigate('JobCardDetails', { jobCardId: '1042' });
+    const screen = () => byTestId(h.root, 'job-card-details-screen');
+    await press(byLabel(screen(), 'Edit flow'));
+    await press(byTestId(screen(), 'flow-cancel'));
+    expect(h.currentRoute()).toBe('JobCardDetails');
     expect(hasTestId(screen(), 'flow-editor')).toBe(false);
     expect(allText(byTestId(screen(), 'overall-progress'))).toContain('42%');
   });

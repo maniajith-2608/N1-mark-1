@@ -10,6 +10,7 @@ export type HeaderSearchBarProps = {
   /** Beside the search, e.g. <FilterMenu variant="inverse" />. */
   right?: ReactNode;
   testID?: string;
+  inputTestID?: string;
 };
 
 const makeStyles = createN1Styles(t => ({
@@ -54,6 +55,7 @@ export function HeaderSearchBar({
   placeholder,
   right,
   testID,
+  inputTestID,
 }: HeaderSearchBarProps) {
   const styles = useN1Styles(makeStyles);
   const theme = useN1Theme();
@@ -69,6 +71,7 @@ export function HeaderSearchBar({
           accessibilityLabel={placeholder}
           selectionColor={theme.colors.textInverse}
           style={styles.input}
+          testID={inputTestID}
           {...SEARCH_INPUT_PROPS}
         />
       </View>

@@ -7,7 +7,7 @@ import type { Invoice, InvoiceInput, LineItem, Quote } from './types';
 export const jobReference = (workOrderId: string) =>
   `WO-${workOrderId.padStart(5, '0')}`;
 
-/** A new work order from a quote: customer, part, quantity and material. */
+/** A new work order from a quote: customer, part, quantity and material grade. */
 export function orderFromQuote(
   quote: Quote,
   customer: Customer | undefined,
@@ -19,7 +19,6 @@ export function orderFromQuote(
     partName: quote.partName,
     jobName: '',
     description: quote.partName,
-    material: quote.material,
     quantity: quote.quantity,
     priority: 'medium',
     dueDate: '',

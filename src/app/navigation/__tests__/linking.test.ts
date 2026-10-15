@@ -73,9 +73,8 @@ const USER_URLS: [path: string, screen: string][] = [
   'operator',
   'qc',
 ].flatMap(role => [
-  [`/dashboard/${role}`, 'Jobs'],
+  [`/dashboard/${role}`, 'Home'],
   [`/dashboard/${role}/profile`, 'Profile'],
-  [`/dashboard/${role}/profile/edit`, 'EditProfile'],
 ]);
 
 const SUPERVISOR_URLS: [path: string, screen: string, params?: object][] = [

@@ -4,6 +4,7 @@ import type {
   QcEntry,
   RejectedMaterial,
 } from '../jobCards/types';
+import type { Attachment } from '../../shared/types';
 import { operationQc } from '../jobCards/utils';
 import { QC_STRINGS } from './constants';
 
@@ -100,6 +101,8 @@ export function qcResult(
   /** The QC user doing the check. */
   inspector = '',
   rejectedMaterial?: RejectedMaterial,
+  /** A supporting document, e.g. photos or a report of the failure. */
+  report?: Attachment,
 ): Partial<JobCard> {
   const op = machineQc(c).operation;
   const entry: QcEntry = {
@@ -118,6 +121,7 @@ export function qcResult(
     ...(inspector && { inspector }),
     operationId: kind === 'machine' ? op?.id : undefined,
     ...(kind === 'rm' && !passed && rejectedMaterial && { rejectedMaterial }),
+    ...(report && { report }),
   };
   return {
     ...(kind === 'rm' && { materialQc: passed ? 'accepted' : 'rejected' }),

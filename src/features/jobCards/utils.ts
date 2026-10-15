@@ -415,7 +415,7 @@ export function jobCardFromOrder(order: WorkOrder): JobCard {
     customerName: order.customerName,
     partName: order.partName,
     jobName: order.jobName,
-    material: order.material || order.rawMaterialGrade,
+    material: order.rawMaterialGrade,
     quantity: order.quantity,
     priority: order.priority,
     dueDate: order.dueDate,
