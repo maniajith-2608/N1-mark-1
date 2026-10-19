@@ -179,8 +179,11 @@ function Sidebar({
         accessibilityRole="link"
         accessibilityLabel={ORGANIZATION_STRINGS.open(organizationName)}
         onPress={openOrganization}
+        accessibilityState={{ selected: activeRoute === 'Organization' }}
         style={({ pressed }) => [
           styles.organization,
+          // Highlighted like a menu item, only while Organization is open.
+          activeRoute === 'Organization' && styles.userCardActive,
           pressed && styles.userCardPressed,
         ]}
         testID="open-organization"

@@ -19,8 +19,15 @@ test('wide screens: no top bar; the sidebar opens the organization', async () =>
   expect(allText(byTestId(h.root, 'open-organization'))).toBe(
     'ABC Engineering Pvt Ltd',
   );
+  expect(
+    byTestId(h.root, 'open-organization').props.accessibilityState?.selected,
+  ).toBe(false);
   await press(byTestId(h.root, 'open-organization'));
   expect(h.currentRoute()).toBe('Organization');
+  // Highlighted like a menu item while Organization is open.
+  expect(
+    byTestId(h.root, 'open-organization').props.accessibilityState?.selected,
+  ).toBe(true);
   // No top bar on wide screens: the sidebar has the only link.
   expect(h.root.findAll(n => n.props.testID === 'open-profile')).toHaveLength(
     0,
