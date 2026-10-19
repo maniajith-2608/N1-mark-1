@@ -36,6 +36,7 @@ export const makeSidebarStyles = createN1Styles(t => ({
     gap: t.spacing.sm,
     paddingHorizontal: t.spacing.md,
     paddingVertical: t.spacing.sm,
+    borderRadius: t.radius.compact,
   },
   logout: {
     flexDirection: 'row',
