@@ -22,7 +22,7 @@ import {
 import { useEmployeeProfile } from '../../profile/hooks/useEmployeeProfile';
 import { JobOverview, QcStation } from '../components/JobOverview';
 import { QC_STATUS_META, QC_STRINGS } from '../constants';
-import { qcEntry, qcItem, qcResult } from '../qc';
+import { qcEntry, qcItem } from '../qc';
 import type { JobsScreenProps } from '../types';
 
 const S = QC_STRINGS.check;
@@ -39,7 +39,7 @@ export function QcCheckScreen({
 }: JobsScreenProps<'QcCheck'>) {
   const styles = useN1Styles(makeStyles);
   const { jobCardId, kind } = route.params;
-  const { jobCard, status, error, reload, update, saving, saveError } =
+  const { jobCard, status, error, reload, run, saving, saveError } =
     useJobCard(jobCardId);
   const { profile } = useEmployeeProfile();
 
@@ -80,17 +80,14 @@ export function QcCheckScreen({
             fullWidth
             loading={saving}
             onPress={() =>
-              update(
-                jobCard.id,
-                qcResult(
-                  jobCard,
-                  kind,
-                  true,
-                  '',
-                  new Date().toISOString(),
-                  profile?.name,
-                ),
-              )
+              run({
+                type: 'recordQc',
+                kind,
+                operationId: item.operation?.id,
+                passed: true,
+                remark: '',
+                inspector: profile?.name ?? '',
+              })
             }
             testID="qc-pass"
           />,
@@ -143,7 +140,7 @@ export function QcCheckScreen({
       <JobOverview
         jobCard={jobCard}
         onViewDetails={() =>
-          navigation.navigate('OrderDetails', { orderId: jobCard.id })
+          navigation.navigate('OrderDetails', { orderId: jobCard.orderId })
         }
         station={
           <QcStation

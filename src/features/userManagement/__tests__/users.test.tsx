@@ -9,7 +9,7 @@ import {
   renderAdmin,
   typeInto,
 } from '../../../shared/testing/testUtils';
-import { userManagementApi } from '../api/userManagementApi';
+import { userManagementApi } from '../api/mockUserManagementApi';
 import { ROLE_OPTIONS } from '../constants';
 
 let mockWidth = 1280;
@@ -110,7 +110,7 @@ describe('Users list (desktop)', () => {
     await press(byTestId(root, 'user-form-submit'));
     expect(allText(root)).toContain('Enter a valid email address');
     expect(allText(root)).toContain(
-      'Use at least 8 characters with letters and numbers',
+      'Use at least 10 characters with letters and numbers',
     );
 
     await typeInto(

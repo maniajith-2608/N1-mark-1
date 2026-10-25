@@ -23,7 +23,9 @@ import {
 } from '../../../shared/components';
 import { COMMON_STRINGS } from '../../../shared/constants';
 import { useListFilter, usePagination } from '../../../shared/hooks';
+import { useAppSelector } from '../../../app/store/hooks';
 import { useJobCards } from '../../jobCards';
+import { selectJobCardsState } from '../../jobCards/store/selectors';
 import { formatDayMonth } from '../../../shared/utils';
 import { OrderCard } from '../components/OrderCard';
 import { OrderStatusBadge, PriorityBadge } from '../components/OrderBadges';
@@ -54,7 +56,7 @@ const COLUMNS: N1TableColumn<WorkOrder>[] = [
     flex: 1.6,
     render: o => (
       <View>
-        <N1Text weight="bold">{S.workOrder(o.id)}</N1Text>
+        <N1Text weight="bold">{S.workOrder(o.number)}</N1Text>
         <N1Text variant="small" color="secondary" numberOfLines={1}>
           {orderTitle(o) || COMMON_STRINGS.dash}
         </N1Text>
@@ -111,7 +113,11 @@ type Navigation = OrdersScreenProps<'OrdersList'>['navigation'];
 export function OrdersListScreen() {
   const styles = useN1Styles(makeStyles);
   const navigation = useNavigation<Navigation>();
-  const jobCards = useJobCards();
+  // Loads the job cards behind each row's clipboard.
+  useJobCards();
+  const jobCardEntities = useAppSelector(
+    state => selectJobCardsState(state).entities,
+  );
   const { isCompact } = useN1Breakpoint();
   const { items, status, error, reload } = useOrders();
 
@@ -158,35 +164,34 @@ export function OrdersListScreen() {
     [navigation],
   );
 
-  // Opens the order's job card (Back returns to Orders), with
-  // Create flow open when it has no route yet. Orders without a job card get
-  // theirs from Create order (raw material arrived) or the shop floor.
+  // Opens the order's job card (Back returns to Orders), with Create flow
+  // open when it has no route yet. createOrder opens every order's card.
   const openJobCard = useCallback(
-    (orderId: string, createFlow: boolean) =>
+    (jobCardId: string, createFlow: boolean) =>
       // Pushed on the Orders stack: Back returns to this list.
       navigation.navigate('JobCardDetails', {
-        jobCardId: orderId,
+        jobCardId,
         editFlow: createFlow || undefined,
       }),
     [navigation],
   );
-  // Only orders that have a job card get the clipboard: Open, or Create
-  // when it has no route yet.
+  // Only orders whose job card is open get the clipboard: Open, or Create
+  // flow when it has no route yet.
   const jobCardAction = useCallback(
     (o: WorkOrder) => {
-      const card = jobCards.items.find(c => c.id === o.id);
+      const card = o.jobCardId ? jobCardEntities[o.jobCardId] : undefined;
       if (!card) {
         return undefined;
       }
       const createFlow = !card.operations.length;
       return {
         label: createFlow
-          ? S.a11y.createJobCard(o.id)
-          : S.a11y.openJobCard(o.id),
-        onPress: () => openJobCard(o.id, createFlow),
+          ? S.a11y.createJobCard(o.number)
+          : S.a11y.openJobCard(o.number),
+        onPress: () => openJobCard(card.id, createFlow),
       };
     },
-    [jobCards.items, openJobCard],
+    [jobCardEntities, openJobCard],
   );
 
   const columns = useMemo<N1TableColumn<WorkOrder>[]>(
@@ -215,7 +220,7 @@ export function OrdersListScreen() {
                 icon="edit"
                 variant="primary"
                 size="sm"
-                accessibilityLabel={S.a11y.edit(o.id)}
+                accessibilityLabel={S.a11y.edit(o.number)}
                 onPress={() => openEdit(o)}
                 testID={`edit-order-${o.id}`}
               />

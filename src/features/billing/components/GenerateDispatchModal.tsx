@@ -6,7 +6,7 @@ import { BILLING_STRINGS } from '../constants';
 import { useInvoices } from '../hooks/useBilling';
 import { useBillingWorkflow } from '../hooks/useBillingWorkflow';
 import { useGst } from '../hooks/useGst';
-import { jobReference } from '../workflow';
+import { jobCardLabel } from '../workflow';
 
 const S = BILLING_STRINGS.dispatch;
 
@@ -36,8 +36,8 @@ export function GenerateDispatchModal({
   const { generateInvoice, busy, error, invoiceId } = useBillingWorkflow();
   const requested = useRef(false);
 
-  const existing = invoices.find(i => i.jobId === jobReference(jobCard.id));
-  const job = jobReference(jobCard.id);
+  const existing = invoices.find(i => i.jobCardId === jobCard.id);
+  const job = jobCardLabel(jobCard);
 
   useOnSettled(busy, error, () => {
     if (requested.current && invoiceId) {
@@ -62,7 +62,7 @@ export function GenerateDispatchModal({
       message={
         <>
           {existing
-            ? S.existing(existing.id)
+            ? S.existing(existing.number)
             : S.confirm(job, jobCard.customerName)}
           {error && (
             <N1Text variant="small" color="danger">

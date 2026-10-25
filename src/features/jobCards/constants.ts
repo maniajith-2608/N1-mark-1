@@ -1,9 +1,11 @@
 import type { N1DropDownOption } from '../../shared/components';
 import type { StatusMeta } from '../../shared/types';
+import { workOrderLabel } from '../orders/constants';
 import type {
   BillingState,
   JobCardFilters,
   MaterialQc,
+  PauseReason,
   QcResult,
   QuotationStatus,
 } from './types';
@@ -29,7 +31,8 @@ export const JOB_CARD_STRINGS = {
     progress: 'Progress',
     actions: 'Actions',
   },
-  workOrder: (id: string) => `WO #${id}`,
+  /** The work order number ("WO-12") as the app writes it. */
+  workOrder: workOrderLabel,
   /** The job card's status (jobCardStage): RM, each operation and its QC, dispatch. */
   stages: {
     rmReceived: 'RM received',
@@ -46,24 +49,29 @@ export const JOB_CARD_STRINGS = {
     waitingForRmQc: 'Waiting for RM QC',
     waitingForQc: (operation: string) => `Waiting for ${operation} QC`,
     redo: (operation: string) => `Redo ${operation}`,
+    waitingForDesign: 'Waiting for design approval',
   },
   /** Blank until the card is saved. */
   jobCardNumber: (code: string) => (code ? `#${code}` : ''),
   operator: (name: string) => `Operator: ${name}`,
   quantity: (n: number) => `${n} pcs`,
   view: 'View',
+  /** Job cards are cancelled, never deleted, and only before work starts. */
   delete: {
-    title: 'Delete job card?',
-    message: (id: string) =>
-      `This will permanently remove the job card for WO #${id}, with its route card and QC history. This can’t be undone.`,
-    confirm: 'Delete job card',
+    title: 'Cancel job card?',
+    message: (number: string) =>
+      `This cancels the job card for ${workOrderLabel(
+        number,
+      )}. Its order stays; nothing on it has started yet.`,
+    confirm: 'Cancel job card',
   },
+  /** Each takes the job's work order number. */
   a11y: {
-    view: (id: string) => `View job card WO #${id}`,
-    delete: (id: string) => `Delete job card WO #${id}`,
-    createFlow: (id: string) => `Create flow for WO #${id}`,
-    editFlow: (id: string) => `Edit flow for WO #${id}`,
-    diagram: (id: string) => `Open drawing for WO #${id}`,
+    view: (number: string) => `View job card ${workOrderLabel(number)}`,
+    delete: (number: string) => `Cancel job card ${workOrderLabel(number)}`,
+    createFlow: (number: string) => `Create flow for ${workOrderLabel(number)}`,
+    editFlow: (number: string) => `Edit flow for ${workOrderLabel(number)}`,
+    diagram: (number: string) => `Open drawing for ${workOrderLabel(number)}`,
   },
   details: {
     title: 'Job card',
@@ -77,7 +85,7 @@ export const JOB_CARD_STRINGS = {
     orderSection: 'Order',
     order: {
       due: (date: string) => `Due ${date}`,
-      open: (id: string) => `Open order WO #${id}`,
+      open: (number: string) => `Open order ${workOrderLabel(number)}`,
     },
     /** The job's details on the Machining tab, above the route card. */
     info: {
@@ -85,20 +93,49 @@ export const JOB_CARD_STRINGS = {
       qty: 'Quantity',
       part: 'Part',
       materialQc: 'Material QC',
+      design: 'Design approval',
     },
     start: 'Start Operation',
     /** Phones: the sticky bottom bar shares its width three ways. */
     startShort: 'Start',
     pause: 'Pause',
     complete: 'Complete',
-    completeFlow: {
-      title: 'Complete the whole flow?',
-      message: (steps: number) =>
-        `This marks the ${steps} remaining ${
-          steps === 1 ? 'step' : 'steps'
-        } as completed and moves the job to final QC. Completed steps can't be changed.`,
-      confirm: 'Complete all',
+    /** Start (or redo) a step: who runs it, on which idle machine. */
+    startStep: {
+      title: (operation: string) => `Start ${operation}`,
+      help: 'The operator runs this step on an idle machine.',
+      operator: 'Operator',
+      operatorPlaceholder: 'Select operator',
+      machine: 'Machine',
+      machinePlaceholder: 'Select an idle machine',
+      noMachines: 'No machine is idle right now.',
+      confirm: 'Start',
     },
+    /** Complete the running step: what it produced. */
+    completeStep: {
+      title: (operation: string) => `Complete ${operation}`,
+      help: (quantity: number) =>
+        `Account for all ${quantity} pieces this step started with.`,
+      good: 'Good',
+      reject: 'Rejected',
+      rework: 'Rework',
+      scrap: 'Scrap',
+      mismatch: (total: number, quantity: number) =>
+        `These add up to ${total}; they must add up to ${quantity}.`,
+      confirm: 'Complete step',
+    },
+    /** Pause the running step: why. */
+    pauseStep: {
+      title: (operation: string) => `Pause ${operation}`,
+      reason: 'Reason',
+      note: 'Details',
+      notePlaceholder: 'What happened?',
+      confirm: 'Pause',
+    },
+    resume: 'Resume',
+    /** Supervisor / admin: the drawing must be approved before work starts. */
+    approveDesign: 'Approve design',
+    rejectDesign: 'Reject design',
     dispatch: 'Generate Dispatch',
     priority: 'Priority:',
     due: 'Due:',
@@ -162,7 +199,7 @@ export const JOB_CARD_STRINGS = {
     createHelp:
       'Add each operation the material will go through, in the order it should happen.',
     editHelp:
-      'Completed steps are locked. Reorder, swap or add the steps still to come.',
+      'Steps already started are locked. Reorder, swap or add the steps still to come.',
     stepPlaceholder: 'Select operation',
     stepLabel: (n: number) => `Operation ${n}`,
     addProcess: 'Add process',
@@ -206,6 +243,24 @@ export const STAGE_META = {
   ready_to_dispatch: { label: ST.readyToDispatch, tone: 'success' },
   done: { label: ST.done, tone: 'success' },
 } as const satisfies Record<string, StatusMeta>;
+
+/** Pause reasons, in the order the pause dialog lists them. */
+export const PAUSE_REASON_OPTIONS: { value: PauseReason; label: string }[] = [
+  { value: 'tool_change', label: 'Tool change' },
+  { value: 'material', label: 'Material' },
+  { value: 'breakdown', label: 'Breakdown' },
+  { value: 'break', label: 'Break' },
+  { value: 'other', label: 'Other' },
+];
+
+export const DESIGN_APPROVAL_META: Record<
+  'approved' | 'pending' | 'rejected',
+  StatusMeta
+> = {
+  approved: { label: 'Approved', tone: 'success' },
+  pending: { label: 'Pending', tone: 'warning' },
+  rejected: { label: 'Rejected', tone: 'danger' },
+};
 
 export const MATERIAL_QC_META: Record<MaterialQc, StatusMeta> = {
   accepted: { label: 'Accepted', tone: 'success' },

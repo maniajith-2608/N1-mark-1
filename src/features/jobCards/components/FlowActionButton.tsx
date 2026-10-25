@@ -21,7 +21,9 @@ export const FlowActionButton = memo(function FlowActionButtonComponent({
       variant={appearance === 'card' ? 'card' : 'primary'}
       size={appearance === 'card' ? 'md' : 'sm'}
       accessibilityLabel={
-        hasFlow ? S.a11y.editFlow(jobCard.id) : S.a11y.createFlow(jobCard.id)
+        hasFlow
+          ? S.a11y.editFlow(jobCard.number)
+          : S.a11y.createFlow(jobCard.number)
       }
       onPress={() => onPress(jobCard)}
       testID={`flow-action-${jobCard.id}`}

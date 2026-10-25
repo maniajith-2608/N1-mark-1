@@ -1,72 +1,72 @@
-import { useMemo } from 'react';
-import { useBillingSummary } from '../../billing';
-import { useCustomerShares } from '../../customers';
-import { useJobCards } from '../../jobCards';
-import { usePriorityJobs } from '../../orders';
-import { PRIORITY_JOBS_LIMIT } from '../constants';
-import type { DashboardPeriod } from '../types';
-import {
-  byDueDate,
-  customerRows,
-  summarizePeriod,
-  withRouteCards,
-} from '../utils';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useN1Theme } from '../../../shared/components';
+import { errorMessage } from '../../../shared/store';
 import type { RequestStatus } from '../../../shared/types';
+import { dashboardApi } from '../api/dashboardApi';
+import { DASHBOARD_STRINGS } from '../constants';
+import type { CustomerRow, DashboardData, DashboardPeriod } from '../types';
 
-const worst = (...statuses: RequestStatus[]): RequestStatus =>
-  statuses.includes('failed')
-    ? 'failed'
-    : statuses.some(s => s === 'idle' || s === 'loading')
-    ? 'loading'
-    : 'succeeded';
+const EMPTY: DashboardData = {
+  stats: { billed: 0, outstanding: 0, orders: 0 },
+  customers: [],
+  jobs: [],
+  totalJobs: 0,
+};
 
 /**
- * Everything the dashboard shows, derived from the customers, orders and
- * billing stores (each loads itself on first use).
+ * Everything the dashboard shows for the period picked in the header, from
+ * one dashboard(period) load; picking another period loads that one.
  */
 export function useDashboard(period: DashboardPeriod) {
-  const billing = useBillingSummary();
-  const customers = useCustomerShares();
-  const orders = usePriorityJobs();
-  const jobCards = useJobCards();
+  const palette = useN1Theme().colors.chart;
+  const [data, setData] = useState<DashboardData>(EMPTY);
+  const [status, setStatus] = useState<RequestStatus>('idle');
+  const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
-  const customerTable = useMemo(
-    () => customerRows(customers.shares, orders.orders),
-    [customers.shares, orders.orders],
-  );
-  // Summary cards for the period picked in the header tabs.
-  const stats = useMemo(
-    () => summarizePeriod(billing.invoices, orders.orders, period),
-    [billing.invoices, orders.orders, period],
-  );
-  // Priority jobs: job cards (they carry progress, process and operator),
-  // earliest due first.
-  const sortedJobs = useMemo(() => byDueDate(jobCards.items), [jobCards.items]);
-  const jobs = useMemo(
+  useEffect(() => {
+    let current = true;
+    setStatus('loading');
+    setError(null);
+    dashboardApi.get(period).then(
+      result => {
+        if (current) {
+          setData(result);
+          setStatus('succeeded');
+        }
+      },
+      (failure: unknown) => {
+        if (current) {
+          setError(errorMessage(failure, DASHBOARD_STRINGS.loadFailed));
+          setStatus('failed');
+        }
+      },
+    );
+    // A slower answer for the period left behind is dropped.
+    return () => {
+      current = false;
+    };
+  }, [period, attempt]);
+
+  const reload = useCallback(() => setAttempt(n => n + 1), []);
+
+  // Chart colours follow the rows' order (biggest share first).
+  const customers = useMemo<CustomerRow[]>(
     () =>
-      withRouteCards(sortedJobs.slice(0, PRIORITY_JOBS_LIMIT), orders.orders),
-    [sortedJobs, orders.orders],
+      data.customers.map((c, index) => ({
+        ...c,
+        color: palette[index % palette.length],
+      })),
+    [data.customers, palette],
   );
 
   return {
-    status: worst(
-      billing.status,
-      customers.status,
-      orders.status,
-      jobCards.status,
-    ),
-    error: billing.error ?? customers.error ?? orders.error ?? jobCards.error,
-    reload: () => {
-      billing.reload();
-      customers.reload();
-      orders.reload();
-      jobCards.reload();
-    },
-    stats,
-    shares: customers.shares,
-    customers: customerTable,
-    activeOrders: customers.totalOrders,
-    jobs,
-    totalJobs: sortedJobs.length,
+    status,
+    error,
+    reload,
+    stats: data.stats,
+    customers,
+    jobs: data.jobs,
+    totalJobs: data.totalJobs,
   };
 }

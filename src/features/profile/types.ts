@@ -70,12 +70,6 @@ export type OrganizationUpdate = Partial<
   Omit<Organization, 'id' | 'code' | 'createdAt' | 'shortName'>
 >;
 
-/** What Create organization collects (the password goes to auth only). */
-export type OrganizationInput = Pick<
-  Organization,
-  'name' | 'code' | 'industry' | 'email' | 'phone' | 'gstNumber'
->;
-
 /** The signed-in person. Will come from the auth session once login lands. */
 export type MyProfile = {
   id: string;
@@ -116,13 +110,23 @@ export type ProfileInput = Partial<
   >
 >;
 
+/** changeMyPassword: the current password proves it's the person. */
 export type PasswordChangeInput = {
-  /** Not asked for on My profile; the signed-in session is trusted. */
-  currentPassword?: string;
+  currentPassword: string;
   newPassword: string;
 };
 
-export type Session = { profile: MyProfile; organization: Organization };
+/**
+ * Permission codes from me.permissions, e.g. "customers.write": show or hide
+ * actions by these rather than by role name (guide section 5, rule 8).
+ */
+export type PermissionCode = string;
+
+export type Session = {
+  profile: MyProfile;
+  organization: Organization;
+  permissions: PermissionCode[];
+};
 
 // Stack nested inside the admin drawer's hidden "Profile" item.
 /** Phones: My profile's menu opens each of these as its own screen. */
@@ -154,6 +158,12 @@ export type EmployeeProfile = {
   joinedOn: ISODateString;
   phone: string;
   email: string;
+};
+
+/** What the employee Profile loads from me. */
+export type EmployeeSession = {
+  profile: EmployeeProfile;
+  permissions: PermissionCode[];
 };
 
 export type EmployeeProfileInput = Pick<

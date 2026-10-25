@@ -27,12 +27,50 @@ export type JobsStackParamList = {
   AssignMachine: { jobCardId: string };
   /** QC: inspect a job, then pass or fail it. */
   QcCheck: { jobCardId: string; kind: QcKind };
-  /** QC: why it failed (typed, or a voice note). */
+  /** QC: why it failed (typed remarks; no voice notes in phase 1). */
   QcFail: { jobCardId: string; kind: QcKind };
 };
 
 export type JobsScreenProps<R extends keyof JobsStackParamList> =
   NativeStackScreenProps<JobsStackParamList, R>;
+
+/**
+ * A work order as the shop floor sees it: the order itself (supervisor), or
+ * its job card's job view (operator, QC), which has no prices or client
+ * details. Fields the job view lacks are left out.
+ */
+export type OrderView = Pick<
+  WorkOrder,
+  | 'id'
+  | 'number'
+  | 'customerName'
+  | 'partName'
+  | 'jobName'
+  | 'description'
+  | 'priority'
+  | 'dueDate'
+  | 'quantity'
+  | 'partNumber'
+  | 'drawingNumber'
+  | 'poNumber'
+  | 'routeCardNo'
+  | 'materialSource'
+> &
+  Partial<
+    Pick<
+      WorkOrder,
+      | 'status'
+      | 'poAmount'
+      | 'projectId'
+      | 'shopOrderNumber'
+      | 'dcNo'
+      | 'dcDate'
+      | 'rmPartNumber'
+      | 'rawMaterialGrade'
+      | 'rawMaterialSize'
+      | 'heatNumber'
+    >
+  >;
 
 export type RawMaterialInput = Pick<
   WorkOrder,

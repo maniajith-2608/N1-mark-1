@@ -13,7 +13,7 @@ import {
 } from '../../../shared/components';
 import { COMMON_STRINGS } from '../../../shared/constants';
 import { formatCurrency } from '../../../shared/utils';
-import { BILLING_STRINGS, INVOICE_STATUS_OPTIONS } from '../constants';
+import { BILLING_STRINGS } from '../constants';
 import { gstRateOptions, type GstContext } from '../hooks/useGst';
 import type { useInvoiceForm } from '../hooks/useInvoiceForm';
 import type { Invoice, Totals } from '../types';
@@ -79,7 +79,7 @@ export function InvoiceOverview({
       <View style={styles.hero}>
         <View style={styles.idRow}>
           <N1Icon name="receipt" size="sm" color="textSecondary" />
-          <N1Text color="secondary">{invoice.id}</N1Text>
+          <N1Text color="secondary">{invoice.number}</N1Text>
           <InvoiceStatusBadge status={invoice.status} />
         </View>
         {/* The total, with the PO amount beside it. */}
@@ -188,7 +188,8 @@ type EditFormProps = {
 };
 
 /**
- * Phones: Edit invoice — only the status, discount, GST rate and notes,
+ * Phones: Edit invoice — only the discount, GST rate and notes (the status
+ * is the server's),
  * in the same small cards, with the amounts following along. The process
  * operations are edited from their own screen (its header's Edit).
  */
@@ -201,15 +202,6 @@ export function InvoiceEditForm({
   const styles = useN1Styles(makeStyles);
   return (
     <View style={styles.root} testID="invoice-edit-form">
-      <Card title={I.status}>
-        <N1DropDown
-          options={INVOICE_STATUS_OPTIONS}
-          value={form.status}
-          onChange={form.setStatus}
-          accessibilityLabel={I.status}
-          testID="invoice-status"
-        />
-      </Card>
       <Card title={I.amount}>
         <View style={styles.fieldRow}>
           <N1TextInput

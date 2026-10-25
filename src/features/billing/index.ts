@@ -5,7 +5,7 @@ export { QuoteDetailsScreen } from './screens/QuoteDetailsScreen';
 export { QuoteFormScreen } from './screens/QuoteFormScreen';
 export { default as BillingNavigation } from './navigation/BillingNavigation';
 export { useInvoices, useQuotes, useBillingSummary } from './hooks/useBilling';
-export { calculateTotals, invoiceTotal } from './utils';
+export { calculateTotals, invoiceTotal, quoteTotal } from './utils';
 export type {
   Invoice,
   Quote,

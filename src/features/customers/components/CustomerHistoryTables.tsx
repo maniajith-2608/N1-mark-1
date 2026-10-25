@@ -17,11 +17,12 @@ import {
 } from '../../../shared/utils';
 import {
   QuoteStatusBadge,
-  calculateTotals,
+  quoteTotal,
   useQuotes,
   type Quote,
 } from '../../billing';
 import {
+  ORDER_STRINGS,
   OrderStatusBadge,
   orderTitle,
   useOrders,
@@ -37,14 +38,14 @@ const newestFirst = (a: string, b: string) => b.localeCompare(a);
 /** Empty-table text: say so while the list is still loading. */
 const emptyText = (status: string, empty: string) =>
   status === 'succeeded' ? empty : COMMON_STRINGS.loading;
-const quoteTotal = (q: Quote) =>
-  calculateTotals(q.lineItems, q.quantity, 0, q.gstRate).total;
 
 const ORDER_COLUMNS: N1TableColumn<WorkOrder>[] = [
   {
     key: 'id',
     title: C.order,
-    render: o => <N1Text weight="bold">{`WO #${o.id}`}</N1Text>,
+    render: o => (
+      <N1Text weight="bold">{ORDER_STRINGS.workOrder(o.number)}</N1Text>
+    ),
   },
   {
     key: 'part',
@@ -161,7 +162,7 @@ function HistoryCard({
 
 const renderOrderCard = (o: WorkOrder) => (
   <HistoryCard
-    id={`WO #${o.id}`}
+    id={ORDER_STRINGS.workOrder(o.number)}
     status={<OrderStatusBadge status={o.status} />}
     part={orderTitle(o)}
     lead={`${C.due} ${formatLongDate(o.dueDate)}`}

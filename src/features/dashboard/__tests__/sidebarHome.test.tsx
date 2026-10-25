@@ -5,6 +5,11 @@ import {
   renderAdmin,
 } from '../../../shared/testing/testUtils';
 
+// Until jest.setup.js maps it: the dashboard reads the in-memory version.
+jest.mock('../api/dashboardApi', () =>
+  jest.requireActual('../api/mockDashboardApi'),
+);
+
 let mockWidth = 1280;
 jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => ({
   __esModule: true,

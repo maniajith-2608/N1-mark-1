@@ -43,7 +43,7 @@ export const BILLING_STRINGS = {
     create: 'Create Quote',
     createA11y: 'Create quote',
     title: 'Quotes',
-    search: 'Search by quote, customer or WO #',
+    search: 'Search by quote, customer or part',
     noun: 'quotes',
     /** Pagination bar: "Showing 8 of 8 quotes · 1 draft · 7 sent". */
     summary: (showing: string, s: { draft: number; sent: number }) =>
@@ -61,9 +61,6 @@ export const BILLING_STRINGS = {
         `This will permanently remove ${id} and its operations. This can’t be undone.`,
       confirm: 'Delete quote',
     },
-    // Billed or converted: the invoice or order still points at it.
-    deleteLocked: (id: string) =>
-      `${id} is used by an invoice or order and can’t be deleted`,
   },
   dispatch: {
     title: 'Dispatch this order?',
@@ -102,6 +99,22 @@ export const BILLING_STRINGS = {
     downloadPdf: 'Download PDF',
     downloadAction: 'Downloading PDFs',
     markPaid: 'Mark as Paid',
+    /** Mark as Paid: the day, and the TDS the customer withheld. */
+    paidTitle: 'Mark as paid',
+    paidSubtitle: (number: string, total: string) => `${number} · ${total}`,
+    paidOn: 'Paid on',
+    tdsAmount: 'TDS withheld (₹)',
+    tdsAmountHint: 'Leave blank if no TDS was deducted',
+    tdsSection: 'TDS section',
+    tdsSectionPlaceholder: 'e.g. 194C',
+    paidOnRequired: 'Pick the day it was paid',
+    tdsSectionRequired: 'Enter the TDS section',
+    paidSummary: (date: string) => `Paid on ${date}`,
+    tdsSummary: (amount: string, section: string) =>
+      `TDS ${amount}${section ? ` (${section})` : ''}`,
+    received: 'Received',
+    sent: 'Invoice sent',
+    sentMessage: (number: string) => `${number} was emailed to the customer.`,
     notFound: 'This invoice no longer exists.',
     /** Phones: the invoice at a glance. */
     billedTo: 'Billed to',
@@ -136,11 +149,26 @@ export const BILLING_STRINGS = {
     newSubtitle: 'New quote',
     status: 'Status',
     order: 'Order',
-    orderValue: (orderId: string) => `WO #${orderId}`,
+    // The quote has the order's id, not its WO number.
+    orderValue: 'View order',
+    send: 'Send Quote',
+    sent: 'Quote sent',
+    sentMessage: (number: string) =>
+      `${number} was emailed to the customer and is now Sent.`,
+    convert: 'Convert to Order',
+    convertTitle: 'Convert to order',
+    convertSubtitle: (number: string, customer: string) =>
+      `${number} · ${customer}`,
+    poNumber: 'PO number',
+    poNumberPlaceholder: 'The customer’s purchase order',
+    dueDate: 'Due date',
+    poNumberRequired: 'Enter the PO number',
+    dueDateRequired: 'Pick the due date',
     preview: 'Preview Quote',
     downloadPdf: 'Download PDF',
     customer: 'Customer',
-    customerPlaceholder: 'Enter customer name',
+    customerPlaceholder: 'Search saved customers',
+    customerUnknown: 'Pick a saved customer',
     partName: 'Part name',
     partNamePlaceholder: 'Enter part name',
     quantity: 'Quantity',
@@ -153,6 +181,17 @@ export const BILLING_STRINGS = {
     details: 'Quote details',
     amount: 'Amount details',
     openOperations: 'Open process operations',
+  },
+  /** The customer has no email on file: ask where to send it. */
+  sendDialog: {
+    title: 'Send by email',
+    message: 'This customer has no email on file. Where should it go?',
+    to: 'Email',
+    toPlaceholder: 'name@company.com',
+    cc: 'Copy to (optional)',
+    ccPlaceholder: 'Separate addresses with commas',
+    invalidEmail: 'Enter a valid email',
+    send: 'Send',
   },
   lineItems: {
     title: 'Process operations',

@@ -126,7 +126,9 @@ function StationFooter({ jobCard }: { jobCard: JobCard }) {
         icon="file"
         label={jobCard.designFile?.name ?? D.noDrawing}
         layout="row"
-        onPress={() => navigation.navigate('Drawing', { orderId: jobCard.id })}
+        onPress={() =>
+          navigation.navigate('Drawing', { orderId: jobCard.orderId })
+        }
         testID="station-drawing"
       />
       <MetaBadge meta={meta} label={S.materialQc(meta.label)} />

@@ -168,7 +168,6 @@ export const linking: LinkingOptions<RootStackParamList> = {
       Auth: {
         screens: {
           Login: 'login',
-          CreateOrganization: 'create-organization',
           ForgotPasswordFlow: {
             path: 'forgot-password',
             screens: {

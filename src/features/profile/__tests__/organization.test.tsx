@@ -1,9 +1,4 @@
-import ReactTestRenderer, { type ReactTestInstance } from 'react-test-renderer';
-import { Provider } from 'react-redux';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import RootNavigator from '../../../app/navigation/RootNavigator';
-import { createStore } from '../../../app/store';
-import { N1ThemeProvider } from '../../../shared/components';
+import { type ReactTestInstance } from 'react-test-renderer';
 import {
   allText,
   byTestId,
@@ -11,14 +6,11 @@ import {
   choose,
   hasTestId,
   press,
-  render,
   renderAdmin,
-  resetMockApis,
   typeInto,
 } from '../../../shared/testing/testUtils';
-import { INDUSTRY_OPTIONS } from '../../auth/constants';
 import { MOCK_SESSION } from '../api/mockData';
-import { profileApi } from '../api/profileApi';
+import { profileApi } from '../api/mockProfileApi';
 import { organizationCompletion } from '../organization';
 
 // The organization name sits in the wide top bar.
@@ -26,17 +18,6 @@ jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => ({
   __esModule: true,
   default: () => ({ width: 1280, height: 900, scale: 1, fontScale: 1 }),
 }));
-
-let app: ReactTestRenderer.ReactTestRenderer | undefined;
-afterEach(async () => {
-  await ReactTestRenderer.act(() => app?.unmount());
-  app = undefined;
-});
-
-const input = (root: ReactTestInstance, placeholder: string) =>
-  root.find(
-    n => typeof n.type === 'string' && n.props.placeholder === placeholder,
-  );
 
 const SECTION_KEYS = [
   'general',
@@ -86,75 +67,6 @@ test('the organization name opens the organization details', async () => {
     '+91 44 4000 1000',
     '33ABCDE1234F1Z5',
     'Sep 12, 2026',
-  ]) {
-    expect(text).toContain(value);
-  }
-});
-
-test('details come from Create organization', async () => {
-  resetMockApis();
-  app = await render(
-    <Provider store={createStore()}>
-      <SafeAreaProvider
-        initialMetrics={{
-          frame: { x: 0, y: 0, width: 1280, height: 900 },
-          insets: { top: 0, left: 0, right: 0, bottom: 0 },
-        }}
-      >
-        <N1ThemeProvider>
-          <RootNavigator />
-        </N1ThemeProvider>
-      </SafeAreaProvider>
-    </Provider>,
-  );
-  const { root } = app;
-
-  // Login → Create organization.
-  const [link] = root.findAll(
-    n =>
-      typeof n.type === 'string' &&
-      n.props.accessibilityRole === 'link' &&
-      allText(n) === 'Create organization',
-  );
-  await press(link);
-
-  await typeInto(
-    input(root, 'ABC Engineering Pvt Ltd'),
-    'Nova Precision Pvt Ltd',
-  );
-  await ReactTestRenderer.act(() => {
-    root
-      .find(n => n.props.options === INDUSTRY_OPTIONS)
-      .props.onChange('automotive');
-  });
-  await typeInto(input(root, 'owner@abcengineering.com'), 'hello@nova.in');
-  await typeInto(input(root, '+91 98765 43210'), '+91 90000 11111');
-  await typeInto(input(root, 'e.g. 33ABCDE1234F1Z5'), '29aaaaa0000a1z5');
-  await typeInto(input(root, 'Create a password'), 'secret123');
-  await typeInto(input(root, 'Re-enter password'), 'secret123');
-  const [submit] = root.findAll(
-    n =>
-      typeof n.type === 'string' &&
-      n.props.accessibilityRole === 'button' &&
-      n.props.accessibilityLabel === 'Create organization',
-  );
-  await press(submit);
-
-  // Signed in as the admin; the top bar shows the new organization.
-  expect(allText(byTestId(root, 'open-organization'))).toBe(
-    'Nova Precision Pvt Ltd',
-  );
-  await press(byTestId(root, 'open-organization'));
-
-  const text = await allTabsText(root);
-  for (const value of [
-    'Nova Precision Pvt Ltd',
-    'NOVAPR',
-    'Automotive',
-    'hello@nova.in',
-    '+91 90000 11111',
-    // Saved in capitals.
-    '29AAAAA0000A1Z5',
   ]) {
     expect(text).toContain(value);
   }

@@ -109,6 +109,8 @@ describe('summarizePeriod', () => {
       quantity: 1,
       discount: 0,
       gstRate: 0,
+      // Invoices carry the server's totals.
+      totals: { total: rate },
       lineItems: [
         {
           id: `${id}-1`,
@@ -219,12 +221,17 @@ describe('customerRows', () => {
 
 describe('withRouteCards', () => {
   test('takes the RC number from the matching order, else the WO number', () => {
-    const card = (id: string) => ({ id } as unknown as JobCard);
-    const orders = [{ id: '1042', routeCardNo: 'RC-2210' }] as WorkOrder[];
+    const card = (orderId: string, number: string) =>
+      ({ id: `jc-${orderId}`, orderId, number } as unknown as JobCard);
+    const orders = [{ id: 'o1', routeCardNo: 'RC-2210' }] as WorkOrder[];
     expect(
-      withRouteCards([card('1042'), card('1099')], orders).map(
-        c => c.routeCardNo,
-      ),
-    ).toEqual(['RC-2210', 'WO #1099']);
+      withRouteCards(
+        [card('o1', 'WO-1042'), card('o2', 'WO-1099')],
+        orders,
+      ).map(c => [c.routeCardNo, c.workOrderNumber]),
+    ).toEqual([
+      ['RC-2210', 'WO-1042'],
+      ['WO #1099', 'WO-1099'],
+    ]);
   });
 });

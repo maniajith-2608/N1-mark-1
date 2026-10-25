@@ -1,11 +1,26 @@
 import type { Customer } from '../customers/types';
 import type { JobCard } from '../jobCards/types';
 import type { OrderInput, WorkOrder } from '../orders/types';
-import type { Invoice, InvoiceInput, LineItem, Quote } from './types';
+import type { InvoiceInput, LineItem, Quote } from './types';
 
 /** "1042" → "WO-01042", the job reference billing uses. */
 export const jobReference = (workOrderId: string) =>
   `WO-${workOrderId.padStart(5, '0')}`;
+
+// Job cards are moving to backend ids, with the work order number (WO-n) and
+// the order id as their own fields; until then the id is the WO number.
+type JobCardRef = JobCard & { number?: string | null; orderId?: string };
+
+/** The job card's work order as people know it, e.g. "WO-12". */
+export function jobCardLabel(jobCard: JobCard) {
+  const number = (jobCard as JobCardRef).number ?? jobCard.id;
+  // A bare number (the mock data's) gets the WO prefix.
+  return /^\d+$/.test(number) ? jobReference(number) : number;
+}
+
+/** The order a job card was made from. */
+export const jobCardOrderId = (jobCard: JobCard) =>
+  (jobCard as JobCardRef).orderId ?? jobCard.id;
 
 /** A new work order from a quote: customer, part, quantity and material grade. */
 export function orderFromQuote(
@@ -37,7 +52,7 @@ export function orderFromQuote(
     rawMaterialGrade: quote.material,
     materialSource: '',
     quoteId: quote.id,
-    notes: `Converted from quote ${quote.id}.`,
+    notes: `Converted from quote ${quote.number}.`,
     designFile: null,
     documents: [],
   };
@@ -65,12 +80,13 @@ export function invoiceForDispatch(
         ratePerMinute: 0,
       }));
   return {
+    customerId: jobCard.customerId,
     customerName: jobCard.customerName,
-    jobId: jobReference(jobCard.id),
+    jobId: jobCardLabel(jobCard),
+    jobCardId: jobCard.id,
     routeCard: order?.routeCardNo ?? '',
     partName: [jobCard.partName, jobCard.jobName].filter(Boolean).join(' — '),
     quantity: jobCard.quantity,
-    status: 'new',
     lineItems,
     discount: 0,
     gstRate: quote ? quote.gstRate : defaultGstRate,
@@ -80,10 +96,3 @@ export function invoiceForDispatch(
     notes: '',
   };
 }
-
-/**
- * Already tied to an order: converted to one, or billed against an order's
- * job. Such a quote can't be converted again.
- */
-export const isQuoteMapped = (quote: Quote, invoices: readonly Invoice[]) =>
-  Boolean(quote.orderId) || invoices.some(i => i.quoteId === quote.id);

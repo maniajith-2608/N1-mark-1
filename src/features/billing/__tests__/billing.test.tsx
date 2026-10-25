@@ -11,6 +11,8 @@ import {
   renderAdmin,
   typeInto,
 } from '../../../shared/testing/testUtils';
+import { ApiError } from '../../../services/api';
+import { invoicesApi } from '../api/mockBillingApi';
 import { MOCK_INVOICES, MOCK_QUOTES } from '../api/mockData';
 import { quoteActions } from '../store/billingSlices';
 import { invoiceDocument, invoiceHtml } from '../invoiceDocument';
@@ -186,27 +188,83 @@ test('invoice details: operations, totals, send and mark as paid', async () => {
   // Nine operations: ₹64,000 + 5% GST.
   expect(allText(byTestId(screen, 'totals-total'))).toBe('₹67,200');
 
-  // Sending needs the backend; the bill stays New until it's paid.
+  // Sending emails the PDF; the bill stays New until it's paid.
   await press(byTestId(screen, 'send-invoice'));
   expect(Alert.alert).toHaveBeenCalledWith(
-    'Not available yet',
-    'Sending invoices will work once the backend is connected.',
+    'Invoice sent',
+    'INV-2026-0125 was emailed to the customer.',
   );
   expect(
     h.store.getState().billing.invoices.entities['INV-2026-0125'].status,
   ).toBe('new');
   await press(byText(screen, 'Download PDF'));
+
+  // Mark as Paid asks for the day and any TDS withheld.
   await press(byTestId(screen, 'mark-paid'));
-  expect(
-    h.store.getState().billing.invoices.entities['INV-2026-0125'].status,
-  ).toBe('paid');
+  const dialog = byTestId(h.root, 'mark-paid-dialog');
+  expect(allText(dialog)).toContain('INV-2026-0125 · ₹67,200');
+  await typeInto(byTestId(dialog, 'tds-amount'), '1344');
+  await press(byTestId(dialog, 'mark-paid-submit'));
+  expect(allText(dialog)).toContain('Enter the TDS section');
+  await typeInto(byTestId(dialog, 'tds-section'), '194C');
+  await press(byTestId(dialog, 'mark-paid-submit'));
+  const paid = h.store.getState().billing.invoices.entities['INV-2026-0125'];
+  expect(paid.status).toBe('paid');
+  expect(paid.payment).toMatchObject({
+    receivedAmount: 65856,
+    tdsAmount: 1344,
+    tdsSection: '194C',
+  });
+  expect(hasTestId(h.root, 'mark-paid-dialog')).toBe(false);
+  expect(allText(screen)).toContain('Received ₹65,856');
+  expect(allText(screen)).toContain('TDS ₹1,344 (194C)');
   const { props } = byTestId(screen, 'mark-paid');
   expect(props['aria-disabled'] ?? props.accessibilityState?.disabled).toBe(
     true,
   );
+  // Paid is final: no Edit.
+  expect(hasTestId(screen, 'edit-invoice')).toBe(false);
 });
 
-test('edit invoice in place: change a rate, add and remove rows, discount, status', async () => {
+test('send asks for an email when the customer has none on file', async () => {
+  jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+  const missing = Object.assign(new ApiError('No email on file', 422), {
+    code: 'CUSTOMER_EMAIL_MISSING',
+  });
+  const send = jest
+    .spyOn(invoicesApi, 'send')
+    .mockRejectedValueOnce(missing)
+    .mockResolvedValueOnce(undefined);
+  const h = await renderAdmin('Billing');
+  await h.navigate('InvoiceDetails', { invoiceId: 'INV-2026-0125' });
+  await press(byTestId(h.root, 'send-invoice'));
+  const dialog = byTestId(h.root, 'send-email-dialog');
+  await typeInto(byTestId(dialog, 'send-email-to'), 'nope');
+  await press(byTestId(dialog, 'send-email-submit'));
+  expect(allText(dialog)).toContain('Enter a valid email');
+  await typeInto(byTestId(dialog, 'send-email-to'), 'buyer@abc.example');
+  await typeInto(byTestId(dialog, 'send-email-cc'), 'accounts@abc.example');
+  await press(byTestId(dialog, 'send-email-submit'));
+  expect(send).toHaveBeenLastCalledWith('INV-2026-0125', {
+    to: 'buyer@abc.example',
+    cc: ['accounts@abc.example'],
+  });
+  expect(hasTestId(h.root, 'send-email-dialog')).toBe(false);
+  expect(Alert.alert).toHaveBeenCalledWith(
+    'Invoice sent',
+    'INV-2026-0125 was emailed to the customer.',
+  );
+});
+
+test('only the owner and the accountant see Mark as Paid', async () => {
+  jest.spyOn(invoicesApi, 'permissions').mockResolvedValue({ markPaid: false });
+  const h = await renderAdmin('Billing');
+  await h.navigate('InvoiceDetails', { invoiceId: 'INV-2026-0125' });
+  expect(hasTestId(h.root, 'mark-paid')).toBe(false);
+  expect(hasTestId(h.root, 'send-invoice')).toBe(true);
+});
+
+test('edit invoice in place: change a rate, add and remove rows, discount', async () => {
   const h = await renderAdmin('Billing');
   await h.navigate('InvoiceDetails', { invoiceId: 'INV-2026-0125' });
   const screen = byTestId(h.root, 'invoice-details-screen');
@@ -232,11 +290,12 @@ test('edit invoice in place: change a rate, add and remove rows, discount, statu
   expect(allText(screen)).toContain('Enter a number');
 
   await typeInto(byTestId(screen, 'invoice-discount'), '1000');
-  await choose(screen, 'invoice-status', 'Overdue');
+  // The status is the server's: no picker.
+  expect(hasTestId(screen, 'invoice-status')).toBe(false);
   await press(byTestId(screen, 'save-invoice'));
 
   const saved = h.store.getState().billing.invoices.entities['INV-2026-0125'];
-  expect(saved.status).toBe('overdue');
+  expect(saved.status).toBe('new');
   expect(saved.discount).toBe(1000);
   // The blank added row is dropped; the untouched ₹80/3 rate stays exact.
   expect(saved.lineItems.map(i => i.operation)).toEqual([
@@ -441,42 +500,89 @@ test('quotes tab, quote details, convert and revise', async () => {
   expect(hasTestId(screen, 'quote-summary')).toBe(false);
   expect(allText(screen)).toContain('Quote|Sent|QT-2026-0042');
   expect(allText(byTestId(screen, 'totals-total'))).toBe('₹42,000');
-  // No material, and Download PDF is the only action.
+  // No material. Sent: no Edit or Send (it stays sent); it can be
+  // converted to an order.
   expect(allText(screen)).not.toContain('Material');
-  expect(hasTestId(screen, 'convert-quote')).toBe(false);
+  expect(hasTestId(screen, 'edit-quote')).toBe(false);
   expect(hasTestId(screen, 'send-quote')).toBe(false);
   expect(allText(screen)).toContain('Download PDF');
+
+  // Convert to Order asks for the customer's PO and the due date.
+  await press(byTestId(screen, 'convert-quote'));
+  const dialog = byTestId(h.root, 'convert-quote-dialog');
+  await press(byTestId(dialog, 'convert-quote-submit'));
+  expect(allText(dialog)).toContain('Enter the PO number');
+  expect(allText(dialog)).toContain('Pick the due date');
+  await typeInto(byTestId(dialog, 'convert-po-number'), 'PO-7788');
+  // The native wheels: pick a day and tap Done.
+  await press(byTestId(dialog, 'convert-due-date'));
+  await ReactTestRenderer.act(() =>
+    byTestId(h.root, 'convert-due-date-wheels').props.onValueChange(
+      {},
+      new Date(2026, 10, 30),
+    ),
+  );
+  await press(byTestId(h.root, 'convert-due-date-done'));
+  await press(byTestId(dialog, 'convert-quote-submit'));
+  const converted = h.store.getState().billing.quotes.entities['QT-2026-0042'];
+  expect(converted.orderId).toBeTruthy();
+  expect(h.currentRoute()).toBe('OrderDetails');
+});
+
+test('a draft is edited in place and sent; a sent quote stays sent', async () => {
+  jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+  const h = await renderAdmin('Billing');
+  await h.navigate('QuoteDetails', { quoteId: 'QT-2026-0038' });
+  const screen = byTestId(h.root, 'quote-details-screen');
+  expect(allText(screen)).toContain('Quote|Draft|QT-2026-0038');
+  expect(hasTestId(screen, 'convert-quote')).toBe(false);
 
   // Edit in place: the fields and operations become inputs on this screen.
   expect(hasTestId(screen, 'quote-customer')).toBe(false);
   await press(byTestId(screen, 'edit-quote'));
   expect(h.currentRoute()).toBe('QuoteDetails');
-  expect(byTestId(screen, 'quote-customer').props.value).toBe(
-    'ABC Engineering',
-  );
+  // A quote keeps its customer.
+  const customer = byTestId(screen, 'quote-customer');
+  expect(customer.props.value).toBe('Nova Fabrication');
+  expect(customer.props.editable).toBe(false);
+  // No status picker: Send makes it Sent.
+  expect(hasTestId(screen, 'quote-status')).toBe(false);
   expect(hasTestId(screen, 'line-op1-rate')).toBe(true);
-  // Double the pieces, double the amount.
-  await typeInto(byTestId(screen, 'quote-quantity'), '300');
-  expect(allText(byTestId(screen, 'totals-total'))).toBe('₹84,000');
+  // Double the pieces, double the amount (a preview until it's saved).
+  expect(allText(byTestId(screen, 'totals-total'))).toBe('₹15,750');
+  await typeInto(byTestId(screen, 'quote-quantity'), '120');
+  expect(allText(byTestId(screen, 'totals-total'))).toBe('₹31,500');
   await press(byTestId(screen, 'save-quote'));
-  expect(
-    h.store.getState().billing.quotes.entities['QT-2026-0042'].quantity,
-  ).toBe(300);
+  const saved = h.store.getState().billing.quotes.entities['QT-2026-0038'];
+  expect(saved.quantity).toBe(120);
+  expect(saved.totals.total).toBe(31500);
   expect(hasTestId(screen, 'edit-quote')).toBe(true);
-  expect(allText(screen)).toContain('300 pcs');
+  expect(allText(screen)).toContain('120 pcs');
 
-  // A quote linked to an order (e.g. by a job card's dispatch) links to it.
+  await press(byTestId(screen, 'send-quote'));
+  expect(Alert.alert).toHaveBeenCalledWith(
+    'Quote sent',
+    'QT-2026-0038 was emailed to the customer and is now Sent.',
+  );
+  expect(
+    h.store.getState().billing.quotes.entities['QT-2026-0038'].status,
+  ).toBe('sent');
+  expect(hasTestId(screen, 'edit-quote')).toBe(false);
+  expect(hasTestId(screen, 'send-quote')).toBe(false);
+  expect(hasTestId(screen, 'convert-quote')).toBe(true);
+});
+
+test('a converted quote links to its order', async () => {
+  const h = await renderAdmin('Billing');
+  await h.navigate('Billing', { tab: 'quotes' });
   const linked = h.store.getState().billing.quotes.entities['QT-2026-0041']!;
   await ReactTestRenderer.act(async () => {
     h.store.dispatch(quoteActions.saveSuccess({ ...linked, orderId: '1042' }));
   });
   await h.navigate('QuoteDetails', { quoteId: 'QT-2026-0041' });
-  const screens = h.root.findAll(
-    n =>
-      typeof n.type === 'string' && n.props.testID === 'quote-details-screen',
-  );
-  const details = screens[screens.length - 1];
-  expect(allText(byTestId(details, 'quote-order'))).toBe('WO #1042');
+  const details = byTestId(h.root, 'quote-details-screen');
+  expect(hasTestId(details, 'convert-quote')).toBe(false);
+  expect(allText(byTestId(details, 'quote-order'))).toBe('View order');
   await press(byTestId(details, 'quote-order'));
   expect(h.currentRoute()).toBe('OrderDetails');
 });
@@ -507,33 +613,19 @@ test('preview quote: a quotation page in the same viewer, with print', async () 
 
 test('quote edit: cancel discards, blank fields are required', async () => {
   const h = await renderAdmin('Billing');
-  await h.navigate('QuoteDetails', { quoteId: 'QT-2026-0042' });
+  await h.navigate('QuoteDetails', { quoteId: 'QT-2026-0038' });
   const screen = byTestId(h.root, 'quote-details-screen');
   await press(byTestId(screen, 'edit-quote'));
-  await typeInto(byTestId(screen, 'quote-customer'), '');
-  await press(byLabel(screen, 'Remove Grinding'));
+  await typeInto(byTestId(screen, 'quote-part'), '');
+  await press(byLabel(screen, 'Remove Welding'));
   await press(byTestId(screen, 'save-quote'));
   expect(allText(screen)).toContain('This field is required');
   await press(byText(screen, 'Cancel'));
-  expect(allText(screen)).toContain('ABC Engineering');
-  expect(allText(screen)).toContain('Finish grind OD');
+  expect(allText(screen)).toContain('Bracket');
+  expect(allText(screen)).toContain('Tack and full weld');
   expect(
-    h.store.getState().billing.quotes.entities['QT-2026-0042'].customerName,
-  ).toBe('ABC Engineering');
-});
-
-test('quotes have two statuses: draft and sent', async () => {
-  const h = await renderAdmin('Billing');
-  await h.navigate('QuoteDetails', { quoteId: 'QT-2026-0042' });
-  await press(byTestId(h.root, 'edit-quote'));
-  await press(byTestId(h.root, 'quote-status'));
-  const options = h.root
-    .findAll(
-      n =>
-        typeof n.type === 'string' && n.props.accessibilityRole === 'menuitem',
-    )
-    .map(n => allText(n));
-  expect(options).toEqual(['Draft', 'Sent']);
+    h.store.getState().billing.quotes.entities['QT-2026-0038'].partName,
+  ).toBe('Bracket');
 });
 
 test('back on a quote returns to where it was opened from', async () => {
@@ -554,46 +646,40 @@ test('back on a quote returns to where it was opened from', async () => {
   expect(hasTestId(h.root, 'quotes-table')).toBe(true);
 });
 
-test('quotes list: edit opens the quote in edit mode; delete asks first', async () => {
+test('quotes list: edit opens a draft in edit mode; delete asks first', async () => {
   const h = await renderAdmin('Billing');
   await h.navigate('Billing', { tab: 'quotes' });
   // Just Edit and Delete in the row: no view or convert icons.
-  expect(() => byLabel(h.root, 'View QT-2026-0040')).toThrow();
-  expect(() => byLabel(h.root, 'Convert QT-2026-0040 to order')).toThrow();
+  expect(() => byLabel(h.root, 'View QT-2026-0038')).toThrow();
+  expect(() => byLabel(h.root, 'Convert QT-2026-0038 to order')).toThrow();
+  // Sent quotes are neither edited nor deleted.
+  expect(() => byLabel(h.root, 'Edit QT-2026-0040')).toThrow();
+  expect(() => byLabel(h.root, 'Delete QT-2026-0040')).toThrow();
 
-  await press(byLabel(h.root, 'Edit QT-2026-0040'));
+  await press(byLabel(h.root, 'Edit QT-2026-0038'));
   expect(h.currentRoute()).toBe('QuoteDetails');
   expect(hasTestId(h.root, 'save-quote')).toBe(true);
   expect(hasTestId(h.root, 'quote-customer')).toBe(true);
 
   // Delete asks first; Cancel keeps the quote.
   await h.navigate('Billing', { tab: 'quotes' });
-  await press(byLabel(h.root, 'Delete QT-2026-0040'));
+  await press(byLabel(h.root, 'Delete QT-2026-0038'));
   const dialog = byTestId(h.root, 'delete-quote-dialog');
   expect(allText(dialog)).toContain('Delete quote?');
-  expect(allText(dialog)).toContain('QT-2026-0040');
+  expect(allText(dialog)).toContain('QT-2026-0038');
   await press(byText(dialog, 'Cancel'));
   expect(
-    h.store.getState().billing.quotes.entities['QT-2026-0040'],
+    h.store.getState().billing.quotes.entities['QT-2026-0038'],
   ).toBeTruthy();
 
-  await press(byLabel(h.root, 'Delete QT-2026-0040'));
+  await press(byLabel(h.root, 'Delete QT-2026-0038'));
   await press(byText(byTestId(h.root, 'delete-quote-dialog'), 'Delete quote'));
   expect(
-    h.store.getState().billing.quotes.entities['QT-2026-0040'],
+    h.store.getState().billing.quotes.entities['QT-2026-0038'],
   ).toBeUndefined();
   expect(allText(byTestId(h.root, 'quotes-table'))).not.toContain(
-    'QT-2026-0040',
+    'QT-2026-0038',
   );
-
-  // QT-2026-0042 is billed on INV-2026-0125: it can't be deleted.
-  const locked = byLabel(
-    h.root,
-    'QT-2026-0042 is used by an invoice or order and can’t be deleted',
-  );
-  expect(
-    locked.props['aria-disabled'] ?? locked.props.accessibilityState?.disabled,
-  ).toBe(true);
 });
 
 test('invoices do not link to quotes', async () => {
@@ -647,6 +733,7 @@ test('creates a quote', async () => {
   const form = byTestId(h.root, 'quote-form-screen');
   await press(byTestId(form, 'save-quote'));
   expect(allText(form)).toContain('This field is required');
+  // A quote is for a saved customer.
   await typeInto(byTestId(form, 'quote-customer'), 'Kaveri Tools');
   await typeInto(byTestId(form, 'quote-part'), 'Pin');
   await typeInto(byTestId(form, 'quote-quantity'), '100');
@@ -657,12 +744,15 @@ test('creates a quote', async () => {
   await choose(form, 'quote-gst-rate', '5%');
   expect(allText(byTestId(form, 'totals-total'))).toBe('₹1,050');
   await press(byTestId(form, 'save-quote'));
+  expect(allText(form)).toContain('Pick a saved customer');
+  await typeInto(byTestId(form, 'quote-customer'), 'kaveri hydraulics');
+  await press(byTestId(form, 'save-quote'));
   const created =
     h.store.getState().billing.quotes.entities[
       `QT-${new Date().getFullYear()}-0043`
     ];
   expect(created).toMatchObject({
-    customerName: 'Kaveri Tools',
+    customerName: 'Kaveri Hydraulics',
     quantity: 100,
     status: 'draft',
     gstRate: 5,
@@ -679,9 +769,12 @@ test('invoice GST: CGST + SGST in state, IGST for another state', async () => {
   expect(text).toContain('₹1,600');
   expect(text).toContain('₹67,200');
 
-  // Nova Fabrication is in Karnataka; the organization is in Tamil Nadu.
-  await h.navigate('InvoiceDetails', { invoiceId: 'INV-2026-0121' });
-  text = allText(h.root);
+  // Saved amounts are the server's. While editing, the preview splits GST
+  // by state: Nova Fabrication is in Karnataka, the organization in Tamil
+  // Nadu.
+  await h.navigate('QuoteDetails', { quoteId: 'QT-2026-0038' });
+  await press(byTestId(h.root, 'edit-quote'));
+  text = allText(byTestId(h.root, 'quote-details-screen'));
   expect(text).toContain('IGST 5%');
   expect(text).not.toContain('CGST');
 });
@@ -724,9 +817,8 @@ test('phone: invoice cards, editor cards and pinned actions', async () => {
     'INV-2026-0125|ABC Engineering|New|Amount|₹67,200|Job|WO-00125|Route card|RC-2225|View invoice',
   );
   expect(byLabel(card, 'Edit INV-2026-0125')).toBeTruthy();
-  // Download says PDFs aren't available yet, as on the invoice page.
+  // Download opens the server's PDF (the mock backend has none).
   await press(byLabel(card, 'Download INV-2026-0125'));
-  expect(Alert.alert).toHaveBeenCalled();
   await press(byLabel(card, 'View INV-2026-0125'));
   let details = byTestId(h.root, 'invoice-details-screen');
   // At a glance: number, status, total and PO amount, then the cards.
@@ -752,16 +844,16 @@ test('phone: invoice cards, editor cards and pinned actions', async () => {
   expect(h.currentRoute()).toBe('InvoiceDetails');
   details = byTestId(h.root, 'invoice-details-screen');
   await press(byText(details, 'Download PDF'));
-  // Edit (in the header) slides up Edit invoice: only status, discount,
-  // GST and notes, with Cancel / Save pinned; the operations are a row to
-  // their own screen.
+  // Edit (in the header) slides up Edit invoice: only discount, GST and
+  // notes (no status: it's the server's), with Cancel / Save pinned; the
+  // operations are a row to their own screen.
   await press(byLabel(details, 'Edit'));
   expect(h.currentRoute()).toBe('InvoiceEdit');
   const form = () => byTestId(h.root, 'invoice-edit-form');
   expect(allText(byTestId(h.root, 'invoice-edit-screen'))).toMatch(
     /^Edit invoice\|INV-2026-0125\|/,
   );
-  expect(hasTestId(form(), 'invoice-status')).toBe(true);
+  expect(hasTestId(form(), 'invoice-status')).toBe(false);
   expect(hasTestId(form(), 'invoice-discount')).toBe(true);
   expect(hasTestId(form(), 'invoice-notes')).toBe(true);
   expect(hasTestId(form(), 'line-op1-minutes')).toBe(false);
@@ -835,17 +927,21 @@ test('phone: invoice cards, editor cards and pinned actions', async () => {
   expect(byLabel(h.root, 'Search by invoice, customer or WO #')).toBeTruthy();
   await press(byTestId(h.root, 'billing-tabs-quotes'));
   expect(h.currentRoute()).toBe('quotes');
-  expect(byLabel(h.root, 'Search by quote, customer or WO #')).toBeTruthy();
+  expect(byLabel(h.root, 'Search by quote, customer or part')).toBeTruthy();
   expect(() =>
     byLabel(h.root, 'Search by invoice, customer or WO #'),
   ).toThrow();
   expect(hasTestId(h.root, 'quote-stats')).toBe(false);
   const quote = byTestId(h.root, 'quote-card-QT-2026-0042');
   expect(allText(quote)).toContain('Part name|Machined Shaft|Quantity|150 pcs');
-  expect(byLabel(quote, 'Edit QT-2026-0042')).toBeTruthy();
   expect(allText(quote)).toContain('View quote');
   expect(allText(quote)).not.toContain('Created on');
-  expect(hasTestId(quote, 'delete-QT-2026-0042')).toBe(true);
+  // Sent: neither edited nor deleted. A draft has both.
+  expect(() => byLabel(quote, 'Edit QT-2026-0042')).toThrow();
+  expect(hasTestId(quote, 'delete-QT-2026-0042')).toBe(false);
+  const draft = byTestId(h.root, 'quote-card-QT-2026-0038');
+  expect(byLabel(draft, 'Edit QT-2026-0038')).toBeTruthy();
+  expect(hasTestId(draft, 'delete-QT-2026-0038')).toBe(true);
   // Back from a quote returns to the Quotes tab.
   await press(quote);
   expect(h.currentRoute()).toBe('QuoteDetails');
@@ -867,39 +963,47 @@ test('phone: quote at a glance, Edit quote sheet and operations bill', async () 
   const details = () => byTestId(h.root, 'quote-details-screen');
   // Like the invoice: number, status and total, then small cards.
   expect(allText(byTestId(details(), 'quote-overview'))).toMatch(
-    /^QT-2026-0042\|Sent\|₹42,000\|Customer\|.*ABC Engineering\|Part details\|Part name\|Machined Shaft\|Quantity\|150 pcs\|Process operations\|4 operations · ₹40,000\|Amount details\|/,
+    /^QT-2026-0042\|Sent\|₹42,000\|Customer\|.*ABC Engineering\|Convert to Order\|Part details\|Part name\|Machined Shaft\|Quantity\|150 pcs\|Process operations\|4 operations · ₹40,000\|Amount details\|/,
   );
   expect(allText(details())).toMatch(/Preview Quote\|Download PDF$/);
-  const saved = () =>
-    h.store.getState().billing.quotes.entities['QT-2026-0042']!;
+  // Sent: no Edit.
+  expect(hasTestId(details(), 'edit-quote')).toBe(false);
 
-  // The header's Edit slides up Edit quote, without the operations.
+  // A draft: the header's Edit slides up Edit quote, without the
+  // operations or a status.
+  await h.navigate('QuoteDetails', { quoteId: 'QT-2026-0038' });
+  expect(allText(byTestId(details(), 'quote-overview'))).toContain(
+    'Send Quote',
+  );
+  const saved = () =>
+    h.store.getState().billing.quotes.entities['QT-2026-0038']!;
   await press(byTestId(details(), 'edit-quote'));
   expect(h.currentRoute()).toBe('QuoteEdit');
   const form = () => byTestId(h.root, 'quote-edit-form');
   expect(hasTestId(form(), 'line-op1-minutes')).toBe(false);
-  await typeInto(byTestId(form(), 'quote-part'), 'Long Shaft');
+  expect(hasTestId(form(), 'quote-status')).toBe(false);
+  await typeInto(byTestId(form(), 'quote-part'), 'Long Bracket');
   await press(byTestId(h.root, 'save-quote'));
-  expect(saved().partName).toBe('Long Shaft');
-  expect(saved().lineItems).toHaveLength(4);
+  expect(saved().partName).toBe('Long Bracket');
+  expect(saved().lineItems).toHaveLength(3);
   expect(h.currentRoute()).toBe('QuoteDetails');
 
   // Process operations: the same bill, edited one at a time.
   await press(byTestId(details(), 'quote-open-operations'));
   expect(h.currentRoute()).toBe('QuoteOperations');
   const ops = () => byTestId(h.root, 'quote-operations-screen');
-  expect(allText(byTestId(ops(), 'operations-subtotal'))).toBe('₹40,000');
+  expect(allText(byTestId(ops(), 'operations-subtotal'))).toBe('₹15,000');
   await press(byTestId(ops(), 'edit-operations'));
   await press(byTestId(ops(), 'edit-operation-op1'));
   const sheet = () => byTestId(h.root, 'operation-sheet');
   await typeInto(byTestId(sheet(), 'operation-minutes'), '3');
   await press(byTestId(sheet(), 'save-operation'));
   expect(saved().lineItems[0].minutesPerPiece).toBe(3);
-  await press(byTestId(ops(), 'delete-operation-op4'));
+  await press(byTestId(ops(), 'delete-operation-op3'));
   const dialog = byTestId(h.root, 'delete-operation-dialog');
   expect(allText(dialog)).toContain('removed from this quote');
   await press(byText(dialog, 'Delete'));
-  expect(saved().lineItems).toHaveLength(3);
+  expect(saved().lineItems).toHaveLength(2);
   await press(byLabel(ops(), 'Back'));
   expect(h.currentRoute()).toBe('QuoteDetails');
 });
@@ -921,7 +1025,7 @@ test('table rows use icon buttons for view and edit', async () => {
 
   await h.navigate('Billing');
   await press(byText(h.root, 'Quotes'));
-  await press(byLabel(h.root, 'Edit QT-2026-0042'));
+  await press(byLabel(h.root, 'Edit QT-2026-0038'));
   expect(h.currentRoute()).toBe('QuoteDetails');
 });
 

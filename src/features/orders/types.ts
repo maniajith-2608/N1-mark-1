@@ -18,8 +18,8 @@ import type {
 export type MaterialSource = 'bought_out' | 'in_house';
 export type OrderPriority = 'high' | 'medium' | 'low';
 /**
- * Where an order is, worked out from its job card and invoice (orderStatus):
- * new → yet to start → in progress / paused → payment due → completed.
+ * Where an order is, set by the server as work happens: new → yet to start →
+ * in progress / paused → payment due → completed.
  */
 export type OrderStatus =
   | 'new'
@@ -30,8 +30,12 @@ export type OrderStatus =
   | 'completed';
 
 export type WorkOrder = {
-  /** Work order number, e.g. "1042" (shown as "WO #1042"). */
+  /** The order's id. */
   id: string;
+  /** Work order number from the server, e.g. "WO-12"; never parsed into an id. */
+  number: string;
+  /** The job card createOrder opened with it; blank until known. */
+  jobCardId: string;
   customerId: string;
   customerName: string;
   customerEmail: string;
@@ -41,7 +45,7 @@ export type WorkOrder = {
   description: string;
   quantity: number;
   priority: OrderPriority;
-  /** Set by the selectors from the job card and invoice; see orderStatus. */
+  /** Set by the server as work happens; never sent. */
   status: OrderStatus;
   dueDate: ISODateString;
   poNumber: string;
@@ -69,10 +73,25 @@ export type WorkOrder = {
   createdAt: ISODateString;
 };
 
+/** What prints with an order and its QR: also in the shop floor's job view. */
+export type OrderSummary = Pick<
+  WorkOrder,
+  | 'number'
+  | 'customerName'
+  | 'partName'
+  | 'jobName'
+  | 'description'
+  | 'partNumber'
+  | 'drawingNumber'
+  | 'poNumber'
+  | 'quantity'
+  | 'dueDate'
+>;
+
 /** Everything the Create / Edit order form can set. All optional in the UI. */
 export type OrderInput = Omit<
   WorkOrder,
-  'id' | 'status' | 'statusHistory' | 'createdAt'
+  'id' | 'number' | 'jobCardId' | 'status' | 'statusHistory' | 'createdAt'
 >;
 
 /** Multi-select filters; an empty list shows every order. */

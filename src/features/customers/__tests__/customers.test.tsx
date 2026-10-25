@@ -8,9 +8,14 @@ import {
   renderAdmin,
   typeInto,
 } from '../../../shared/testing/testUtils';
-import { customersApi } from '../api/customersApi';
+import { customersApi } from '../api/mockCustomersApi';
 import { validateCustomer } from '../components/CustomerFormModal';
 import { formatAddress } from '../utils';
+
+// Until jest.setup.js maps it: the dashboard reads the in-memory version.
+jest.mock('../../dashboard/api/dashboardApi', () =>
+  jest.requireActual('../../dashboard/api/mockDashboardApi'),
+);
 
 let mockWidth = 1280;
 jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => ({
@@ -47,10 +52,14 @@ test('adds a customer with validation', async () => {
   const { root, store } = await renderAdmin('Customers');
   await press(byTestId(root, 'add-customer'));
   await press(byTestId(root, 'customer-form-submit'));
-  expect(allText(root).split('This field is required').length - 1).toBe(3);
+  // Name, contact, mobile and the billing address (street, city, PIN code).
+  expect(allText(root).split('This field is required').length - 1).toBe(6);
   await typeInto(byTestId(root, 'customer-form-name'), 'Kaveri Tools');
   await typeInto(byTestId(root, 'customer-form-contact'), 'Lakshmi Raman');
   await typeInto(byTestId(root, 'customer-form-mobile'), '+91 98400 12345');
+  await typeInto(byTestId(root, 'customer-form-address'), '8 Mill Road');
+  await typeInto(byTestId(root, 'customer-form-city'), 'Erode');
+  await typeInto(byTestId(root, 'customer-form-pin'), '638001');
   await typeInto(byTestId(root, 'customer-form-gst'), 'bad');
   await press(byTestId(root, 'customer-form-submit'));
   expect(allText(root)).toContain('GST numbers are 15 letters and digits');
@@ -237,15 +246,29 @@ test('validator and address helpers', () => {
     alternateMobile: '',
     email: 'bad',
     gstNumber: '',
-    address: '',
-    city: '',
+    address: '1 Beach Road',
+    city: 'Kochi',
     state: 'Kerala',
-    pinCode: '',
+    pinCode: '682001',
     country: 'India',
     notes: '',
   };
   expect(validateCustomer(base)).toEqual({
     email: 'Enter a valid email address',
+  });
+  // The API needs a billing address to create a customer.
+  expect(
+    validateCustomer({
+      ...base,
+      email: '',
+      address: '',
+      city: '',
+      pinCode: '',
+    }),
+  ).toEqual({
+    address: 'This field is required',
+    city: 'This field is required',
+    pinCode: 'This field is required',
   });
   expect(validateCustomer({ ...base, email: '', mobile: '12' })).toEqual({
     mobile: 'Enter a valid phone number',

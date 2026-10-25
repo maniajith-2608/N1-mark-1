@@ -52,8 +52,6 @@ export const QC_STRINGS = {
     remarks: 'Remarks',
     placeholder:
       'Describe the reason for failure — e.g. dimension out of tolerance, surface defect, missing certificate…',
-    voiceNote: 'Voice note',
-    voiceNotes: 'Voice notes',
     submit: 'Submit Fail',
     /** RM QC: what was received, all required. */
     rejectedMaterial: 'Rejected material',
@@ -131,7 +129,7 @@ export const JOBS_STRINGS = {
   },
   order: {
     title: 'Order',
-    createJobCard: 'Create Job Card',
+    importJob: 'Import Job',
     viewJobCard: 'View Job Card',
     openDrawing: (no: string) => `Open drawing ${no}`,
   },
@@ -170,11 +168,11 @@ export const JOBS_STRINGS = {
     title: 'Raw Material Details',
     heading: 'A few details are missing',
     help: (workOrder: string) =>
-      `Fill in the raw material details for ${workOrder} before the job card is created.`,
+      `Fill in the raw material details for ${workOrder} before the job is imported.`,
     /** When the order already has every detail: confirm instead of fill in. */
     confirmHeading: 'Check the raw material details',
     confirmHelp: (workOrder: string) =>
-      `Confirm the raw material details for ${workOrder} before the job card is created.`,
+      `Confirm the raw material details for ${workOrder} before the job is imported.`,
     continue: 'Continue',
     /** Re-initiate RM QC: the replacement for rejected material. */
     retestHeading: 'Replacement material',

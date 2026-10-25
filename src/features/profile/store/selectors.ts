@@ -19,3 +19,24 @@ export const selectShellUser = createSelector(
         .join(' · '),
     },
 );
+
+const selectAdminPermissions = (state: RootState) => state.profile.permissions;
+const selectEmployeePermissions = (state: RootState) =>
+  state.employeeProfile.permissions;
+
+/**
+ * The signed-in person's permission codes (me.permissions), from whichever
+ * profile their area loaded: My profile for admins, Profile for the others.
+ * Empty until that loads.
+ */
+export const selectMyPermissions = createSelector(
+  [selectAdminPermissions, selectEmployeePermissions],
+  (admin, employee) => (admin.length ? admin : employee),
+);
+
+/**
+ * Show or hide an action by permission, not by role name (guide section 5,
+ * rule 8): `useAppSelector(s => selectHasPermission(s, 'customers.write'))`.
+ */
+export const selectHasPermission = (state: RootState, code: string) =>
+  selectMyPermissions(state).includes(code);

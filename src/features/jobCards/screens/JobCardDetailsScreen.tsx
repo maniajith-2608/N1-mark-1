@@ -23,7 +23,6 @@ import {
   ComingSoon,
   N1BottomBar,
   N1Button,
-  N1ConfirmDialog,
   N1Card,
   N1DetailGrid,
   N1Divider,
@@ -41,7 +40,7 @@ import {
 } from '../../../shared/components';
 import { useOnSettled, useToggle } from '../../../shared/hooks';
 import { pickDocument } from '../../../services/files/pickDocument';
-import { openDocument } from '../../../services/files/viewDocument';
+import { openStoredFile } from '../../../services/files/fileStorage';
 import {
   formatLongDate,
   notify,
@@ -72,30 +71,36 @@ import { COMMON_STRINGS } from '../../../shared/constants';
 import { QcHistory } from '../components/QcHistory';
 import { QcReportSheet } from '../components/QcReportSheet';
 import { RouteCard } from '../components/RouteCard';
-import { JOB_CARD_STRINGS, MATERIAL_QC_META } from '../constants';
+import {
+  DESIGN_APPROVAL_META,
+  JOB_CARD_STRINGS,
+  MATERIAL_QC_META,
+} from '../constants';
+import {
+  CompleteStepDialog,
+  PauseStepDialog,
+  StartStepDialog,
+} from '../components/StepDialogs';
 import { useJobCardBack } from '../hooks/useJobCardBack';
 import { useJobCard } from '../hooks/useJobCards';
 import type {
   JobCard,
-  JobCardInput,
   JobCardsScreenProps,
+  JobOperation,
   QcEntry,
+  RouteStep,
 } from '../types';
 import {
-  attachQcReport,
-  canCompleteFlow,
   canPauseOrComplete,
   canStart,
-  completeFlow,
   jobCardStage,
-  redoOperation,
+  nextOperation,
+  runningOperation,
   startBlockedReason,
   jobCardHeading,
   jobProgress,
   materialRejection,
-  pauseOperation,
   rejectedMaterialItems,
-  startOperation,
 } from '../utils';
 
 const S = JOB_CARD_STRINGS;
@@ -222,7 +227,7 @@ function InlineFlowEditor({
   saving: boolean;
   saveError: string | null;
   onCancel: () => void;
-  onSave: (input: JobCardInput) => void;
+  onSave: (steps: RouteStep[]) => void;
   /** Keep the title, Cancel and Save on top while the steps scroll. */
   sticky: boolean;
 }) {
@@ -299,13 +304,22 @@ export function JobCardDetailsScreen({
   const sectionTabsOptions = useSectionTabsOptions();
   const { isCompact } = useN1Breakpoint();
   const { jobCardId } = route.params;
-  const { jobCard, status, error, reload, update, saving, saveError } =
+  const { jobCard, status, error, reload, run, saving, saveError } =
     useJobCard(jobCardId);
-  // The work order behind the card (same id), shown as a card that opens it.
-  const { order } = useOrder(jobCardId);
+  // The work order behind the card, shown as a card that opens it.
+  const orderId = jobCard?.orderId;
+  const { order } = useOrder(orderId);
   const [tab, setTab] = useState<Tab>('machining');
+  // The step a Start, Pause or Complete dialog is open for.
+  const [dialog, setDialog] = useState<{
+    type: 'start' | 'pause' | 'complete';
+    operation: JobOperation;
+  } | null>(null);
+  const closeDialog = useCallback(() => setDialog(null), []);
+  const dialogFor = (type: 'start' | 'pause' | 'complete') =>
+    dialog?.type === type ? dialog.operation : null;
 
-  const back = useJobCardBack({ route, navigation });
+  const back = useJobCardBack({ route, navigation }, orderId);
   // Create / Edit flow happens here on the Machining tab, not on a screen of
   // its own. Opened with `editFlow` (from the lists), it starts open.
   const [editingFlow, setEditingFlow] = useState(
@@ -329,11 +343,11 @@ export function JobCardDetailsScreen({
   }, [navigation]);
   const savingFlow = useRef(false);
   const saveFlow = useCallback(
-    (input: JobCardInput) => {
+    (steps: RouteStep[]) => {
       savingFlow.current = true;
-      update(jobCardId, input);
+      run({ type: 'route', steps });
     },
-    [update, jobCardId],
+    [run],
   );
   useOnSettled(saving, saveError, () => {
     if (savingFlow.current) {
@@ -342,7 +356,6 @@ export function JobCardDetailsScreen({
     }
   });
   const [dispatchOpen, openDispatch, closeDispatch] = useToggle(false);
-  const [completeOpen, openComplete, closeComplete] = useToggle(false);
   // Admin: open the invoice in Billing. Shop-floor roles have no Billing
   // screen, so they're told it was created.
   const showInvoice = useCallback(
@@ -381,10 +394,17 @@ export function JobCardDetailsScreen({
       ORDER_STRINGS.details.printDrawing,
     );
   }, [order]);
-  const download = useCallback(
-    () => notifyUnavailable(ORDER_STRINGS.details.downloadAction),
-    [],
-  );
+  // The stored design file opens (or downloads) in its own tab.
+  const designFile = jobCard?.designFile;
+  const download = useCallback(() => {
+    if (!designFile) {
+      notifyUnavailable(ORDER_STRINGS.details.downloadAction);
+      return;
+    }
+    openStoredFile(designFile).catch(() =>
+      notifyUnavailable(ORDER_STRINGS.details.downloadAction),
+    );
+  }, [designFile]);
   // Admin: the order slides in on this stack (Job Cards, Orders, Customers)
   // and its Back returns here; opened from that order already, it goes back
   // to it. A stack without Order details (Dashboard, Users) opens it in
@@ -399,63 +419,68 @@ export function JobCardDetailsScreen({
     const state = navigation.getState();
     const below = state.routes[state.index - 1];
     const belowParams = below?.params as { orderId?: string } | undefined;
-    if (below?.name === 'OrderDetails' && belowParams?.orderId === jobCardId) {
+    if (!orderId) {
+      return;
+    }
+    if (below?.name === 'OrderDetails' && belowParams?.orderId === orderId) {
       navigation.goBack();
     } else if (state.routeNames.includes('OrderDetails')) {
-      navigation.push('OrderDetails', {
-        orderId: jobCardId,
-        fromJobCardId: jobCardId,
-      });
+      navigation.push('OrderDetails', { orderId, fromJobCardId: jobCardId });
     } else {
       navigation.navigate('Orders', {
         screen: 'OrderDetails',
-        params: { orderId: jobCardId, fromJobCardId: jobCardId },
+        params: { orderId, fromJobCardId: jobCardId },
         initial: false,
       });
     }
-  }, [navigation, jobCardId]);
-  // QC reports: pick a file for a check, or open one (web opens files picked
-  // this session; the rest explain it isn't available yet).
+  }, [navigation, jobCardId, orderId]);
+  // QC reports: pick a file for a check (uploaded, then attachQcReport), or
+  // open a stored one.
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const uploadReport = useCallback(
     async (entry: QcEntry) => {
-      if (!jobCard) {
-        return;
-      }
       setUploadingId(entry.id);
       try {
         const file = await pickDocument(R.kind, R.sample, R.accept);
         if (file) {
-          update(jobCard.id, attachQcReport(jobCard, entry.id, file));
+          run({ type: 'attachQcReport', qcId: entry.id, report: file });
         }
       } finally {
         setUploadingId(null);
       }
     },
-    [jobCard, update],
+    [run],
   );
   // Phones: the report's details in a sheet. Wide screens open the file.
   const [reportEntry, setReportEntry] = useState<QcEntry | null>(null);
   const closeReport = useCallback(() => setReportEntry(null), []);
   const openFile = useCallback((entry: QcEntry) => {
-    if (!entry.report || !openDocument(entry.report)) {
+    if (!entry.report) {
       notifyUnavailable(R.open);
+      return;
     }
+    openStoredFile(entry.report)
+      .then(opened => opened || notifyUnavailable(R.open))
+      .catch(() => notifyUnavailable(R.open));
   }, []);
   const openReport = useCallback(
     (entry: QcEntry) => (isCompact ? setReportEntry(entry) : openFile(entry)),
     [isCompact, openFile],
   );
+  const employeeRole = useOptionalEmployeeRole();
   // Supervisor only: enter the replacement material so RM QC checks it again.
   // RawMaterial lives in the role's stack, not the admin Job Cards stack.
-  const canReinitiate = useOptionalEmployeeRole() === 'supervisor';
-  const reinitiate = useCallback(
-    () =>
+  const canReinitiate = employeeRole === 'supervisor';
+  // Invoices are for owner, admin and accountant: the backend refuses the
+  // supervisor (a delivery challan for them is coming next).
+  const canDispatch = employeeRole === null;
+  const reinitiate = useCallback(() => {
+    if (orderId) {
       navigation.dispatch(
-        StackActions.push('RawMaterial', { orderId: jobCardId, retest: true }),
-      ),
-    [navigation, jobCardId],
-  );
+        StackActions.push('RawMaterial', { orderId, retest: true }),
+      );
+    }
+  }, [navigation, orderId]);
 
   const backLink = (
     <Pressable
@@ -479,7 +504,8 @@ export function JobCardDetailsScreen({
       title={D.title}
       onBack={back.goBack}
       compactRight={
-        jobCard && (
+        jobCard &&
+        canDispatch && (
           <N1IconButton
             icon="package"
             variant="tile"
@@ -503,28 +529,42 @@ export function JobCardDetailsScreen({
     );
   }
 
-  const now = () => new Date().toISOString();
-  const start = () => update(jobCard.id, startOperation(jobCard, now()));
-  const pause = () => update(jobCard.id, pauseOperation(jobCard));
-  // Complete finishes the whole flow, not just the running step.
-  const complete = () => {
-    closeComplete();
-    update(jobCard.id, completeFlow(jobCard, now()));
+  // Start picks the operator and an idle machine; a paused step resumes on
+  // its own machine.
+  const next = nextOperation(jobCard);
+  const start = () => {
+    if (next?.status === 'paused') {
+      run({ type: 'resume', operationId: next.id });
+    } else if (next) {
+      setDialog({ type: 'start', operation: next });
+    }
   };
-  const remainingSteps = jobCard.operations.filter(
-    op => op.status !== 'completed',
-  ).length;
+  const runningStep = runningOperation(jobCard);
+  const pause = () =>
+    runningStep && setDialog({ type: 'pause', operation: runningStep });
+  // Complete finishes the running step (one at a time: each has its QC).
+  const complete = () =>
+    runningStep && setDialog({ type: 'complete', operation: runningStep });
   const running = canPauseOrComplete(jobCard);
   const hasFlow = jobCard.operations.length > 0;
-  // The next step waits for RM QC and for the last step's QC to pass.
+  // The next step waits for RM QC, the design approval and the last step's
+  // QC to pass.
   const blocked = running ? undefined : startBlockedReason(jobCard);
-  // A step that failed its QC is sent back to be done again.
+  // A failed QC check reopens its step as rework, started again on a machine.
   const stage = jobCardStage(jobCard);
   const failedStep =
-    stage.key === 'operation_qc' && stage.failed ? stage.operation : null;
+    stage.key === 'operation' && stage.state === 'rework'
+      ? stage.operation
+      : null;
   const redo = () =>
     failedStep &&
-    update(jobCard.id, redoOperation(jobCard, failedStep.id, now()));
+    !blocked &&
+    setDialog({ type: 'start', operation: failedStep });
+  // Supervisor / admin: approve the drawing before work starts.
+  const canApproveDesign =
+    jobCard.designApproval !== 'approved' && Boolean(jobCard.designFile);
+  const approveDesign = () =>
+    run({ type: 'designApproval', approval: 'approved' });
 
   const heading = (text: string) => (
     <N1Text variant="title" weight="bold">
@@ -568,8 +608,8 @@ export function JobCardDetailsScreen({
       variant="secondary"
       size={isCompact ? 'lg' : 'sm'}
       fullWidth={isCompact}
-      onPress={openComplete}
-      disabled={saving || !canCompleteFlow(jobCard)}
+      onPress={complete}
+      disabled={saving || !running}
       testID="complete-operation"
     />
   );
@@ -584,7 +624,7 @@ export function JobCardDetailsScreen({
             {jobCardHeading(jobCard)}
           </N1Text>
           <N1Text variant="small" color="secondary" testID="job-card-wo">
-            {S.workOrder(jobCard.id)}
+            {S.workOrder(jobCard.number)}
           </N1Text>
         </View>
         <View style={styles.badges}>
@@ -592,7 +632,7 @@ export function JobCardDetailsScreen({
           <JobCardStatusBadge jobCard={jobCard} />
         </View>
         {/* Phones: Generate Dispatch is in the header. */}
-        {!isCompact && (
+        {!isCompact && canDispatch && (
           <>
             <View style={styles.spacer} />
             <View style={styles.actions}>
@@ -619,9 +659,7 @@ export function JobCardDetailsScreen({
       <DrawingQrSection
         drawingNumber={drawingNumber}
         hasDrawing={Boolean(jobCard.designFile)}
-        qrValue={
-          order ? orderQrValue(order) : ORDER_STRINGS.workOrder(jobCard.id)
-        }
+        qrValue={order ? orderQrValue(order) : jobCard.number}
         onViewDrawing={() => setViewing({ type: 'drawing', drawingNumber })}
         onPrintDrawing={printDrawing}
         columns={OVERVIEW_COLUMNS}
@@ -637,9 +675,28 @@ export function JobCardDetailsScreen({
             label: I.materialQc,
             value: <MetaBadge meta={MATERIAL_QC_META[jobCard.materialQc]} />,
           },
+          {
+            label: I.design,
+            value: (
+              <MetaBadge meta={DESIGN_APPROVAL_META[jobCard.designApproval]} />
+            ),
+          },
         ]}
         testID="job-card-facts"
       />
+      {canApproveDesign && (
+        <View style={styles.actions}>
+          <N1Button
+            title={D.approveDesign}
+            leftIcon="check"
+            variant="secondary"
+            size="sm"
+            onPress={approveDesign}
+            disabled={saving}
+            testID="approve-design"
+          />
+        </View>
+      )}
     </View>
   );
 
@@ -709,13 +766,13 @@ export function JobCardDetailsScreen({
                   variant="danger"
                   size="sm"
                   onPress={redo}
-                  disabled={saving}
+                  disabled={saving || Boolean(blocked)}
                   testID="redo-operation"
                 />
               )}
             </View>
           )}
-          {hasFlow && blocked && !failedStep && (
+          {hasFlow && blocked && (
             <N1Text variant="small" color="secondary" testID="start-blocked">
               {blocked}
             </N1Text>
@@ -796,17 +853,24 @@ export function JobCardDetailsScreen({
     />
   );
 
-  const completeDialog = (
-    <N1ConfirmDialog
-      visible={completeOpen}
-      title={D.completeFlow.title}
-      message={D.completeFlow.message(remainingSteps)}
-      confirmLabel={D.completeFlow.confirm}
-      icon="check-circle"
-      onConfirm={complete}
-      onCancel={closeComplete}
-      testID="complete-flow-dialog"
-    />
+  const stepDialogs = (
+    <>
+      <StartStepDialog
+        operation={dialogFor('start')}
+        jobCard={jobCard}
+        onClose={closeDialog}
+      />
+      <PauseStepDialog
+        operation={dialogFor('pause')}
+        jobCard={jobCard}
+        onClose={closeDialog}
+      />
+      <CompleteStepDialog
+        operation={dialogFor('complete')}
+        jobCard={jobCard}
+        onClose={closeDialog}
+      />
+    </>
   );
 
   const viewer = (
@@ -878,7 +942,7 @@ export function JobCardDetailsScreen({
           onClose={closeFlow}
         />
         {dispatchModal}
-        {completeDialog}
+        {stepDialogs}
         {viewer}
         {reportSheet}
       </AdminScreenBackground.Provider>
@@ -908,7 +972,7 @@ export function JobCardDetailsScreen({
         )}
       </N1Card>
       {dispatchModal}
-      {completeDialog}
+      {stepDialogs}
       {viewer}
     </AdminScreen>
   );

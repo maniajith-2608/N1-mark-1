@@ -29,7 +29,8 @@ export function InvoiceOperationsScreen({
           <ComingSoon icon="receipt" title={I.title} message={I.notFound} />
         </AsyncContent>
       }
-      editing={edit}
+      editing={edit && !(invoice?.status === 'paid')}
+      readOnly={invoice?.status === 'paid'}
       onEditingChange={on => navigation.setParams({ edit: on })}
       onBack={() => navigation.goBack()}
       onSave={save}

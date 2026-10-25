@@ -1,4 +1,5 @@
 import type { Attachment } from '../../shared/types';
+import { rememberPickedFile } from './pickedFiles';
 
 // The project builds without the DOM typings; just what this file touches.
 type PickedFile = { name: string; size: number; type: string };
@@ -71,13 +72,18 @@ export function chooseFiles(
       const stamp = Date.now();
       resolve(
         await Promise.all(
-          files.map(async (file, i) => ({
-            id: `${kind}-${stamp}-${i}`,
-            name: file.name,
-            kind,
-            sizeBytes: file.size,
-            uri: await previewUri(file),
-          })),
+          files.map(async (file, i) => {
+            const id = `${kind}-${stamp}-${i}`;
+            // Kept for the upload when the record is saved.
+            rememberPickedFile(id, file);
+            return {
+              id,
+              name: file.name,
+              kind,
+              sizeBytes: file.size,
+              uri: await previewUri(file),
+            };
+          }),
         ),
       );
     });

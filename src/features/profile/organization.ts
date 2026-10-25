@@ -1,20 +1,9 @@
 import type { N1DropDownOption, N1IconName } from '../../shared/components';
-import {
-  COMMON_STRINGS,
-  GST_RATES,
-  INDIAN_STATES,
-  stateForGstin,
-} from '../../shared/constants';
+import { COMMON_STRINGS, INDIAN_STATES } from '../../shared/constants';
 import type { FormErrors } from '../../shared/hooks';
-import {
-  isBlank,
-  isEmail,
-  isPhone,
-  isPinCode,
-  normalizeGstin,
-} from '../../shared/utils';
+import { isBlank, isEmail, isPhone, isPinCode } from '../../shared/utils';
 import { INDUSTRY_OPTIONS } from '../auth/constants';
-import type { Organization, OrganizationInput } from './types';
+import type { Organization } from './types';
 
 export const ORGANIZATION_STRINGS = {
   title: 'Organization details',
@@ -104,9 +93,6 @@ export const BUSINESS_TYPE_OPTIONS: N1DropDownOption<string>[] = [
 export const STATE_OPTIONS: N1DropDownOption<string>[] = INDIAN_STATES.map(
   s => ({ label: s.name, value: s.name }),
 );
-
-/** Rates a new organization starts with (28% added but switched off). */
-const DEFAULT_TAX_RATES = GST_RATES.filter(rate => rate > 0);
 
 /** Label for a dropdown value; the value itself when it isn't listed. */
 export const optionLabel = (
@@ -200,7 +186,15 @@ export function validateSection(
     }
   }
   if (section === 'address') {
-    if (!isBlank(v.pinCode) && !isPinCode(v.pinCode)) {
+    // The backend saves the address whole: street, city, state and PIN.
+    (['address', 'city', 'state'] as const).forEach(key => {
+      if (isBlank(v[key])) {
+        errors[key] = R;
+      }
+    });
+    if (isBlank(v.pinCode)) {
+      errors.pinCode = R;
+    } else if (!isPinCode(v.pinCode)) {
       errors.pinCode = E.pinCode;
     }
   }
@@ -262,49 +256,6 @@ export const shortNameOf = (name: string) =>
   name
     .replace(/\s+(private limited|pvt\.? ltd\.?|ltd\.?|llp|inc\.?)$/i, '')
     .trim() || name;
-
-/** A new organization from Create organization, with sensible defaults. */
-export function newOrganization(
-  input: OrganizationInput,
-  now: string,
-): Organization {
-  const name = input.name.trim();
-  const gstNumber = normalizeGstin(input.gstNumber);
-  return {
-    id: `ORG-${Date.now()}`,
-    code: input.code,
-    createdAt: now,
-    shortName: shortNameOf(name),
-    name,
-    logo: null,
-    phone: input.phone.trim(),
-    email: input.email.trim(),
-    website: '',
-    businessType: '',
-    industry: input.industry,
-    registrationDetails: '',
-    address: '',
-    city: '',
-    state: '',
-    pinCode: '',
-    country: 'India',
-    gstRegistered: Boolean(gstNumber),
-    gstNumber,
-    gstState: gstNumber ? stateForGstin(gstNumber) : '',
-    taxRates: DEFAULT_TAX_RATES.map(rate => ({
-      id: `rate-${rate}`,
-      rate,
-      active: rate !== 28,
-    })),
-    defaultTaxRate: 18,
-    invoicePrefix: 'INV-',
-    invoiceStartNumber: 1,
-    invoiceFooter: '',
-    invoiceLogo: null,
-    termsAndConditions: '',
-    signature: null,
-  };
-}
 
 export const fieldLabel = (key: keyof typeof F) => F[key];
 

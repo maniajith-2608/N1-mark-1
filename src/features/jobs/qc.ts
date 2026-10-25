@@ -78,13 +78,45 @@ export function machineQc(c: JobCard): QcItem {
 export const qcItem = (c: JobCard, kind: QcKind) =>
   kind === 'rm' ? rawMaterialQc(c) : machineQc(c);
 
+/** One check on QC's list, as the server's QC queue (qcQueue) reports it. */
+export type QcQueueEntry = {
+  jobCardId: string;
+  kind: QcKind;
+  status: QcStatus;
+  stage: string;
+  subject: string;
+};
+
+/** The check a job's row shows: the server's queue entry, else worked out. */
+export function queuedQcItem(
+  c: JobCard,
+  kind: QcKind,
+  queue: ReadonlyMap<string, QcQueueEntry>,
+): QcItem {
+  const item = qcItem(c, kind);
+  const queued = queue.get(qcQueueKey(c.id, kind));
+  return queued
+    ? {
+        ...item,
+        status: queued.status,
+        stage: queued.stage,
+        subject: queued.subject,
+      }
+    : item;
+}
+
+export const qcQueueKey = (jobCardId: string, kind: QcKind) =>
+  `${jobCardId}:${kind}`;
+
 /** The latest check logged for this item, for its remark. */
 export function qcEntry(c: JobCard, kind: QcKind): QcEntry | undefined {
   const opId = kind === 'machine' ? machineQc(c).operation?.id : undefined;
   return [...c.qcHistory]
     .reverse()
     .find(e =>
-      kind === 'machine' ? e.operationId === opId : e.stage === S.materialStage,
+      kind === 'machine'
+        ? e.operationId === opId
+        : e.kind === 'rm' || e.stage === S.materialStage,
     );
 }
 
@@ -107,6 +139,7 @@ export function qcResult(
   const op = machineQc(c).operation;
   const entry: QcEntry = {
     id: `qc-${Date.now()}`,
+    kind,
     stage: kind === 'rm' ? S.materialStage : S.operationStage(op?.name ?? ''),
     result:
       kind === 'rm'

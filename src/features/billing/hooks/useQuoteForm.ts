@@ -3,7 +3,7 @@ import { COMMON_STRINGS } from '../../../shared/constants';
 import { useForm, type FormErrors } from '../../../shared/hooks';
 import { isBlank, isNumeric, toNumber } from '../../../shared/utils';
 import { BILLING_STRINGS } from '../constants';
-import type { Quote, QuoteInput, QuoteStatus } from '../types';
+import type { Quote, QuoteInput } from '../types';
 import { useLineItems } from './useLineItems';
 
 export type QuoteValues = {
@@ -11,7 +11,6 @@ export type QuoteValues = {
   partName: string;
   quantity: string;
   material: string;
-  status: QuoteStatus;
 };
 
 const EMPTY: QuoteValues = {
@@ -19,7 +18,6 @@ const EMPTY: QuoteValues = {
   partName: '',
   quantity: '',
   material: '',
-  status: 'draft',
 };
 
 export const toQuoteValues = (q?: Quote): QuoteValues =>
@@ -29,7 +27,6 @@ export const toQuoteValues = (q?: Quote): QuoteValues =>
         partName: q.partName,
         quantity: String(q.quantity),
         material: q.material,
-        status: q.status,
       }
     : EMPTY;
 
@@ -49,11 +46,15 @@ export const validateQuoteValues = (
   return errors;
 };
 
-type QuoteChanges = Omit<QuoteInput, 'orderId'>;
+type QuoteChanges = Pick<
+  QuoteInput,
+  'partName' | 'quantity' | 'material' | 'gstRate' | 'lineItems'
+>;
 
 /**
- * An existing quote's editable fields (customer, part, quantity, material,
- * status, GST rate and operations), edited in place on the quote page.
+ * An existing draft's editable fields (part, quantity, material, GST rate
+ * and operations), edited in place on the quote page. The customer is fixed
+ * (a different customer is a new quote) and Send makes it Sent.
  */
 export function useQuoteForm(quote: Quote | undefined) {
   const form = useForm<QuoteValues>(toQuoteValues(quote), validateQuoteValues);
@@ -91,11 +92,9 @@ export function useQuoteForm(quote: Quote | undefined) {
         return null;
       }
       const changes = {
-        customerName: values.customerName.trim(),
         partName: values.partName.trim(),
         quantity: toNumber(values.quantity),
         material: values.material.trim(),
-        status: values.status,
         gstRate,
       };
       return withLines ? { ...changes, lineItems: lines.items } : changes;

@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { View } from 'react-native';
 import {
   AsyncContent,
@@ -14,14 +14,16 @@ import {
 import {
   JOB_CARD_STRINGS,
   JobCardStatusBadge,
-  completeOperation,
   currentOperation,
   jobHeading,
-  pauseOperation,
   startBlockedReason,
-  startOperation,
   useJobCard,
+  type JobOperation,
 } from '../../jobCards';
+import {
+  CompleteStepDialog,
+  PauseStepDialog,
+} from '../../jobCards/components/StepDialogs';
 import { JobOverview } from '../components/JobOverview';
 import { JOBS_STRINGS } from '../constants';
 import type { JobsScreenProps } from '../types';
@@ -35,8 +37,9 @@ const makeStyles = createN1Styles(t => ({
 }));
 
 /**
- * Operator's job: start the next operation (after choosing a
- * machine), then pause or complete it.
+ * Operator's job: start the next operation (after choosing an idle
+ * machine), then pause (with a reason), resume or complete it (with its
+ * good, rejected, rework and scrap pieces). Each is its own mutation.
  */
 export function OperatorJobScreen({
   route,
@@ -44,8 +47,13 @@ export function OperatorJobScreen({
 }: JobsScreenProps<'OperatorJob'>) {
   const styles = useN1Styles(makeStyles);
   const { jobCardId } = route.params;
-  const { jobCard, status, error, reload, update, saving, saveError } =
+  const { jobCard, status, error, reload, run, saving, saveError } =
     useJobCard(jobCardId);
+  const [dialog, setDialog] = useState<{
+    type: 'pause' | 'complete';
+    operation: JobOperation;
+  } | null>(null);
+  const closeDialog = useCallback(() => setDialog(null), []);
 
   const goBack = useCallback(() => navigation.goBack(), [navigation]);
   const header = (
@@ -63,7 +71,6 @@ export function OperatorJobScreen({
   }
 
   const op = currentOperation(jobCard);
-  const now = () => new Date().toISOString();
   const opStatus = jobCard.status === 'completed' ? 'completed' : op?.status;
 
   // A list (not a fragment) so the bottom bar gives each button a slot.
@@ -78,7 +85,7 @@ export function OperatorJobScreen({
         size="lg"
         fullWidth
         disabled={saving}
-        onPress={() => update(jobCard.id, pauseOperation(jobCard))}
+        onPress={() => op && setDialog({ type: 'pause', operation: op })}
         testID="pause-operation"
       />,
       <N1Button
@@ -89,7 +96,7 @@ export function OperatorJobScreen({
         size="lg"
         fullWidth
         disabled={saving}
-        onPress={() => update(jobCard.id, completeOperation(jobCard, now()))}
+        onPress={() => op && setDialog({ type: 'complete', operation: op })}
         testID="complete-operation"
       />,
     ];
@@ -102,7 +109,7 @@ export function OperatorJobScreen({
         size="lg"
         fullWidth
         loading={saving}
-        onPress={() => update(jobCard.id, startOperation(jobCard, now()))}
+        onPress={() => op && run({ type: 'resume', operationId: op.id })}
         testID="resume-operation"
       />
     );
@@ -137,14 +144,24 @@ export function OperatorJobScreen({
       <JobOverview
         jobCard={jobCard}
         onViewDetails={() =>
-          navigation.navigate('OrderDetails', { orderId: jobCard.id })
+          navigation.navigate('OrderDetails', { orderId: jobCard.orderId })
         }
       />
-      {saveError && (
+      {saveError && !dialog && (
         <N1Text variant="small" color="danger">
           {saveError}
         </N1Text>
       )}
+      <PauseStepDialog
+        operation={dialog?.type === 'pause' ? dialog.operation : null}
+        jobCard={jobCard}
+        onClose={closeDialog}
+      />
+      <CompleteStepDialog
+        operation={dialog?.type === 'complete' ? dialog.operation : null}
+        jobCard={jobCard}
+        onClose={closeDialog}
+      />
     </UserScreen>
   );
 }

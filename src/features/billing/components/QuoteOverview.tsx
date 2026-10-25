@@ -1,6 +1,7 @@
 import { Pressable, View } from 'react-native';
 import {
   N1Avatar,
+  N1Button,
   N1DropDown,
   N1Icon,
   N1Text,
@@ -10,7 +11,7 @@ import {
 } from '../../../shared/components';
 import { COMMON_STRINGS } from '../../../shared/constants';
 import { formatCurrency } from '../../../shared/utils';
-import { BILLING_STRINGS, QUOTE_STATUS_OPTIONS } from '../constants';
+import { BILLING_STRINGS } from '../constants';
 import { gstRateOptions, type GstContext } from '../hooks/useGst';
 import type { useQuoteForm } from '../hooks/useQuoteForm';
 import type { Quote, Totals } from '../types';
@@ -45,6 +46,11 @@ type Props = {
   /** Set when the quote is mapped to an order: the order opens it. */
   onOpenOrder?: () => void;
   onOpenOperations: () => void;
+  /** A draft: email it to the customer, which makes it Sent. */
+  onSend?: () => void;
+  /** Sent and not yet converted: make the work order. */
+  onConvert?: () => void;
+  busy?: boolean;
 };
 
 /**
@@ -57,6 +63,9 @@ export function QuoteOverview({
   totals,
   onOpenOrder,
   onOpenOperations,
+  onSend,
+  onConvert,
+  busy,
 }: Props) {
   const styles = useN1Styles(makeStyles);
 
@@ -65,7 +74,7 @@ export function QuoteOverview({
       <View style={styles.hero}>
         <View style={styles.idRow}>
           <N1Icon name="receipt" size="sm" color="textSecondary" />
-          <N1Text color="secondary">{quote.id}</N1Text>
+          <N1Text color="secondary">{quote.number}</N1Text>
           <QuoteStatusBadge status={quote.status} />
         </View>
         <N1Text variant="h2" accessibilityRole="header" testID="quote-total">
@@ -85,6 +94,29 @@ export function QuoteOverview({
             {quote.customerName || COMMON_STRINGS.dash}
           </N1Text>
         </View>
+        {onSend && (
+          <N1Button
+            title={Q.send}
+            leftIcon="arrow-right"
+            variant="soft"
+            size="sm"
+            fullWidth
+            onPress={onSend}
+            loading={busy}
+            testID="send-quote"
+          />
+        )}
+        {onConvert && (
+          <N1Button
+            title={Q.convert}
+            leftIcon="package"
+            variant="soft"
+            size="sm"
+            fullWidth
+            onPress={onConvert}
+            testID="convert-quote"
+          />
+        )}
       </Card>
 
       <Card title={Q.partDetails} testID="quote-part-details">
@@ -102,11 +134,11 @@ export function QuoteOverview({
                   testID="quote-order"
                 >
                   <N1Text variant="small" weight="semiBold" style={styles.link}>
-                    {Q.orderValue(quote.orderId)}
+                    {Q.orderValue}
                   </N1Text>
                 </Pressable>
               ) : (
-                Q.orderValue(quote.orderId)
+                Q.orderValue
               )
             }
           />
@@ -140,7 +172,8 @@ type EditFormProps = {
 };
 
 /**
- * Phones: Edit quote — the customer, part, quantity, status and GST rate,
+ * Phones: Edit quote — the part, quantity and GST rate (the customer is
+ * fixed),
  * in the same small cards, with the amounts following along. The process
  * operations are edited from their own screen (its header's Edit).
  */
@@ -158,6 +191,8 @@ export function QuoteEditForm({ form, gst, totals, saveError }: EditFormProps) {
             value={values.customerName}
             onChangeText={bind('customerName')}
             errorText={errors.customerName}
+            // A quote keeps its customer: a new one is a new quote.
+            disabled
             testID="quote-customer"
           />
           <N1TextInput
@@ -180,15 +215,6 @@ export function QuoteEditForm({ form, gst, totals, saveError }: EditFormProps) {
             testID="quote-quantity"
           />
         </View>
-      </Card>
-      <Card title={Q.status}>
-        <N1DropDown
-          options={QUOTE_STATUS_OPTIONS}
-          value={values.status}
-          onChange={bind('status')}
-          accessibilityLabel={Q.status}
-          testID="quote-status"
-        />
       </Card>
       <Card title={Q.amount}>
         {gst.registered && (

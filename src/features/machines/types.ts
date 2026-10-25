@@ -17,7 +17,10 @@ export type MachineStatus = 'running' | 'idle' | 'maintenance';
 
 /** The job a machine is working on, as the shop-floor API reports it. */
 export type MachineWork = {
+  /** The work order's id. */
   workOrderId: string;
+  /** Its number as people know it ("1042"); blank if it couldn't be read. */
+  workOrderNumber: string;
   title: string;
   operator: string;
 };

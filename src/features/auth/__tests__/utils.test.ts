@@ -35,7 +35,7 @@ describe('isValidEmail', () => {
 
 describe('checkPassword', () => {
   test('all rules pass for a strong matching password', () => {
-    expect(checkPassword('secret123', 'secret123')).toEqual({
+    expect(checkPassword('secret1234', 'secret1234')).toEqual({
       minLength: true,
       lettersAndNumbers: true,
       matches: true,
@@ -57,8 +57,10 @@ describe('checkPassword', () => {
 
 describe('isPasswordValid', () => {
   test('needs every rule to pass', () => {
-    expect(isPasswordValid(checkPassword('secret123', 'secret123'))).toBe(true);
-    expect(isPasswordValid(checkPassword('secret123', 'secret124'))).toBe(
+    expect(isPasswordValid(checkPassword('secret1234', 'secret1234'))).toBe(
+      true,
+    );
+    expect(isPasswordValid(checkPassword('secret1234', 'secret1235'))).toBe(
       false,
     );
   });
@@ -66,8 +68,8 @@ describe('isPasswordValid', () => {
 
 describe('passwordChecklist', () => {
   test('maps rules to checklist rows', () => {
-    expect(passwordChecklist(checkPassword('secret123', 'x'))).toEqual([
-      { label: 'Minimum 8 characters', done: true },
+    expect(passwordChecklist(checkPassword('secret1234', 'x'))).toEqual([
+      { label: 'Minimum 10 characters', done: true },
       { label: 'Letters and numbers', done: true },
       { label: 'Passwords match', done: false },
     ]);

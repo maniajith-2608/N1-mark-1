@@ -112,7 +112,7 @@ export function invoiceDocument(
     seller: sellerOf(org),
     title: P.title,
     meta: [
-      { label: P.number, value: invoice.id },
+      { label: P.number, value: invoice.number },
       { label: P.date, value: formatDate(invoice.issuedAt) },
       { label: I.status, value: INVOICE_STATUS_META[invoice.status].label },
     ],
@@ -149,7 +149,7 @@ export function quoteDocument(
     seller: sellerOf(org),
     title: P.quoteTitle,
     meta: [
-      { label: P.quoteNumber, value: quote.id },
+      { label: P.quoteNumber, value: quote.number },
       { label: P.date, value: formatDate(quote.createdAt) },
       { label: Q.status, value: QUOTE_STATUS_META[quote.status].label },
     ],

@@ -154,6 +154,8 @@ export const ORDER_FORM_STEPS: (keyof OrderFormValues)[][] = [
  */
 export const REQUIRED_ORDER_FIELDS = [
   'customerName',
+  'poNumber',
+  'quantity',
   'partName',
   'drawingNumber',
   'routeCardNo',
@@ -177,12 +179,19 @@ export function validateOrderForm(
       errors[key] = COMMON_STRINGS.required;
     }
   });
+  // An order is made for a saved customer; new ones are added first.
+  if (!isBlank(v.customerName) && !v.customerId) {
+    errors.customerName = ORDER_STRINGS.form.pickCustomer;
+  }
   if (!isBlank(v.customerEmail) && !isEmail(v.customerEmail)) {
     errors.customerEmail = COMMON_STRINGS.invalidEmail;
   }
+  // The server needs at least one piece.
   if (
     !isBlank(v.quantity) &&
-    (!isNumeric(v.quantity) || Number(v.quantity) < 0)
+    (!isNumeric(v.quantity) ||
+      !Number.isInteger(Number(v.quantity)) ||
+      Number(v.quantity) < 1)
   ) {
     errors.quantity = COMMON_STRINGS.invalidNumber;
   }

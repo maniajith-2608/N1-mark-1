@@ -3,16 +3,18 @@ import type { RequestStatus } from '../../../shared/types';
 import type {
   MyProfile,
   Organization,
-  OrganizationInput,
   OrganizationUpdate,
   PasswordChangeInput,
   ProfileInput,
+  PermissionCode,
   Session,
 } from '../types';
 
 export type ProfileState = {
   profile: MyProfile | null;
   organization: Organization | null;
+  /** me.permissions; see selectHasPermission. */
+  permissions: PermissionCode[];
   status: RequestStatus;
   error: string | null;
   saving: boolean;
@@ -26,6 +28,7 @@ export type ProfileState = {
 const initialState: ProfileState = {
   profile: null,
   organization: null,
+  permissions: [],
   status: 'idle',
   error: null,
   saving: false,
@@ -46,20 +49,13 @@ const profileSlice = createSlice({
     fetchSessionSuccess: (state, action: PayloadAction<Session>) => {
       state.profile = action.payload.profile;
       state.organization = action.payload.organization;
+      state.permissions = action.payload.permissions;
       state.status = 'succeeded';
       state.signedOut = false;
     },
     fetchSessionFailure: (state, action: PayloadAction<string>) => {
       state.status = 'failed';
       state.error = action.payload;
-    },
-    /** Create organization; the saga stores it and loads the new session. */
-    createOrganizationRequest: (
-      state,
-      _action: PayloadAction<OrganizationInput>,
-    ) => {
-      state.status = 'loading';
-      state.error = null;
     },
     updateOrganizationRequest: (
       state,

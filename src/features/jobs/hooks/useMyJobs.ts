@@ -1,20 +1,24 @@
 import { useCallback, useEffect, useMemo } from 'react';
 import { useAppDispatch, useAppSelector } from '../../../app/store/hooks';
 import type { RootState } from '../../../app/store';
-import { useJobCards } from '../../jobCards';
+import { selectJobCardsState } from '../../jobCards/store/selectors';
 import { useEmployeeRole } from '../../profile/context/EmployeeRoleContext';
+import { qcQueueKey, type QcQueueEntry } from '../qc';
 import { myJobsActions } from '../store/myJobsSlice';
 import type { RawMaterialInput } from '../types';
 
 const selectMyJobs = (state: RootState) => state.myJobs;
 const NO_IDS: string[] = [];
 
-/** The signed-in user's jobs (their job cards), newest import first. */
+/**
+ * The signed-in user's jobs (myJobs): an operator's assigned work, or the
+ * jobs a supervisor or QC added to their list, as whole job cards.
+ */
 export function useMyJobs() {
   const role = useEmployeeRole();
   const dispatch = useAppDispatch();
   const state = useAppSelector(selectMyJobs);
-  const jobCards = useJobCards();
+  const entities = useAppSelector(s => selectJobCardsState(s).entities);
 
   // Load when nothing is loaded yet, or another role's list is.
   const stale = state.status === 'idle' || state.role !== role;
@@ -27,8 +31,8 @@ export function useMyJobs() {
   // Another role's list is hidden while this one loads.
   const ids = stale ? NO_IDS : state.ids;
   const items = useMemo(
-    () => ids.flatMap(id => jobCards.items.find(c => c.id === id) ?? []),
-    [ids, jobCards.items],
+    () => ids.flatMap(id => entities[id] ?? []),
+    [ids, entities],
   );
   const stats = useMemo(() => {
     const count = (status: string) =>
@@ -39,31 +43,40 @@ export function useMyJobs() {
       total: items.length,
     };
   }, [items]);
-
-  const reload = useCallback(() => {
-    dispatch(myJobsActions.fetchRequest(role));
-    jobCards.reload();
-  }, [dispatch, role, jobCards]);
-  const importJob = useCallback(
-    (orderId: string, rawMaterial?: RawMaterialInput, retest?: boolean) =>
-      dispatch(
-        myJobsActions.importRequest({ role, orderId, rawMaterial, retest }),
+  const qcQueue = useMemo(
+    () =>
+      new Map<string, QcQueueEntry>(
+        state.qcQueue.map(e => [qcQueueKey(e.jobCardId, e.kind), e]),
       ),
+    [state.qcQueue],
+  );
+
+  const reload = useCallback(
+    () => dispatch(myJobsActions.fetchRequest(role)),
+    [dispatch, role],
+  );
+  /** Finds the job behind a typed or scanned code. */
+  const lookup = useCallback(
+    (code: string) => dispatch(myJobsActions.lookupRequest({ role, code })),
+    [dispatch, role],
+  );
+  const importJob = useCallback(
+    (jobCardId: string, rawMaterial?: RawMaterialInput) =>
+      dispatch(myJobsActions.importRequest({ role, jobCardId, rawMaterial })),
     [dispatch, role],
   );
 
-  // Loaded only once both the list and the job cards are in.
-  const failed = state.status === 'failed' || jobCards.status === 'failed';
-  const loaded =
-    !stale && state.status === 'succeeded' && jobCards.status === 'succeeded';
   return {
     role,
     items,
     ids,
     stats,
-    status: failed ? 'failed' : loaded ? 'succeeded' : 'loading',
-    error: state.error ?? jobCards.error,
+    qcQueue,
+    status: stale ? 'loading' : state.status,
+    error: state.error,
     reload,
+    lookup,
+    found: state.found,
     importJob,
     importing: state.importing,
     importError: state.importError,

@@ -88,7 +88,16 @@ export function validateCustomer(v: CustomerInput): FormErrors<CustomerInput> {
   ) {
     errors.gstNumber = F.gstInvalid;
   }
-  if (!isBlank(v.pinCode) && !isPinCode(v.pinCode)) {
+  // The billing address is required by the API (street, city, PIN code).
+  if (isBlank(v.address)) {
+    errors.address = COMMON_STRINGS.required;
+  }
+  if (isBlank(v.city)) {
+    errors.city = COMMON_STRINGS.required;
+  }
+  if (isBlank(v.pinCode)) {
+    errors.pinCode = COMMON_STRINGS.required;
+  } else if (!isPinCode(v.pinCode)) {
     errors.pinCode = F.pinCodeInvalid;
   }
   return errors;
@@ -240,16 +249,22 @@ export function CustomerFormModal({
       </FormRow>
       <N1TextInput
         label={F.address}
+        required
         placeholder={F.addressPlaceholder}
         value={values.address}
         onChangeText={bind('address')}
+        errorText={errors.address}
+        testID="customer-form-address"
       />
       <FormRow>
         <N1TextInput
           label={F.city}
+          required
           placeholder={F.cityPlaceholder}
           value={values.city}
           onChangeText={bind('city')}
+          errorText={errors.city}
+          testID="customer-form-city"
         />
         <N1DropDown
           label={F.state}
@@ -261,6 +276,7 @@ export function CustomerFormModal({
       <FormRow>
         <N1TextInput
           label={F.pinCode}
+          required
           placeholder={F.pinCodePlaceholder}
           value={values.pinCode}
           onChangeText={bind('pinCode')}

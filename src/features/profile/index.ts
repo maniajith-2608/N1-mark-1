@@ -5,6 +5,8 @@ export { OrganizationScreen } from './screens/OrganizationScreen';
 export { default as ProfileNavigation } from './navigation/ProfileNavigation';
 export { useSession, useOrganizationName } from './hooks/useSession';
 export { profileActions } from './store/profileSlice';
+export { usePermission } from './hooks/usePermission';
+export { selectHasPermission, selectMyPermissions } from './store/selectors';
 
 // Profile screens shared by the non-admin roles.
 export { EmployeeProfileScreen } from './screens/EmployeeProfileScreen';
@@ -15,6 +17,7 @@ export type {
   EmployeeRole,
   MyProfile,
   Organization,
+  PermissionCode,
   ProfileStackParamList,
   Session,
 } from './types';

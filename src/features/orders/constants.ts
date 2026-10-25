@@ -2,6 +2,13 @@ import type { N1DropDownOption, N1RadioOption } from '../../shared/components';
 import type { StatusMeta } from '../../shared/types';
 import type { MaterialSource, OrderPriority, OrderStatus } from './types';
 
+/**
+ * A work order number as the app writes it: the server's "WO-12" (or a bare
+ * "12") reads "WO #12". Display only; never parsed back into an id.
+ */
+export const workOrderLabel = (number: string) =>
+  `WO #${number.replace(/^WO-?/i, '')}`;
+
 export const ORDER_STRINGS = {
   title: 'Orders',
   subtitle:
@@ -22,12 +29,15 @@ export const ORDER_STRINGS = {
     due: 'Due date',
     actions: 'Actions',
   },
+  /** Each takes the order's work order number. */
   a11y: {
-    edit: (id: string) => `Edit order WO #${id}`,
-    createJobCard: (id: string) => `Create job card for WO #${id}`,
-    openJobCard: (id: string) => `Open job card for WO #${id}`,
+    edit: (number: string) => `Edit order ${workOrderLabel(number)}`,
+    createJobCard: (number: string) =>
+      `Create job card for ${workOrderLabel(number)}`,
+    openJobCard: (number: string) =>
+      `Open job card for ${workOrderLabel(number)}`,
   },
-  workOrder: (id: string) => `WO #${id}`,
+  workOrder: workOrderLabel,
   /** Labels for the order details encoded under the WO number in its QR code. */
   qr: {
     customer: 'Customer',
@@ -55,7 +65,7 @@ export const ORDER_STRINGS = {
     drawing: 'Drawing',
     drawingNo: 'Drawing no',
     printDrawing: 'Print drawing with QR',
-    qrA11y: (id: string) => `QR code for WO #${id}`,
+    qrA11y: (number: string) => `QR code for ${workOrderLabel(number)}`,
     documents: 'Documents',
     noDocuments: 'No documents attached.',
     download: (name: string) => `Download ${name}`,
@@ -67,7 +77,8 @@ export const ORDER_STRINGS = {
     drawingTitle: (no: string) => `Drawing ${no}`,
     orderQr: 'Order QR',
     orderQrA11y: (workOrder: string) => `QR code for ${workOrder}`,
-    orderQrFile: (id: string) => `WO-${id}-QR.png`,
+    orderQrFile: (number: string) =>
+      `WO-${number.replace(/^WO-?/i, '')}-QR.png`,
     print: 'Print',
     printAction: 'Printing documents',
     downloadDocument: 'Download',
@@ -94,18 +105,19 @@ export const ORDER_STRINGS = {
       documents: 'Documents',
       jobCard: 'Job card details',
     },
-    createJobCard: 'Create job card',
+    /** Opens the raw material dialog while details are missing. */
+    addRawMaterial: 'Add raw material',
     rawMaterialTitle: 'Raw material details',
     rawMaterialHelp: (workOrder: string) =>
-      `${workOrder} is missing some raw material details. Fill them in to create its job card.`,
-    rawMaterialSubmit: 'Save & create job card',
+      `${workOrder} is missing some raw material details. Fill them in so RM QC can inspect the material.`,
+    rawMaterialSubmit: 'Save raw material',
     jobCards: 'Job cards',
-    noJobCard: 'No job card yet',
+    noJobCard: 'No job card',
     noJobCardHelp:
-      'Create one with the Create job card button above to plan its process and track it on the shop floor.',
+      'Every order opens its job card when it is created. This one was cancelled before work started.',
     jobCardNow: (where: string) => `Now: ${where}`,
     jobCardNoFlow: 'No process steps yet — open it to plan the flow.',
-    openJobCard: (id: string) => `Open job card WO #${id}`,
+    openJobCard: (number: string) => `Open job card ${workOrderLabel(number)}`,
     overview: 'Overview',
     dispatch: 'Dispatch',
     billingSection: 'Quotation & billing',
@@ -126,7 +138,8 @@ export const ORDER_STRINGS = {
     createTitle: 'Create order',
     createSubtitle: 'Add a new work order for the shop floor.',
     editTitle: 'Edit order',
-    editSubtitle: (id: string) => `Update WO #${id}'s details.`,
+    editSubtitle: (number: string) =>
+      `Update ${workOrderLabel(number)}'s details.`,
     /** The stepper, in order. */
     steps: ['Customer', 'Order details', 'Raw material'],
     stepOf: (n: number, total: number, label: string) =>
@@ -140,15 +153,13 @@ export const ORDER_STRINGS = {
     rawMaterialSection: 'Raw material details',
     materialSource: 'Material source',
     rawMaterialArrived: 'Mark raw material arrived',
-    rawMaterialArrivedHelp:
-      'All raw material details are required. The job card is created with the order.',
+    rawMaterialArrivedHelp: 'All raw material details are required.',
     rawMaterialArrivedEditHelp: 'All raw material details are required.',
     rawMaterialPendingHelp:
       'Not arrived yet — fill in what you know; the details are optional.',
     next: 'Next and Continue',
     back: 'Back',
     submitCreate: 'Create order',
-    submitCreateWithJobCard: 'Create order & add job card',
     submitEdit: 'Save changes',
     designFile: 'Design file',
     designHint: 'Click or drop design file (PDF, DWG, STEP)',
@@ -164,7 +175,10 @@ export const ORDER_STRINGS = {
     poAccept: '.pdf,.doc,.docx,.xls,.xlsx,image/*',
     customer: 'Customer',
     customerPlaceholder: 'Search or type a customer name',
-    newCustomer: 'Not in your customers — this name will be used as typed.',
+    /** An order is made for a saved customer; new ones are added first. */
+    pickCustomer: 'Pick one of your customers. Add a new customer first.',
+    /** Edit: an order keeps its customer. */
+    customerLocked: 'An order keeps its customer.',
     customerEmail: 'Customer email',
     customerEmailPlaceholder: 'accounts@company.com',
     poNumber: 'PO number',

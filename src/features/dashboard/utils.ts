@@ -99,10 +99,10 @@ export function isDueSoon(dueIso: string, now = new Date()): boolean {
  * Customers for the dashboard table, biggest share of orders first, each with
  * how many of their work orders aren't completed yet.
  */
-export function customerRows(
-  shares: readonly CustomerShare[],
+export function customerRows<S extends Omit<CustomerShare, 'color'>>(
+  shares: readonly S[],
   orders: readonly WorkOrder[],
-): CustomerRow[] {
+): (S & Pick<CustomerRow, 'pendingDelivery'>)[] {
   const pending = new Map<string, number>();
   for (const o of orders) {
     if (o.status !== 'completed') {
@@ -115,8 +115,8 @@ export function customerRows(
 }
 
 /**
- * Adds each job card's route card number from its work order (they share an
- * id), falling back to the WO number when the order has none.
+ * Adds each job card's route card number from its work order, falling back
+ * to the WO number when the order has none.
  */
 export function withRouteCards(
   cards: readonly JobCard[],
@@ -125,6 +125,8 @@ export function withRouteCards(
   const routeCards = new Map(orders.map(o => [o.id, o.routeCardNo]));
   return cards.map(c => ({
     ...c,
-    routeCardNo: routeCards.get(c.id) || JOB_CARD_STRINGS.workOrder(c.id),
+    routeCardNo:
+      routeCards.get(c.orderId) || JOB_CARD_STRINGS.workOrder(c.number),
+    workOrderNumber: c.number,
   }));
 }

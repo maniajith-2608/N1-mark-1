@@ -4,10 +4,14 @@ import type {
   EmployeeProfile,
   EmployeeProfileInput,
   EmployeeRole,
+  EmployeeSession,
+  PermissionCode,
 } from '../types';
 
 export type EmployeeProfileState = {
   profile: EmployeeProfile | null;
+  /** me.permissions; see selectHasPermission. */
+  permissions: PermissionCode[];
   status: RequestStatus;
   error: string | null;
   saving: boolean;
@@ -16,6 +20,7 @@ export type EmployeeProfileState = {
 
 const initialState: EmployeeProfileState = {
   profile: null,
+  permissions: [],
   status: 'idle',
   error: null,
   saving: false,
@@ -35,8 +40,9 @@ const employeeProfileSlice = createSlice({
       state.status = 'loading';
       state.error = null;
     },
-    fetchSuccess: (state, action: PayloadAction<EmployeeProfile>) => {
-      state.profile = action.payload;
+    fetchSuccess: (state, action: PayloadAction<EmployeeSession>) => {
+      state.profile = action.payload.profile;
+      state.permissions = action.payload.permissions;
       state.status = 'succeeded';
     },
     fetchFailure: (state, action: PayloadAction<string>) => {

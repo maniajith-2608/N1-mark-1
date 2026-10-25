@@ -30,7 +30,6 @@ import {
   type ViewerTarget,
 } from '../../orders/components/DocumentViewer';
 import { ORDER_STRINGS } from '../../orders/constants';
-import { useOrders } from '../../orders/hooks/useOrders';
 import { FlowActionButton } from '../components/FlowActionButton';
 import { FlowEditorSheet } from '../components/FlowEditorSheet';
 import { JobCardStatusBadge } from '../components/JobCardBadges';
@@ -45,6 +44,7 @@ import {
   jobCardSearchText,
   jobProgress,
   jobTitle,
+  hasStarted,
   matchesJobCardFilters,
 } from '../utils';
 
@@ -136,15 +136,12 @@ export function JobCardsListScreen() {
   );
   const flowJobCard = items.find(c => c.id === flowId);
   // The diagram opens full size, numbered by its order's drawing number.
-  const { items: orders } = useOrders();
   const [viewing, setViewing] = useState<ViewerTarget | null>(null);
   const closeViewer = useCallback(() => setViewing(null), []);
   const drawingNumberOf = useCallback(
     (c: JobCard) =>
-      orders.find(o => o.id === c.id)?.drawingNumber ||
-      c.designFile?.name ||
-      S.details.noDrawing,
-    [orders],
+      c.drawingNumber || c.designFile?.name || S.details.noDrawing,
+    [],
   );
   const openDrawing = useCallback(
     (c: JobCard) =>
@@ -165,7 +162,7 @@ export function JobCardsListScreen() {
               {S.jobCardNumber(c.code)}
             </N1Text>
             <N1Text variant="caption" color="secondary" numberOfLines={1}>
-              {S.workOrder(c.id)}
+              {S.workOrder(c.number)}
             </N1Text>
           </View>
         ),
@@ -201,7 +198,7 @@ export function JobCardsListScreen() {
             icon="file"
             variant="soft"
             size="sm"
-            accessibilityLabel={S.a11y.diagram(c.id)}
+            accessibilityLabel={S.a11y.diagram(c.number)}
             onPress={() => openDrawing(c)}
             disabled={!c.designFile}
             testID={`diagram-${c.id}`}
@@ -228,8 +225,9 @@ export function JobCardsListScreen() {
               icon="trash"
               variant="danger"
               size="sm"
-              accessibilityLabel={S.a11y.delete(c.id)}
+              accessibilityLabel={S.a11y.delete(c.number)}
               onPress={() => requestDelete(c)}
+              disabled={hasStarted(c)}
               testID={`delete-${c.id}`}
             />
           </View>
@@ -343,7 +341,9 @@ export function JobCardsListScreen() {
       <N1ConfirmDialog
         visible={deletion.target !== null}
         title={S.delete.title}
-        message={deletion.target ? S.delete.message(deletion.target.id) : ''}
+        message={
+          deletion.target ? S.delete.message(deletion.target.number) : ''
+        }
         confirmLabel={S.delete.confirm}
         tone="danger"
         icon="trash"

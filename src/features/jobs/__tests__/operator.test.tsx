@@ -9,7 +9,7 @@ import {
   renderAppAs,
   typeInto,
 } from '../../../shared/testing/testUtils';
-import { jobCardsApi } from '../../jobCards/api/jobCardsApi';
+import { jobCardsApi } from '../../jobCards/api/mockJobCardsApi';
 
 jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => ({
   __esModule: true,
@@ -58,20 +58,19 @@ test("My Jobs shows the operator's jobs as cards", async () => {
   expect(allText(root)).toContain('Resume');
 });
 
-test('importing a job adds it and opens its Job Detail', async () => {
+test('a scanned or typed code opens the job (operators open their own)', async () => {
   const root = await operator();
-  await importCode(root, 'WO-1040');
+  await importCode(root, 'WO-1037');
 
   let text = allText(root);
   expect(text).toContain('Job Detail');
-  expect(text).toContain('WO #1040 · Bracket — Job B');
-  expect(text).toContain('Active station');
+  expect(text).toContain('WO #1037 · Bracket — Job F');
   expect(text).toContain('Route card & progress');
 
+  // Their list is their assigned work; opening a job doesn't change it.
   await press(byLabel(root, 'Back'));
   text = allText(root);
-  expect(text).toContain('5 in progress · 6 total');
-  expect(text.indexOf('WO #1040')).toBeLessThan(text.indexOf('WO #1042'));
+  expect(text).toContain('4 in progress · 5 total');
 });
 
 test('a job without a route card cannot be imported', async () => {
@@ -90,12 +89,19 @@ test('pause, resume, complete, then start the next step on a machine', async () 
   // Turning is running: Pause and Complete.
   expect(byTestId(root, 'active-station')).toBeTruthy();
   expect(allText(root)).toContain('Running');
+  // Pause asks why.
   await press(byTestId(root, 'pause-operation'));
-  expect(allText(root)).toContain('Paused');
+  await press(byLabel(byTestId(root, 'pause-step-dialog'), 'Material'));
+  await press(byTestId(root, 'pause-step-submit'));
+  expect(allText(byTestId(root, 'active-station'))).toContain('Paused');
 
   await press(byTestId(root, 'resume-operation'));
+  // Complete accounts for the pieces: all good here.
   await press(byTestId(root, 'complete-operation'));
-  expect((await card('1042')).operations[2].status).toBe('completed');
+  await press(byTestId(root, 'complete-step-submit'));
+  expect((await card('1042')).operations[2]).toMatchObject({
+    status: 'completed',
+  });
 
   // Next step (Deburring) waits for a machine.
   let text = allText(root);
@@ -138,8 +144,9 @@ test('View Details opens the order full screen, and closes back to the job', asy
   const text = allText(modal);
   expect(text).toContain('Order Details');
   expect(text).toContain('Acme Metalworks');
-  expect(text).toContain('Shop order number');
-  expect(text).toContain('HT-99213');
+  // The job view: no prices or raw material details.
+  expect(text).toContain('PO number');
+  expect(text).not.toContain('PO amount');
 
   await press(byLabel(modal, 'Close'));
   expect(hasTestId(root, 'order-details-modal')).toBe(false);

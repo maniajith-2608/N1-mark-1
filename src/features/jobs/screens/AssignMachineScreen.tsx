@@ -17,12 +17,9 @@ import {
   JOB_CARD_STRINGS,
   currentOperation,
   jobHeading,
-  startOperation,
   useJobCard,
-  useJobCards,
 } from '../../jobCards';
 import { useMachines, type Machine } from '../../machines';
-import { useEmployeeProfile } from '../../profile/hooks/useEmployeeProfile';
 import { JOBS_STRINGS } from '../constants';
 import type { JobsScreenProps } from '../types';
 
@@ -44,39 +41,36 @@ const BADGE: Record<
   maintenance: { label: S.maintenance, tone: 'warning' },
 };
 
-/** Choose the machine for the next operation, then start it. */
+/**
+ * Choose an idle machine for the next operation (or its rework), then start
+ * it (startJobStep). The step is already assigned to this operator.
+ */
 export function AssignMachineScreen({
   route,
   navigation,
 }: JobsScreenProps<'AssignMachine'>) {
   const styles = useN1Styles(makeStyles);
   const { jobCardId } = route.params;
-  const { jobCard, status, error, reload, update, saving, saveError } =
+  const { jobCard, status, error, reload, run, saving, saveError } =
     useJobCard(jobCardId);
-  const { items: jobCards } = useJobCards();
   const machines = useMachines();
-  const { profile } = useEmployeeProfile();
+  // The machine's id.
   const [selected, setSelected] = useState<string>();
 
   const goBack = useCallback(() => navigation.goBack(), [navigation]);
   useOnSettled(saving, saveError, goBack);
 
-  // Busy if the machine list says so, or a job is running on it right now.
-  const availability = useMemo(() => {
-    const running = new Set(
-      jobCards.flatMap(c =>
-        c.operations
-          .filter(op => op.status === 'running')
-          .map(op => op.machine),
-      ),
-    );
-    return (m: Machine): Availability =>
-      m.status === 'maintenance'
-        ? 'maintenance'
-        : m.status === 'running' || running.has(m.code)
-        ? 'inUse'
-        : 'available';
-  }, [jobCards]);
+  // One machine runs one step at a time: the server marks it running.
+  const availability = useMemo(
+    () =>
+      (m: Machine): Availability =>
+        m.status === 'maintenance'
+          ? 'maintenance'
+          : m.status === 'running'
+          ? 'inUse'
+          : 'available',
+    [],
+  );
 
   const header = (
     <N1Header title={S.title} leftIcon="chevron-left" onLeftPress={goBack} />
@@ -97,14 +91,8 @@ export function AssignMachineScreen({
 
   const op = currentOperation(jobCard);
   const confirm = () => {
-    if (selected) {
-      update(
-        jobCard.id,
-        startOperation(jobCard, new Date().toISOString(), {
-          machine: selected,
-          operator: profile?.name ?? '',
-        }),
-      );
+    if (selected && op) {
+      run({ type: 'start', operationId: op.id, machineId: selected });
     }
   };
 
@@ -156,9 +144,9 @@ export function AssignMachineScreen({
                       tone={BADGE[state].tone}
                     />
                   }
-                  selected={selected === m.code}
+                  selected={selected === m.id}
                   disabled={state !== 'available'}
-                  onPress={() => setSelected(m.code)}
+                  onPress={() => setSelected(m.id)}
                   testID={`machine-${m.code}`}
                 />
               );

@@ -29,7 +29,8 @@ export function QuoteOperationsScreen({
           <ComingSoon icon="receipt" title={Q.title} message={Q.notFound} />
         </AsyncContent>
       }
-      editing={edit}
+      editing={edit && !(quote?.status !== 'draft')}
+      readOnly={quote?.status !== 'draft'}
       onEditingChange={on => navigation.setParams({ edit: on })}
       onBack={() => navigation.goBack()}
       onSave={save}

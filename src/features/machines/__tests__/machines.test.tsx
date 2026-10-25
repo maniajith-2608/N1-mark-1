@@ -75,14 +75,16 @@ test('adds a machine with required fields and a unique code', async () => {
   const created = Object.values(store.getState().machines.entities).find(
     m => m.code === 'CNC-05',
   );
+  // A new machine starts idle: Add machine has no status field.
+  expect(hasTestId(root, 'machine-form-status')).toBe(false);
   expect(created).toMatchObject({
     name: 'Turning Center 3',
-    status: 'running',
+    status: 'idle',
     currentWork: null,
   });
-  // The total in the pagination bar counts the new machine (and it's running).
+  // The total in the pagination bar counts the new machine (and it's idle).
   expect(allText(byTestId(root, 'machines-table'))).toContain(
-    'of 11 machines · 6 running',
+    'of 11 machines · 5 running · 4 idle',
   );
 });
 
@@ -218,4 +220,22 @@ test('search finds the machine running a work order', async () => {
   const text = allText(byTestId(root, 'machines-table'));
   expect(text).toContain('Showing 1 of 1');
   expect(text).toContain('Turning Center 2');
+});
+
+test('a running machine keeps its status; others choose idle or maintenance', async () => {
+  const { root } = await renderAdmin('Machines');
+  await press(byLabel(root, 'Edit Turning Center 1'));
+  expect(
+    byTestId(root, 'machine-form-status').props.accessibilityState.disabled,
+  ).toBe(true);
+  await press(byTestId(root, 'machine-form-submit'));
+  await press(byLabel(root, 'Edit Milling Center 1'));
+  await press(byTestId(root, 'machine-form-status'));
+  const options = root
+    .findAll(
+      n =>
+        typeof n.type === 'string' && n.props.accessibilityRole === 'menuitem',
+    )
+    .map(n => allText(n));
+  expect(options).toEqual(['Idle', 'Maintenance']);
 });

@@ -1,3 +1,4 @@
+import { MOCK_ORDERS } from '../../orders/api/mockData';
 import type { JobCard, JobOperation, OperationStatus } from '../types';
 import { jobCardCode, statusFor } from '../utils';
 
@@ -13,7 +14,7 @@ type Seed = Pick<
   | 'priority'
   | 'dueDate'
 > &
-  Partial<Omit<JobCard, 'status'>>;
+  Partial<Omit<JobCard, 'status' | 'orderId' | 'number'>>;
 
 const DAY = '2026-09-25';
 
@@ -54,7 +55,16 @@ const pendingOp = (id: string, name: string): JobOperation => ({
 
 function card(seed: Seed): Omit<JobCard, 'code'> {
   const operations = seed.operations ?? [];
+  // The job view's order details, as the server copies them in.
+  const order = MOCK_ORDERS.find(o => o.id === seed.id);
   return {
+    partNumber: order?.partNumber ?? '',
+    drawingNumber: order?.drawingNumber ?? '',
+    poNumber: order?.poNumber ?? '',
+    routeCardNo: order?.routeCardNo ?? '',
+    // The order's own seed uses the same number for its id and WO number.
+    orderId: seed.id,
+    number: seed.id,
     designFile: {
       id: 'design',
       name: 'drawing.pdf',
@@ -64,12 +74,16 @@ function card(seed: Seed): Omit<JobCard, 'code'> {
     designApproval: 'approved',
     materialSource: 'bought_out',
     materialQc: 'accepted',
-    qcHistory: [],
     quotation: 'accepted',
     billing: 'not_invoiced',
     ...seed,
     operations,
     status: statusFor(operations),
+    // Material checks are raw material QC; the rest inspect a step.
+    qcHistory: (seed.qcHistory ?? []).map(e => ({
+      ...e,
+      kind: e.operationId ? 'machine' : 'rm',
+    })),
   };
 }
 
@@ -112,7 +126,12 @@ const CARDS = [
         startedAt: `${DAY}T10:25:00`,
         completedAt: null,
       },
-      pendingOp('1042-op4', 'Deburring'),
+      // Assigned ahead: a step needs its operator before it starts.
+      {
+        ...pendingOp('1042-op4', 'Deburring'),
+        operator: 'Ravi Kumar',
+        operatorId: 'USR-6',
+      },
       pendingOp('1042-op5', 'Marking'),
       pendingOp('1042-op6', 'Final check'),
     ],

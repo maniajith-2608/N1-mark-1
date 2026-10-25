@@ -1,6 +1,7 @@
 import { FormRow, N1DropDown, N1TextInput } from '../../../shared/components';
 import type { FormErrors } from '../../../shared/hooks';
 import {
+  MACHINE_SETTABLE_STATUS_OPTIONS,
   MACHINE_STATUS_OPTIONS,
   MACHINE_STRINGS,
   MACHINE_TYPE_OPTIONS,
@@ -17,12 +18,21 @@ type Props = {
   ) => (value: MachineInput[K]) => void;
   /** Machine details: fields stay locked until Edit is pressed. */
   locked?: boolean;
+  /** Add machine: no status, since a new machine always starts idle. */
+  isNew?: boolean;
 };
 
 /** The machine's fields, shared by Add machine and Machine details. */
-export function MachineFields({ values, errors, bind, locked = false }: Props) {
+export function MachineFields({
+  values,
+  errors,
+  bind,
+  locked = false,
+  isNew = false,
+}: Props) {
   // Locked fields hide placeholders and required marks; they only show data.
   const hint = (placeholder: string) => (locked ? undefined : placeholder);
+  const running = values.status === 'running';
   return (
     <>
       <FormRow>
@@ -79,14 +89,18 @@ export function MachineFields({ values, errors, bind, locked = false }: Props) {
           readOnly={locked}
           testID="machine-form-location"
         />
-        <N1DropDown
-          label={F.status}
-          options={MACHINE_STATUS_OPTIONS}
-          value={values.status}
-          onChange={bind('status')}
-          disabled={locked}
-          testID="machine-form-status"
-        />
+        {isNew ? null : (
+          <N1DropDown
+            label={F.status}
+            options={
+              running ? MACHINE_STATUS_OPTIONS : MACHINE_SETTABLE_STATUS_OPTIONS
+            }
+            value={values.status}
+            onChange={bind('status')}
+            disabled={locked || running}
+            testID="machine-form-status"
+          />
+        )}
       </FormRow>
       <N1TextInput
         label={F.notes}

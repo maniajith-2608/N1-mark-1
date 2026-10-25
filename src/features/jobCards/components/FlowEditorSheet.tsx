@@ -13,7 +13,7 @@ import { useHeldWhileVisible, useOnSettled } from '../../../shared/hooks';
 import { DrawingPreview } from '../../orders/components/DrawingPreview';
 import { PriorityBadge } from '../../orders/components/OrderBadges';
 import { JOB_CARD_STRINGS as S } from '../constants';
-import { useJobCards } from '../hooks/useJobCards';
+import { useJobCardCommands } from '../hooks/useJobCards';
 import type { JobCard } from '../types';
 import { jobTitle } from '../utils';
 import { FlowEditor, useFlowEditor } from './FlowEditor';
@@ -80,7 +80,7 @@ function FlowSheetBody({
   const styles = useN1Styles(makeStyles);
   const editor = useFlowEditor(jobCard);
   const editing = jobCard.operations.length > 0;
-  const { update, saving, saveError } = useJobCards();
+  const { run, saving, saveError } = useJobCardCommands();
   // Closes once its own save lands, not on other job card updates.
   const savingHere = useRef(false);
   useOnSettled(saving, saveError, () => {
@@ -90,12 +90,12 @@ function FlowSheetBody({
     }
   });
   const save = useCallback(() => {
-    const input = editor.submit();
-    if (input) {
+    const steps = editor.submit();
+    if (steps) {
       savingHere.current = true;
-      update(jobCard.id, input);
+      run(jobCard.id, { type: 'route', steps });
     }
-  }, [editor, update, jobCard.id]);
+  }, [editor, run, jobCard.id]);
 
   // Just a reminder of the part: a viewer can't open over this sheet.
   const thumb = jobCard.designFile ? (
@@ -111,7 +111,7 @@ function FlowSheetBody({
       visible={visible}
       onClose={onClose}
       title={editing ? S.flow.editTitle : S.flow.createTitle}
-      subtitle={S.workOrder(jobCard.id)}
+      subtitle={S.workOrder(jobCard.number)}
       footer={
         <FormFooter
           onCancel={onClose}
@@ -133,7 +133,7 @@ function FlowSheetBody({
             {jobTitle(jobCard) || COMMON_STRINGS.dash}
           </N1Text>
           <N1Text variant="caption" color="tertiary">
-            {S.workOrder(jobCard.id)}
+            {S.workOrder(jobCard.number)}
           </N1Text>
         </View>
         <PriorityBadge priority={jobCard.priority} />

@@ -21,11 +21,12 @@ import { useOnSettled } from '../../../shared/hooks';
 import { printOrNotify } from '../../../services/print';
 import {
   formatCurrency,
-  notifyUnavailable,
+  formatShortDate,
   toNumber,
 } from '../../../shared/utils';
 import { useSession } from '../../profile';
 import { InvoiceStatusBadge } from '../components/BillingBadges';
+import { MarkPaidDialog, SendEmailDialog } from '../components/BillingDialogs';
 import { InvoiceOverview } from '../components/InvoiceOverview';
 import { InvoicePreviewModal } from '../components/InvoicePreviewModal';
 import {
@@ -36,10 +37,14 @@ import { BillingSection } from '../components/BillingSection';
 import { LineItemsEditor } from '../components/LineItemsEditor';
 import { LineItemsTable } from '../components/LineItemsTable';
 import { TotalsSummary } from '../components/TotalsSummary';
-import { BILLING_STRINGS, INVOICE_STATUS_OPTIONS } from '../constants';
-import { parseJobCode } from '../../jobs/utils';
+import { BILLING_STRINGS } from '../constants';
 import { useOrder } from '../../orders/hooks/useOrders';
-import { useInvoice } from '../hooks/useBilling';
+import { useBillingPermissions, useInvoice } from '../hooks/useBilling';
+import {
+  useDownloadPdf,
+  useMarkPaid,
+  useSendByEmail,
+} from '../hooks/useBillingActions';
 import { gstRateOptions, useGst } from '../hooks/useGst';
 import { useInvoiceForm } from '../hooks/useInvoiceForm';
 import {
@@ -48,7 +53,7 @@ import {
   type InvoiceDocument,
 } from '../invoiceDocument';
 import { calculateTotals } from '../utils';
-import type { BillingScreenProps } from '../types';
+import type { BillingScreenProps, Payment } from '../types';
 
 const I = BILLING_STRINGS.invoice;
 const T = BILLING_STRINGS.totals;
@@ -91,8 +96,8 @@ export function InvoiceDetailsScreen({
     clearErrors,
   } = useInvoice(invoiceId);
 
-  // Edit turns the operations, status, discount, GST rate and notes into
-  // inputs right here; Save or Cancel turns them back.
+  // Edit turns the operations, discount, GST rate and notes into inputs
+  // right here; Save or Cancel turns them back. The status is the server's.
   const form = useInvoiceForm(invoice);
   const [editing, setEditing] = useState(false);
   const { reset: resetForm } = form;
@@ -152,9 +157,9 @@ export function InvoiceDetailsScreen({
     }
   }, [navigation, fromJobCardId]);
   const backLabel = fromJobCardId ? I.backToJobCard : I.back;
-  // "WO-00125" → work order "125": the job links to its order when there is
-  // one, and Back on the order returns here.
-  const orderId = invoice ? parseJobCode(invoice.jobId) : '';
+  // The job links to its order when there is one, and Back on the order
+  // returns here.
+  const orderId = invoice?.orderId ?? '';
   const { order } = useOrder(orderId || undefined);
   const openOrder = useCallback(
     () =>
@@ -165,12 +170,21 @@ export function InvoiceDetailsScreen({
       }),
     [navigation, orderId, invoiceId],
   );
-  const markPaid = useCallback(
-    () => update(invoiceId, { status: 'paid' }),
-    [update, invoiceId],
+  // Only the owner and the accountant record payments.
+  const { canMarkPaid } = useBillingPermissions();
+  const paying = useMarkPaid(invoiceId);
+  // Emails the PDF, at any status and as often as needed.
+  const emailed = useMemo(
+    () =>
+      invoice && {
+        kind: 'invoice' as const,
+        id: invoice.id,
+        number: invoice.number,
+      },
+    [invoice],
   );
-  // Sending (and re-sending) needs the backend; the status stays New.
-  const send = useCallback(() => notifyUnavailable(I.sendAction), []);
+  const sending = useSendByEmail(emailed || undefined);
+  const send = sending.send;
   // Preview Invoice: the invoice as it prints, from what's saved.
   const { organization } = useSession();
   const [preview, setPreview] = useState<InvoiceDocument | null>(null);
@@ -180,10 +194,7 @@ export function InvoiceDetailsScreen({
       printOrNotify(invoiceHtml(doc), doc.title, doc.printAction),
     [],
   );
-  const downloadPdf = useCallback(
-    () => notifyUnavailable(I.downloadAction),
-    [],
-  );
+  const { download: downloadPdf } = useDownloadPdf(emailed || undefined);
   // Phones: the operations open on their own screen (to edit, while
   // editing); Back returns here.
   const openOperations = useCallback(
@@ -192,7 +203,8 @@ export function InvoiceDetailsScreen({
   );
 
   const gst = useGst(invoice?.customerName ?? '');
-  // While editing, the amounts follow the inputs.
+  // The server's totals; while editing, a preview follows the inputs until
+  // Save brings the server's back.
   const totals = useMemo(() => {
     if (!invoice) {
       return null;
@@ -205,13 +217,7 @@ export function InvoiceDetailsScreen({
           form.gstRate,
           gst.supply,
         )
-      : calculateTotals(
-          invoice.lineItems,
-          invoice.quantity,
-          invoice.discount,
-          invoice.gstRate,
-          gst.supply,
-        );
+      : invoice.totals;
   }, [
     invoice,
     editing,
@@ -248,7 +254,7 @@ export function InvoiceDetailsScreen({
       leftIcon="arrow-right"
       variant="secondary"
       onPress={send}
-      disabled={isPaid}
+      loading={sending.sending}
       fullWidth
       testID="send-invoice"
     />
@@ -272,13 +278,12 @@ export function InvoiceDetailsScreen({
       fullWidth
     />
   );
-  const paidButton = (
+  const paidButton = canMarkPaid && (
     <N1Button
       title={I.markPaid}
       leftIcon="check-circle"
-      onPress={markPaid}
+      onPress={paying.show}
       disabled={isPaid}
-      loading={saving}
       fullWidth
       testID="mark-paid"
     />
@@ -308,9 +313,10 @@ export function InvoiceDetailsScreen({
     </View>
   );
 
+  // A paid invoice is final: no Edit.
   const headerRight = editing ? (
     !isCompact && saveFooter
-  ) : (
+  ) : isPaid ? null : (
     <N1Button
       title={COMMON_STRINGS.edit}
       leftIcon="edit"
@@ -378,13 +384,6 @@ export function InvoiceDetailsScreen({
       </BillingSection>
       {editing ? (
         <View style={styles.fields}>
-          <N1DropDown
-            label={I.status}
-            options={INVOICE_STATUS_OPTIONS}
-            value={form.status}
-            onChange={form.setStatus}
-            testID="invoice-status"
-          />
           <View style={styles.fieldRow}>
             <N1TextInput
               label={I.discount}
@@ -427,28 +426,35 @@ export function InvoiceDetailsScreen({
   );
   // Notes sit under the amounts so the operations get the full left side.
   const notes = (
-    <BillingSection title={I.notes}>
-      {editing ? (
-        <N1TextInput
-          value={form.notes}
-          onChangeText={form.setNotes}
-          placeholder={COMMON_STRINGS.dash}
-          accessibilityLabel={I.notes}
-          multiline
-          testID="invoice-notes"
-        />
-      ) : (
-        <N1Text>{invoice.notes || COMMON_STRINGS.dash}</N1Text>
-      )}
-    </BillingSection>
+    <>
+      {invoice.payment && <PaymentDetails payment={invoice.payment} />}
+      <BillingSection title={I.notes}>
+        {editing ? (
+          <N1TextInput
+            value={form.notes}
+            onChangeText={form.setNotes}
+            placeholder={COMMON_STRINGS.dash}
+            accessibilityLabel={I.notes}
+            multiline
+            testID="invoice-notes"
+          />
+        ) : (
+          <N1Text>{invoice.notes || COMMON_STRINGS.dash}</N1Text>
+        )}
+      </BillingSection>
+    </>
   );
   const previewModal = (
-    <InvoicePreviewModal
-      doc={preview}
-      onClose={closePreview}
-      onPrint={print}
-      onDownload={downloadPdf}
-    />
+    <>
+      <InvoicePreviewModal
+        doc={preview}
+        onClose={closePreview}
+        onPrint={print}
+        onDownload={downloadPdf}
+      />
+      <MarkPaidDialog invoice={invoice} {...paying.dialog} />
+      <SendEmailDialog {...sending.dialog} />
+    </>
   );
 
   // Phones: the invoice at a glance in small cards. The header's Edit
@@ -463,13 +469,15 @@ export function InvoiceDetailsScreen({
               title={I.title}
               onBack={goBack}
               compactRight={
-                <N1IconButton
-                  icon="edit"
-                  variant="tile"
-                  accessibilityLabel={COMMON_STRINGS.edit}
-                  onPress={openEdit}
-                  testID="edit-invoice"
-                />
+                !isPaid && (
+                  <N1IconButton
+                    icon="edit"
+                    variant="tile"
+                    accessibilityLabel={COMMON_STRINGS.edit}
+                    onPress={openEdit}
+                    testID="edit-invoice"
+                  />
+                )
               }
             />
           }
@@ -507,7 +515,7 @@ export function InvoiceDetailsScreen({
             onOpenOrder={order ? openOrder : undefined}
             onOpenOperations={openOperations}
             onSend={send}
-            sendDisabled={isPaid}
+            sendDisabled={sending.sending}
           />
         </AdminScreen>
         {previewModal}
@@ -524,7 +532,7 @@ export function InvoiceDetailsScreen({
         title={I.title}
         badge={<InvoiceStatusBadge status={invoice.status} />}
         titleExtra={poAmount}
-        subtitle={invoice.id}
+        subtitle={invoice.number}
         headerRight={headerRight}
         summary={
           <N1DetailGrid
@@ -540,5 +548,24 @@ export function InvoiceDetailsScreen({
       />
       {previewModal}
     </>
+  );
+}
+
+/** A paid invoice: when, what was received, and the TDS withheld. */
+function PaymentDetails({ payment }: { payment: Payment }) {
+  return (
+    <BillingSection title={I.paidSummary(formatShortDate(payment.paidOn))}>
+      <N1Text>
+        {`${I.received} ${formatCurrency(payment.receivedAmount)}`}
+      </N1Text>
+      {payment.tdsAmount > 0 && (
+        <N1Text color="secondary">
+          {I.tdsSummary(
+            formatCurrency(payment.tdsAmount),
+            payment.tdsSection ?? '',
+          )}
+        </N1Text>
+      )}
+    </BillingSection>
   );
 }

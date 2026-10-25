@@ -1,19 +1,39 @@
 import { useCallback, useRef } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { useOnSettled } from '../../../shared/hooks';
-import type { BillingScreenProps, Quote } from '../types';
+import type {
+  BillingScreenProps,
+  ConvertQuoteInput,
+  PaymentInput,
+  Quote,
+} from '../types';
 import { useAppDispatch, useAppSelector } from '../../../app/store/hooks';
-import type { RootState } from '../../../app/store';
-import { workflowActions } from '../store/workflowSlice';
+import { selectWorkflow } from '../store/selectors';
+import { workflowActions, type SendPayload } from '../store/workflowSlice';
 
-const selectWorkflow = (state: RootState) => state.billing.workflow;
-
-/** Convert a quote to an order, or bill a dispatched job. */
+/**
+ * Convert a quote to an order, bill a dispatched job, mark an invoice paid,
+ * or send an invoice or quote by email.
+ */
 export function useBillingWorkflow() {
   const dispatch = useAppDispatch();
   const state = useAppSelector(selectWorkflow);
   const convertQuote = useCallback(
-    (quoteId: string) => dispatch(workflowActions.convertQuoteRequest(quoteId)),
+    (quoteId: string, input: ConvertQuoteInput) =>
+      dispatch(workflowActions.convertQuoteRequest({ quoteId, ...input })),
+    [dispatch],
+  );
+  const markPaid = useCallback(
+    (invoiceId: string, payment: PaymentInput) =>
+      dispatch(workflowActions.markPaidRequest({ invoiceId, payment })),
+    [dispatch],
+  );
+  const send = useCallback(
+    (payload: SendPayload) => dispatch(workflowActions.sendRequest(payload)),
+    [dispatch],
+  );
+  const clearError = useCallback(
+    () => dispatch(workflowActions.clearError()),
     [dispatch],
   );
   const generateInvoice = useCallback(
@@ -23,14 +43,22 @@ export function useBillingWorkflow() {
       ),
     [dispatch],
   );
-  return { ...state, convertQuote, generateInvoice };
+  return {
+    ...state,
+    convertQuote,
+    generateInvoice,
+    markPaid,
+    send,
+    clearError,
+  };
 }
 
 type Navigation = BillingScreenProps<'BillingHome'>['navigation'];
 
 /**
  * Convert to Order: a converted quote opens its order; otherwise the order
- * is created from the quote, then opened (Back returns to billing).
+ * is created from the quote (with the customer's PO number and due date),
+ * then opened (Back returns to billing).
  */
 export function useConvertToOrder() {
   const navigation = useNavigation<Navigation>();
@@ -55,12 +83,12 @@ export function useConvertToOrder() {
   });
 
   const convert = useCallback(
-    (quote: Quote) => {
+    (quote: Quote, input?: ConvertQuoteInput) => {
       if (quote.orderId) {
         openOrder(quote.orderId);
-      } else {
+      } else if (input) {
         converting.current = quote.id;
-        convertQuote(quote.id);
+        convertQuote(quote.id, input);
       }
     },
     [openOrder, convertQuote],

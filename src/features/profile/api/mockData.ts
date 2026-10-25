@@ -1,7 +1,19 @@
 import { DAY_MS, MINUTE_MS, isoAgo } from '../../../services/mock/mockServer';
 import type { Session } from '../types';
 
+/** An owner's codes from me.permissions. */
+export const MOCK_ADMIN_PERMISSIONS = [
+  'org.read',
+  'org.manage',
+  'users.read',
+  'users.manage',
+  'customers.read',
+  'customers.write',
+  'customers.delete',
+];
+
 export const MOCK_SESSION: Session = {
+  permissions: MOCK_ADMIN_PERMISSIONS,
   organization: {
     id: 'ORG-1',
     code: 'ABC001',

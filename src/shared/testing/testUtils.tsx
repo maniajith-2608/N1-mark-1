@@ -15,15 +15,15 @@ import { N1ThemeProvider } from '../components';
 import AdminDashboardNavigation from '../../app/navigation/AdminDashboardNavigation';
 import RootNavigator from '../../app/navigation/RootNavigator';
 import type { AdminDrawerParamList } from '../../features/dashboard/types';
-import { customersApi } from '../../features/customers/api/customersApi';
-import { invoicesApi, quotesApi } from '../../features/billing/api/billingApi';
-import { jobCardsApi } from '../../features/jobCards/api/jobCardsApi';
-import { myJobsApi } from '../../features/jobs/api/myJobsApi';
-import { machinesApi } from '../../features/machines/api/machinesApi';
-import { ordersApi } from '../../features/orders/api/ordersApi';
-import { profileApi } from '../../features/profile/api/profileApi';
-import { employeeProfileApi } from '../../features/profile/api/employeeProfileApi';
-import { userManagementApi } from '../../features/userManagement/api/userManagementApi';
+import { customersApi } from '../../features/customers/api/mockCustomersApi';
+import { invoicesApi, quotesApi } from '../../features/billing/api/mockBillingApi';
+import { jobCardsApi } from '../../features/jobCards/api/mockJobCardsApi';
+import { myJobsApi } from '../../features/jobs/api/mockMyJobsApi';
+import { machinesApi } from '../../features/machines/api/mockMachinesApi';
+import { ordersApi } from '../../features/orders/api/mockOrdersApi';
+import { profileApi } from '../../features/profile/api/mockProfileApi';
+import { employeeProfileApi } from '../../features/profile/api/mockEmployeeProfileApi';
+import { userManagementApi } from '../../features/userManagement/api/mockUserManagementApi';
 import { createStore } from '../../app/store';
 
 const SAFE_AREA = {

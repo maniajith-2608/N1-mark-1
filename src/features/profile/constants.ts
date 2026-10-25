@@ -32,7 +32,11 @@ export const PROFILE_STRINGS = {
     phone: 'Phone number',
   },
   passwordTitle: 'Change password',
-  passwordSubtitle: 'Choose a new password for your account.',
+  passwordSubtitle:
+    'Enter your current password, then choose a new one for your account.',
+  currentPassword: 'Current password',
+  currentPasswordPlaceholder: 'Enter your current password',
+  currentPasswordWrong: 'Your current password is not right.',
   logoutTitle: 'Log out?',
   logoutMessage: 'You’ll need to sign in again to use N1.',
 } as const;

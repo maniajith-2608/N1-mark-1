@@ -89,5 +89,36 @@ export type CustomerRow = CustomerShare & {
   pendingDelivery: number;
 };
 
-/** A priority job: the job card plus its work order's route card number. */
-export type PriorityJob = JobCard & { routeCardNo: string };
+/**
+ * A priority job: what its tile shows of the job card, plus its route card
+ * number and WO number.
+ */
+export type PriorityJob = Pick<
+  JobCard,
+  | 'id'
+  | 'code'
+  | 'customerName'
+  | 'partName'
+  | 'quantity'
+  | 'dueDate'
+  | 'status'
+  | 'operations'
+> & {
+  routeCardNo: string;
+  /** "1042", shown as "WO #1042". */
+  workOrderNumber: string;
+};
+
+/** A dashboard customer row before it's given its chart colour. */
+export type DashboardCustomer = Omit<CustomerRow, 'color'>;
+
+/** Everything the dashboard shows for one period. */
+export type DashboardData = {
+  stats: PeriodSummary;
+  /** Biggest share of the period's orders first. */
+  customers: DashboardCustomer[];
+  /** Earliest due first, at most PRIORITY_JOBS_LIMIT. */
+  jobs: PriorityJob[];
+  /** All priority jobs, for "View all". */
+  totalJobs: number;
+};

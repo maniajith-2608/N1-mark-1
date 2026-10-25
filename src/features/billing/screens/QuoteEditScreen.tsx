@@ -20,8 +20,8 @@ import { calculateTotals } from '../utils';
 const Q = BILLING_STRINGS.quote;
 
 /**
- * Phones: Edit quote, sliding up over the quote — the customer, part,
- * quantity, status and GST rate; the operations are edited from their own
+ * Phones: Edit quote, sliding up over the quote — the part, quantity and
+ * GST rate (the customer is fixed; Send makes it Sent); the operations are edited from their own
  * screen. Save or Cancel slides back down.
  */
 export function QuoteEditScreen({
@@ -73,7 +73,7 @@ export function QuoteEditScreen({
         <DetailHeader
           sheet
           title={Q.editTitle}
-          subtitle={quoteId}
+          subtitle={quote?.number}
           onBack={close}
         />
       }

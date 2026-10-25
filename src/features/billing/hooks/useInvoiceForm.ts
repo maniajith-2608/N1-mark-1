@@ -2,12 +2,12 @@ import { useCallback, useState } from 'react';
 import { COMMON_STRINGS } from '../../../shared/constants';
 import { isNumeric, toNumber } from '../../../shared/utils';
 import { BILLING_STRINGS } from '../constants';
-import type { Invoice, InvoiceInput, InvoiceStatus } from '../types';
+import type { Invoice, InvoiceInput } from '../types';
 import { useLineItems } from './useLineItems';
 
 type InvoiceChanges = Pick<
   InvoiceInput,
-  'status' | 'lineItems' | 'discount' | 'gstRate' | 'notes'
+  'lineItems' | 'discount' | 'gstRate' | 'notes'
 >;
 
 /** Blank, or a number that isn't negative. */
@@ -15,13 +15,12 @@ const isBadAmount = (text: string) =>
   text.trim() !== '' && (!isNumeric(text) || Number(text) < 0);
 
 /**
- * The editable parts of an invoice (operations, status, discount, GST rate,
- * notes), edited in place on the invoice page. The PO amount comes from the
- * order and isn't edited here.
+ * The editable parts of an invoice (operations, discount, GST rate, notes),
+ * edited in place on the invoice page. The status is the server's (New,
+ * Overdue, Paid) and the PO amount comes from the order: neither is edited.
  */
 export function useInvoiceForm(invoice: Invoice | undefined) {
   const lines = useLineItems(invoice?.lineItems ?? []);
-  const [status, setStatus] = useState<InvoiceStatus>(invoice?.status ?? 'new');
   const [discount, setDiscount] = useState(
     invoice ? String(invoice.discount) : '0',
   );
@@ -37,7 +36,6 @@ export function useInvoiceForm(invoice: Invoice | undefined) {
       return;
     }
     resetLines(invoice.lineItems);
-    setStatus(invoice.status);
     setDiscount(String(invoice.discount));
     setGstRate(invoice.gstRate);
     setNotes(invoice.notes);
@@ -62,20 +60,17 @@ export function useInvoiceForm(invoice: Invoice | undefined) {
         return null;
       }
       return {
-        status,
         ...(withLines && { lineItems: lines.items }),
         discount: toNumber(discount),
         gstRate,
         notes: notes.trim(),
       };
     },
-    [discount, lines.items, status, gstRate, notes],
+    [discount, lines.items, gstRate, notes],
   );
 
   return {
     lines,
-    status,
-    setStatus,
     discount,
     setDiscount,
     gstRate,

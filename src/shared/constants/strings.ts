@@ -1,5 +1,7 @@
 // Text shared by several features. Feature-specific text lives in each feature's constants.ts.
 
+import { PASSWORD_MIN_LENGTH } from '../../config/constants';
+
 export const COMMON_STRINGS = {
   printFailedTitle: "Couldn't print",
   printFailed: 'The print dialog could not be opened. Please try again.',
@@ -56,7 +58,7 @@ export const NAV_STRINGS = {
 } as const;
 
 export const PASSWORD_STRINGS = {
-  minLength: 'Minimum 8 characters',
+  minLength: `Minimum ${PASSWORD_MIN_LENGTH} characters`,
   lettersAndNumbers: 'Letters and numbers',
   match: 'Passwords match',
   mismatch: 'Passwords don’t match',

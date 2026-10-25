@@ -1,7 +1,8 @@
 import type { Attachment } from '../../shared/types';
+import { rememberPickedFile } from './pickedFiles';
 
 // The project builds without the DOM typings; just what this file touches.
-type PickedFile = { name: string; size: number };
+type PickedFile = { name: string; size: number; type: string };
 type FileInput = {
   type: string;
   accept: string;
@@ -46,8 +47,11 @@ export function pickImage(kind: string): Promise<Attachment | null> {
         resolve(null);
         return;
       }
+      const id = `${kind}-${Date.now()}`;
+      // Kept for the upload when the record is saved.
+      rememberPickedFile(id, file);
       resolve({
-        id: `${kind}-${Date.now()}`,
+        id,
         name: file.name,
         kind,
         sizeBytes: file.size,

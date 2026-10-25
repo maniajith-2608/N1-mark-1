@@ -21,7 +21,7 @@ const EMPTY: MachineInput = {
   model: '',
   type: 'cnc_lathe',
   location: '',
-  status: 'running',
+  status: 'idle',
   notes: '',
 };
 
@@ -131,7 +131,12 @@ export function MachineFormModal({
       }
       testID="machine-form"
     >
-      <MachineFields values={values} errors={errors} bind={bind} />
+      <MachineFields
+        values={values}
+        errors={errors}
+        bind={bind}
+        isNew={!isEdit}
+      />
       {saveError && (
         <N1Text variant="small" color="danger">
           {saveError}
