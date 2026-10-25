@@ -1,9 +1,12 @@
+import { useEffect } from 'react';
 import { useCrudResource } from '../../../shared/store';
-import { useAppSelector } from '../../../app/store/hooks';
+import { useAppDispatch, useAppSelector } from '../../../app/store/hooks';
+import { workflowActions } from '../store/workflowSlice';
 import { invoiceActions, quoteActions } from '../store/billingSlices';
 import {
   selectAllInvoices,
   selectAllQuotes,
+  selectBillingPermissions,
   selectBillingSummary,
   selectInvoiceById,
   selectInvoiceStats,
@@ -50,4 +53,19 @@ export function useBillingSummary() {
   const { items: invoices, status, error, reload } = useInvoices();
   const summary = useAppSelector(selectBillingSummary);
   return { ...summary, invoices, status, error, reload };
+}
+
+/**
+ * What this user may do in billing (loaded once): only the owner and the
+ * accountant may mark an invoice paid.
+ */
+export function useBillingPermissions() {
+  const dispatch = useAppDispatch();
+  const permissions = useAppSelector(selectBillingPermissions);
+  useEffect(() => {
+    if (!permissions) {
+      dispatch(workflowActions.fetchPermissionsRequest());
+    }
+  }, [dispatch, permissions]);
+  return { canMarkPaid: permissions?.markPaid ?? false };
 }

@@ -1,33 +1,49 @@
-import { respond } from '../../../services/mock/mockServer';
+import { fetchAllNodes, fromWireEnum } from '../../../services/api';
+import { jobCardsApi } from '../../jobCards/api/jobCardsApi';
+import type { JobCard } from '../../jobCards/types';
 import type { EmployeeRole } from '../../profile/types';
+import type { QcKind, QcQueueEntry, QcStatus } from '../qc';
 
-/** Jobs already on each role's list (work order numbers). */
-const SEED: Record<EmployeeRole, string[]> = {
-  // 1041 is waiting on a re-initiate: RM QC rejected its material.
-  supervisor: ['1041', '1042', '1040', '1035', '1034', '1038'],
-  operator: ['1042', '1039', '1034', '1041', '1037'],
-  qc: ['1042', '1039', '1041', '1034', '1036'],
+// N1 Core API: myJobs (an operator's assigned work; a supervisor's or QC's
+// own list, added to with watchJob) and qcQueue (QC's checks, as the server
+// works them out).
+
+type QcQueueNode = {
+  jobCardId: string;
+  kind: 'RM' | 'MACHINE';
+  status: Uppercase<QcStatus>;
+  stage: string;
+  subject: string;
 };
 
-const copy = () =>
-  Object.fromEntries(
-    Object.entries(SEED).map(([role, ids]) => [role, [...ids]]),
-  ) as Record<EmployeeRole, string[]>;
-
-// Mock backend. Replace with GET /me/jobs and POST /me/jobs.
-let lists = copy();
+/**
+ * The checks on QC's own list (watched), for both tabs. A literal page
+ * size: the cost check counts a variable one as 100.
+ */
+async function qcQueue(): Promise<QcQueueEntry[]> {
+  const nodes = await fetchAllNodes<QcQueueNode>(
+    `query QcQueue($after: String) {
+      qcQueue(first: 100, after: $after, filter: { watched: true }) {
+        edges { node { jobCardId kind status stage subject } }
+        pageInfo { hasNextPage endCursor }
+      }
+    }`,
+    'qcQueue',
+  );
+  return nodes.map(node => ({
+    jobCardId: node.jobCardId,
+    kind: node.kind === 'RM' ? 'rm' : ('machine' as QcKind),
+    status: fromWireEnum<QcStatus>(node.status),
+    stage: node.stage,
+    subject: node.subject,
+  }));
+}
 
 export const myJobsApi = {
-  list: (role: EmployeeRole) => respond(lists[role]),
-  /** Puts the job at the top of the role's list (once). */
-  add: (role: EmployeeRole, id: string) => {
-    lists = {
-      ...lists,
-      [role]: [id, ...lists[role].filter(existing => existing !== id)],
-    };
-    return respond(lists[role]);
-  },
-  reset: () => {
-    lists = copy();
-  },
+  /** The role's jobs, as whole job cards (the server knows whose). */
+  list: (_role: EmployeeRole): Promise<JobCard[]> => jobCardsApi.myJobs(),
+  /** Supervisor and QC: adds the job to their own list. */
+  watch: (_role: EmployeeRole, jobCardId: string): Promise<JobCard> =>
+    jobCardsApi.run(jobCardId, { type: 'watch' }),
+  qcQueue,
 };

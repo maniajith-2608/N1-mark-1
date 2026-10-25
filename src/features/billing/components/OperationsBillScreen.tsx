@@ -26,12 +26,19 @@ const makeStyles = createN1Styles(t => ({
 
 type Props = {
   /** The invoice or quote; absent while loading or when it's gone. */
-  doc?: { id: string; lineItems: LineItem[]; quantity: number };
+  doc?: {
+    id: string;
+    number: string;
+    lineItems: LineItem[];
+    quantity: number;
+  };
   /** "invoice" / "quote", for the delete question. */
   docLabel: string;
   /** Shown when there's no `doc`: loading, error or not found. */
   fallback: ReactNode;
   editing: boolean;
+  /** A paid invoice or a sent quote: no Edit. */
+  readOnly?: boolean;
   onEditingChange: (editing: boolean) => void;
   onBack: () => void;
   /** Saves the whole list after one operation changes. */
@@ -53,6 +60,7 @@ export function OperationsBillScreen({
   docLabel,
   fallback,
   editing,
+  readOnly = false,
   onEditingChange,
   onBack,
   onSave,
@@ -105,7 +113,7 @@ export function OperationsBillScreen({
       title={editing ? I.editOperations : L.title}
       onBack={onBack}
       compactRight={
-        doc ? (
+        doc && !readOnly ? (
           <N1IconButton
             icon={editing ? 'check' : 'edit'}
             variant="tile"
@@ -123,7 +131,7 @@ export function OperationsBillScreen({
       <AdminScreen header={header} testID={testID}>
         {doc ? (
           <View style={styles.content}>
-            <N1Text color="secondary">{doc.id}</N1Text>
+            <N1Text color="secondary">{doc.number}</N1Text>
             <OperationsBill
               items={doc.lineItems}
               quantity={doc.quantity}

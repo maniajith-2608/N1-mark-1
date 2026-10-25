@@ -59,7 +59,7 @@ export const LinkedOrderCard = memo(function LinkedOrderCardComponent({
   return (
     <Pressable
       accessibilityRole={onPress ? 'button' : undefined}
-      accessibilityLabel={O.open(order.id)}
+      accessibilityLabel={O.open(order.number)}
       disabled={!onPress}
       onPress={onPress}
       onHoverIn={() => setHovered(true)}

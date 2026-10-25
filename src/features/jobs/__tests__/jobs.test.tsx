@@ -5,15 +5,17 @@ import {
   byLabel,
   byTestId,
   byText,
+  flush,
   hasTestId,
   press,
   renderAppAs,
   typeInto,
 } from '../../../shared/testing/testUtils';
-import { jobCardsApi } from '../../jobCards/api/jobCardsApi';
+import { jobCardsApi } from '../../jobCards/api/mockJobCardsApi';
 import { MOCK_ORDERS } from '../../orders/api/mockData';
-import { ordersApi } from '../../orders/api/ordersApi';
-import { isRawMaterialMissing, parseJobCode } from '../utils';
+import { ordersApi } from '../../orders/api/mockOrdersApi';
+import { normaliseJobCode } from '../../jobCards/utils';
+import { isRawMaterialMissing } from '../utils';
 
 jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => ({
   __esModule: true,
@@ -46,13 +48,17 @@ async function importCode(
 }
 
 describe('utils', () => {
-  test('parseJobCode reads the work order number from any code format', () => {
-    expect(parseJobCode('WO-01042')).toBe('1042');
-    expect(parseJobCode('wo #1042')).toBe('1042');
-    expect(parseJobCode(' 1042 ')).toBe('1042');
-    expect(parseJobCode('WO-')).toBe('');
+  test('normaliseJobCode writes any WO number the way the server reads it', () => {
+    expect(normaliseJobCode('WO-01042')).toBe('WO-1042');
+    expect(normaliseJobCode('wo #1042')).toBe('WO-1042');
+    expect(normaliseJobCode(' 1042 ')).toBe('WO-1042');
+    // Card codes and QR values pass through.
+    expect(normaliseJobCode('job12')).toBe('JOB12');
+    expect(normaliseJobCode('JC-00012')).toBe('JC-00012');
     // An order QR code: only the first line counts, not the details under it.
-    expect(parseJobCode('WO #1042\nPart no: PN-33021\nQty: 200')).toBe('1042');
+    expect(normaliseJobCode('WO #1042\nPart no: PN-33021\nQty: 200')).toBe(
+      'WO-1042',
+    );
   });
 
   test('isRawMaterialMissing flags any blank raw material detail', () => {
@@ -136,6 +142,8 @@ async function scan(root: ReactTestRenderer.ReactTestInstance, value: string) {
   await ReactTestRenderer.act(async () =>
     camera.props.outputs[0].onBarcodeScanned([{ rawValue: value }]),
   );
+  // The lookup (jobCardByQr) and the order it opens load.
+  await flush();
 }
 
 describe('Scan QR code', () => {
@@ -215,6 +223,7 @@ test('order → raw material modal → job added to My Jobs → job card', async
   await typeInto(byTestId(root, 'raw-material-heatNumber'), 'HT-55555');
   await press(byLabel(root, 'In-house'));
   await press(byTestId(root, 'raw-material-submit'));
+  await flush();
 
   // Straight to the new job's job card.
   text = allText(root);
@@ -238,7 +247,7 @@ test('order → raw material modal → job added to My Jobs → job card', async
 
 test('the order keeps its heading and drawing pinned; the thumbnail opens the Drawing screen', async () => {
   const root = await secondAdmin();
-  await importCode(root, '1043');
+  await importCode(root, '1039');
 
   const tile = byTestId(root, 'order-summary-tile');
   expect(allText(tile)).toContain('Drawing');
@@ -249,9 +258,9 @@ test('the order keeps its heading and drawing pinned; the thumbnail opens the Dr
   expect(allText(scroll)).toContain('Shop order number');
   // Overview, Dispatch and Raw material, the same fields as the admin order.
   expect(allText(byTestId(scroll, 'order-info-overview'))).toMatch(
-    /^Overview\|Quantity\|150 pcs\|Due date\|.*\|Part name\|Spindle\|.*PO amount\|₹65,000/,
+    /^Overview\|Quantity\|80 pcs\|Due date\|.*\|Part name\|Flange\|.*PO amount\|₹95,000/,
   );
-  expect(allText(byTestId(scroll, 'order-info-dispatch'))).toContain('DC-5562');
+  expect(allText(byTestId(scroll, 'order-info-dispatch'))).toContain('DC-5558');
   expect(allText(byTestId(scroll, 'order-info-material'))).toContain(
     'Material source',
   );
@@ -259,7 +268,7 @@ test('the order keeps its heading and drawing pinned; the thumbnail opens the Dr
   // The thumbnail opens the Drawing screen; close returns to the order.
   await press(byTestId(tile, 'order-drawing-thumb'));
   const drawing = byTestId(root, 'drawing-screen');
-  expect(allText(drawing)).toContain('DRW-1188');
+  expect(allText(drawing)).toContain('DRW-1184');
   expect(hasTestId(drawing, 'drawing-print')).toBe(true);
   await press(byLabel(drawing, 'Close'));
   expect(hasTestId(root, 'drawing-screen')).toBe(false);
@@ -275,7 +284,7 @@ test('closing the raw material modal keeps the order open', async () => {
   await press(byLabel(root, 'Close'));
 
   expect(allText(root)).not.toContain('Raw Material Details');
-  expect(allText(root)).toContain('Create Job Card');
+  expect(allText(root)).toContain('Import Job');
 });
 
 test('a job already on My Jobs opens its job card from the order', async () => {

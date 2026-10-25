@@ -14,10 +14,9 @@ import {
   OrderStatusBadge,
   PriorityBadge,
   orderHeading,
-  type WorkOrder,
 } from '../../orders';
 import { JOBS_STRINGS } from '../constants';
-import type { JobsScreenProps } from '../types';
+import type { JobsScreenProps, OrderView } from '../types';
 
 const D = ORDER_STRINGS.details;
 const S = JOBS_STRINGS.order;
@@ -57,7 +56,7 @@ const makeStyles = createN1Styles(t => ({
 export const OrderSummaryTile = memo(function OrderSummaryTileComponent({
   order,
 }: {
-  order: WorkOrder;
+  order: OrderView;
 }) {
   const styles = useN1Styles(makeStyles);
   const drawingNumber = order.drawingNumber || D.noDrawing;
@@ -69,7 +68,7 @@ export const OrderSummaryTile = memo(function OrderSummaryTileComponent({
       <View style={styles.summary}>
         <View style={styles.badges}>
           <PriorityBadge priority={order.priority} suffix="priority" />
-          <OrderStatusBadge status={order.status} />
+          {order.status && <OrderStatusBadge status={order.status} />}
         </View>
         <N1Text variant="h2">{orderHeading(order)}</N1Text>
         {order.customerName !== '' && (

@@ -16,6 +16,7 @@ import {
   isNumeric,
   isPhone,
   isStrongPassword,
+  toE164Phone,
   parseDisplayDate,
   percentOf,
   toDisplayDate,
@@ -105,19 +106,19 @@ test('validators', () => {
 });
 
 test('password rules', () => {
-  expect(checkPassword('abc12345', 'abc12345')).toEqual({
+  expect(checkPassword('abc1234567', 'abc1234567')).toEqual({
     minLength: true,
     lettersAndNumbers: true,
     matches: true,
   });
-  expect(checkPassword('abcdefgh', 'x')).toEqual({
+  expect(checkPassword('abcdefghij', 'x')).toEqual({
     minLength: true,
     lettersAndNumbers: false,
     matches: false,
   });
   expect(checkPassword('', '')).toMatchObject({ matches: false });
   expect(isStrongPassword('short1')).toBe(false);
-  expect(isStrongPassword('longer123')).toBe(true);
+  expect(isStrongPassword('longer1234')).toBe(true);
 });
 
 test('GST numbers follow the 15-character GSTIN format', () => {
@@ -128,4 +129,10 @@ test('GST numbers follow the 15-character GSTIN format', () => {
   expect(isGstin('33ABCDE1234F1Z')).toBe(false); // too short
   expect(isGstin('AAABCDE1234F1Z5')).toBe(false); // state code
   expect(isGstin('33ABCDE1234F1X5')).toBe(false); // 14th must be Z
+});
+
+test('toE164Phone gives the +91… form the backend matches', () => {
+  expect(toE164Phone('98765 43210')).toBe('+919876543210');
+  expect(toE164Phone('+91 98765-43210')).toBe('+919876543210');
+  expect(toE164Phone('919876543210')).toBe('+919876543210');
 });

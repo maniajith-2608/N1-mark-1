@@ -1,6 +1,8 @@
+import type { AuthTokens } from '../../services/api';
 import { USER_ROLES, type UserRole } from './constants';
 
 const KEY = 'n1.session.role';
+const TOKENS_KEY = 'n1.session.tokens';
 
 /** The part of the browser's localStorage used here. */
 type KeyValueStorage = {
@@ -40,5 +42,31 @@ export function saveSessionRole(role: UserRole | null) {
     }
   } catch {
     // Storage blocked (private mode): the session just won't survive a refresh.
+  }
+}
+
+// The sign-in tokens, so a page refresh stays signed in. A saved role without
+// them ends at the first API call (the client finds nothing to refresh with).
+export function loadSessionTokens(): AuthTokens | null {
+  try {
+    const value = storage()?.getItem(TOKENS_KEY);
+    const tokens = value ? (JSON.parse(value) as Partial<AuthTokens>) : null;
+    return tokens?.accessToken && tokens.refreshToken
+      ? { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveSessionTokens(tokens: AuthTokens | null) {
+  try {
+    if (tokens) {
+      storage()?.setItem(TOKENS_KEY, JSON.stringify(tokens));
+    } else {
+      storage()?.removeItem(TOKENS_KEY);
+    }
+  } catch {
+    // As above.
   }
 }

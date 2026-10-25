@@ -1,13 +1,13 @@
 import { useCallback, useRef } from 'react';
 import { useNavigation } from '@react-navigation/native';
+import { useAppSelector } from '../../../app/store/hooks';
 import { COMMON_STRINGS } from '../../../shared/constants';
 import { useOnSettled } from '../../../shared/hooks';
-import { JOB_CARD_STRINGS, useJobCards } from '../../jobCards';
-import { useOrders } from '../../orders';
+import { JOB_CARD_STRINGS } from '../../jobCards';
+import { selectJobCardById } from '../../jobCards/store/selectors';
 import { JOBS_STRINGS, ROLE_JOBS } from '../constants';
 import type { QcKind } from '../qc';
 import type { JobsScreenProps } from '../types';
-import { parseJobCode } from '../utils';
 import { useMyJobs } from './useMyJobs';
 import { useOpenOverTabs } from './useOpenOverTabs';
 
@@ -15,68 +15,63 @@ type Navigation = JobsScreenProps<'EnterJobCode'>['navigation'];
 const S = JOBS_STRINGS.code;
 
 /**
- * Imports a job from a typed or scanned code, shared by Enter Job Code and
- * Scan QR Code. Second Admin goes on to the order; the shop floor adds the
- * job and opens it once the import saga succeeds.
+ * Opens a job from a typed or scanned code (jobCardByQr), shared by Enter
+ * Job Code and Scan QR Code. The supervisor goes on to the order; QC adds
+ * the job to their list and opens its check; an operator opens their job.
  *
- * `importCode` returns an error message for an invalid code, or `undefined`
- * once the import has started.
+ * `importCode` returns an error message for a blank code, or `undefined`
+ * once the lookup has started; a code nothing matches shows `importError`.
  */
 export function useImportJobByCode(qcKind: QcKind = 'rm') {
   const navigation = useNavigation<Navigation>();
-  const orders = useOrders();
-  const jobCards = useJobCards();
   const myJobs = useMyJobs();
   const openOverTabs = useOpenOverTabs();
   const { importTo } = ROLE_JOBS[myJobs.role];
-  const importing = useRef('');
+  const looking = useRef(false);
+  const { found } = myJobs;
+  const foundCard = useAppSelector(state =>
+    found ? selectJobCardById(state, found.jobCardId) : undefined,
+  );
+
+  // Operators run jobs that have a route card; QC can check any job card.
+  const routeMissing =
+    importTo === 'job' && foundCard && !foundCard.operations.length
+      ? S.noRoute(JOB_CARD_STRINGS.workOrder(foundCard.number))
+      : null;
 
   useOnSettled(myJobs.importing, myJobs.importError, () => {
-    const jobCardId = importing.current;
-    if (!jobCardId) {
+    if (!looking.current || !found) {
       return;
     }
-    importing.current = '';
-    if (importTo === 'qc') {
-      openOverTabs('QcCheck', { jobCardId, kind: qcKind });
+    looking.current = false;
+    if (routeMissing) {
+      return;
+    }
+    if (importTo === 'order') {
+      navigation.navigate('ImportOrder', { orderId: found.orderId });
+    } else if (importTo === 'qc') {
+      openOverTabs('QcCheck', { jobCardId: found.jobCardId, kind: qcKind });
     } else {
-      openOverTabs('OperatorJob', { jobCardId });
+      openOverTabs('OperatorJob', { jobCardId: found.jobCardId });
     }
   });
 
-  const { items: orderItems } = orders;
-  const { items: jobCardItems } = jobCards;
-  const { importJob } = myJobs;
+  const { lookup } = myJobs;
   const importCode = useCallback(
     (code: string): string | undefined => {
       if (!code.trim()) {
         return COMMON_STRINGS.required;
       }
-      // A code with no work order number (e.g. some other QR) isn't found.
-      const orderId = parseJobCode(code);
-      if (!orderId || !orderItems.some(o => o.id === orderId)) {
-        return S.notFound(code.trim());
-      }
-      if (importTo === 'order') {
-        navigation.navigate('ImportOrder', { orderId });
-        return undefined;
-      }
-      // Operators can only run jobs that already have a route card; QC can
-      // check any job card (raw material comes before the route).
-      const jobCard = jobCardItems.find(c => c.id === orderId);
-      if (!jobCard || (importTo === 'job' && !jobCard.operations.length)) {
-        return S.noRoute(JOB_CARD_STRINGS.workOrder(orderId));
-      }
-      importing.current = orderId;
-      importJob(orderId);
+      looking.current = true;
+      lookup(code);
       return undefined;
     },
-    [orderItems, jobCardItems, importJob, importTo, navigation],
+    [lookup],
   );
 
   return {
     importCode,
-    loading: orders.isLoading || jobCards.isLoading || myJobs.importing,
-    importError: myJobs.importError,
+    loading: myJobs.importing,
+    importError: myJobs.importError ?? routeMissing,
   } as const;
 }

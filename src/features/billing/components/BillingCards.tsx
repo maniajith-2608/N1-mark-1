@@ -144,27 +144,30 @@ export const InvoiceCard = memo(function InvoiceCardComponent({
   const styles = useN1Styles(makeStyles);
   return (
     <BillingCard
-      id={i.id}
+      id={i.number}
       customer={i.customerName}
       status={<InvoiceStatusBadge status={i.status} />}
       amount={invoiceTotal(i)}
       viewLabel={I.viewCard}
-      viewA11y={A.view(i.id)}
+      viewA11y={A.view(i.number)}
       onView={() => onView(i)}
       actions={
         <>
           <N1IconButton
             icon="download"
             variant="card"
-            accessibilityLabel={A.download(i.id)}
+            accessibilityLabel={A.download(i.number)}
             onPress={() => onDownload(i)}
           />
-          <N1IconButton
-            icon="edit"
-            variant="card"
-            accessibilityLabel={A.edit(i.id)}
-            onPress={() => onEdit(i)}
-          />
+          {/* A paid invoice is final: no Edit. */}
+          {i.status !== 'paid' && (
+            <N1IconButton
+              icon="edit"
+              variant="card"
+              accessibilityLabel={A.edit(i.number)}
+              onPress={() => onEdit(i)}
+            />
+          )}
         </>
       }
       testID={`invoice-card-${i.id}`}
@@ -189,8 +192,6 @@ type QuoteCardProps = {
   onView: (quote: Quote) => void;
   onEdit: (quote: Quote) => void;
   onDelete: (quote: Quote) => void;
-  /** Billed or converted: an invoice or order uses it, so it stays. */
-  deleteLocked: boolean;
 };
 
 /**
@@ -203,38 +204,38 @@ export const QuoteCard = memo(function QuoteCardComponent({
   onView,
   onEdit,
   onDelete,
-  deleteLocked,
 }: QuoteCardProps) {
   const styles = useN1Styles(makeStyles);
+  // Only a draft is edited or deleted; a sent quote is the customer's copy.
+  const isDraft = q.status === 'draft';
   return (
     <BillingCard
-      id={q.id}
+      id={q.number}
       customer={q.customerName}
       status={<QuoteStatusBadge status={q.status} />}
       amount={quoteTotal(q)}
       viewLabel={QS.viewCard}
-      viewA11y={A.view(q.id)}
+      viewA11y={A.view(q.number)}
       onView={() => onView(q)}
       actions={
-        <>
-          <N1IconButton
-            icon="edit"
-            variant="card"
-            accessibilityLabel={A.edit(q.id)}
-            onPress={() => onEdit(q)}
-            testID={`edit-${q.id}`}
-          />
-          <N1IconButton
-            icon="trash"
-            variant="cardDanger"
-            accessibilityLabel={
-              deleteLocked ? QS.deleteLocked(q.id) : A.delete(q.id)
-            }
-            disabled={deleteLocked}
-            onPress={() => onDelete(q)}
-            testID={`delete-${q.id}`}
-          />
-        </>
+        isDraft && (
+          <>
+            <N1IconButton
+              icon="edit"
+              variant="card"
+              accessibilityLabel={A.edit(q.number)}
+              onPress={() => onEdit(q)}
+              testID={`edit-${q.id}`}
+            />
+            <N1IconButton
+              icon="trash"
+              variant="cardDanger"
+              accessibilityLabel={A.delete(q.number)}
+              onPress={() => onDelete(q)}
+              testID={`delete-${q.id}`}
+            />
+          </>
+        )
       }
       testID={`quote-card-${q.id}`}
     >

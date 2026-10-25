@@ -22,6 +22,7 @@ import {
   currentOperation,
   jobProgress,
   progressTone,
+  type JobCard,
 } from '../../jobCards';
 import { DASHBOARD_STRINGS } from '../constants';
 import type { PriorityJob } from '../types';
@@ -88,6 +89,9 @@ const makeStyles = createN1Styles(t => ({
     alignItems: 'center',
     gap: t.spacing.xs,
   },
+  // Nothing in the period: the message sits in the middle of the card.
+  empty: { padding: t.spacing.xxl, alignItems: 'center' },
+  emptyFill: { flex: 1, justifyContent: 'center' },
   pressed: { opacity: t.opacity.pressed },
 }));
 
@@ -116,8 +120,10 @@ export const PriorityJobsCard = memo(function PriorityJobsCardComponent({
     <>
       {jobs.map(job => {
         const heading = S.heading(job.routeCardNo, job.customerName);
-        const op = currentOperation(job);
-        const progress = jobProgress(job);
+        // The progress helpers only read the card's operations.
+        const card = job as Pick<JobCard, 'operations'> as JobCard;
+        const op = currentOperation(card);
+        const progress = jobProgress(card);
         // Red only while there's still work left to do.
         const urgent = progress < 100 && isDueSoon(job.dueDate);
         const danger = theme.colors.tone.danger;
@@ -142,7 +148,8 @@ export const PriorityJobsCard = memo(function PriorityJobsCardComponent({
               >
                 {[
                   JOB_CARD_STRINGS.jobCardNumber(job.code),
-                  JOB_CARD_STRINGS.workOrder(job.id),
+                  job.workOrderNumber &&
+                    JOB_CARD_STRINGS.workOrder(job.workOrderNumber),
                   job.partName,
                 ]
                   .filter(Boolean)
@@ -210,7 +217,16 @@ export const PriorityJobsCard = memo(function PriorityJobsCardComponent({
           testID="view-all-jobs"
         />
       </View>
-      {scrollable ? (
+      {jobs.length === 0 ? (
+        <View
+          style={[styles.empty, scrollable && styles.emptyFill]}
+          testID="priority-jobs-empty"
+        >
+          <N1Text color="secondary" align="center">
+            {S.empty}
+          </N1Text>
+        </View>
+      ) : scrollable ? (
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.list}

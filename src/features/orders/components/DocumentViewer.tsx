@@ -123,9 +123,9 @@ export function DocumentViewer({
           {doc?.name}
         </N1Text>
         <N1Text variant="small" color="secondary" align="center">
-          {doc?.uri && onOpen ? D.viewerOpenHelp : D.viewerUnavailable}
+          {doc && onOpen ? D.viewerOpenHelp : D.viewerUnavailable}
         </N1Text>
-        {doc?.uri && onOpen && (
+        {doc && onOpen && (
           <N1Button
             title={D.openInNewTab}
             leftIcon="arrow-right"

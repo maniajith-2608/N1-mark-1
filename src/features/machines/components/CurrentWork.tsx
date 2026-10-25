@@ -6,8 +6,8 @@ import {
   useN1Styles,
 } from '../../../shared/components';
 import { COMMON_STRINGS } from '../../../shared/constants';
-import { MACHINE_STRINGS } from '../constants';
 import type { MachineWork } from '../types';
+import { workTitle } from '../utils';
 
 const makeStyles = createN1Styles(t => ({
   panel: {
@@ -35,7 +35,7 @@ export const CurrentWork = memo(function CurrentWorkComponent({
   return (
     <View style={variant === 'panel' && styles.panel}>
       <N1Text variant="small" weight="bold" numberOfLines={1}>
-        {`${MACHINE_STRINGS.workOrder(work.workOrderId)} · ${work.title}`}
+        {workTitle(work)}
       </N1Text>
       <N1Text variant="caption" color="secondary">
         {work.operator}

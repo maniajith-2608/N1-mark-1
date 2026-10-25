@@ -15,6 +15,7 @@ import {
   MACHINE_TYPE_LABELS,
 } from '../constants';
 import type { Machine } from '../types';
+import { workTitle } from '../utils';
 import { MachineStatusBadge } from './MachineBadge';
 
 const makeStyles = createN1Styles(t => ({
@@ -79,11 +80,7 @@ export const MachineCard = memo(function MachineCardComponent({
       <View style={styles.pair}>
         <LabeledValue
           title={S.columns.work}
-          value={
-            work
-              ? `${S.workOrder(work.workOrderId)} · ${work.title}`
-              : COMMON_STRINGS.dash
-          }
+          value={work ? workTitle(work) : COMMON_STRINGS.dash}
         />
         <LabeledValue
           title={S.columns.operator}

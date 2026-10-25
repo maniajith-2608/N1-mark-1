@@ -17,8 +17,9 @@ const S = JOBS_STRINGS.order;
 const D = ORDER_STRINGS.details;
 
 /**
- * The scanned work order; Create Job Card asks for its raw material. Its
- * heading and drawing stay pinned on top while the details scroll.
+ * The scanned work order; Import Job asks for its raw material, then adds
+ * the job to My Jobs. Its heading and drawing stay pinned on top while the
+ * details scroll.
  */
 export function ImportOrderScreen({
   route,
@@ -29,14 +30,15 @@ export function ImportOrderScreen({
   const myJobs = useMyJobs();
 
   // Already on My Jobs: open its job card instead of importing it again.
-  const imported = myJobs.ids.includes(orderId);
+  const jobCardId = order?.jobCardId ?? '';
+  const imported = Boolean(jobCardId) && myJobs.ids.includes(jobCardId);
   const onPrimary = useCallback(() => {
     if (imported) {
-      navigation.navigate('JobCardDetails', { jobCardId: orderId });
+      navigation.navigate('JobCardDetails', { jobCardId });
     } else {
       navigation.navigate('RawMaterial', { orderId });
     }
-  }, [imported, navigation, orderId]);
+  }, [imported, navigation, orderId, jobCardId]);
 
   const header = (
     <N1Header
@@ -58,7 +60,7 @@ export function ImportOrderScreen({
 
   const footer = (
     <N1Button
-      title={imported ? S.viewJobCard : S.createJobCard}
+      title={imported ? S.viewJobCard : S.importJob}
       leftIcon={imported ? 'file' : 'plus'}
       size="lg"
       fullWidth

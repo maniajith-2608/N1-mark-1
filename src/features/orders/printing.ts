@@ -6,7 +6,7 @@ import { detailList, escapeHtml, printPage } from '../../services/print';
 import { DIM_FONT, DIM_LABELS, PART, VIEW } from './components/DrawingPreview';
 import { qrPath } from './components/QrCode';
 import { ORDER_STRINGS } from './constants';
-import type { WorkOrder } from './types';
+import type { OrderSummary } from './types';
 import { orderHeading, orderQrValue, orderTitle } from './utils';
 
 const P = ORDER_STRINGS.print;
@@ -51,19 +51,19 @@ function drawingSvg(): string {
 }
 
 /** The order's QR code as SVG markup, the same code the screen shows. */
-function qrSvg(order: WorkOrder, scale = PRINT_QR_SCALE): string {
+function qrSvg(order: OrderSummary, scale = PRINT_QR_SCALE): string {
   const { path, modules } = qrPath(orderQrValue(order));
   const size = ORDER_QR_SIZE * scale;
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" ` +
     `viewBox="0 0 ${modules} ${modules}" shape-rendering="crispEdges" role="img" ` +
-    `aria-label="${escapeHtml(ORDER_STRINGS.details.qrA11y(order.id))}">` +
+    `aria-label="${escapeHtml(ORDER_STRINGS.details.qrA11y(order.number))}">` +
     `<rect width="${modules}" height="${modules}" fill="${colors.qrBackground}"/>` +
     `<path d="${path}" fill="${colors.qrForeground}"/></svg>`
   );
 }
 
-const orderDetails = (order: WorkOrder) => {
+const orderDetails = (order: OrderSummary) => {
   const Q = ORDER_STRINGS.qr;
   return detailList([
     [Q.customer, order.customerName],
@@ -79,14 +79,14 @@ const orderDetails = (order: WorkOrder) => {
 };
 
 /** The order's QR beside its details: scanning it opens the job. */
-const qrRow = (order: WorkOrder, label: string, value: string) =>
+const qrRow = (order: OrderSummary, label: string, value: string) =>
   '<div class="row"><div>' +
   `<div class="label">${escapeHtml(label)}</div>` +
   `<div class="value">${escapeHtml(value)}</div>` +
   `${orderDetails(order)}</div>${qrSvg(order)}</div>`;
 
 /** The drawing with its number, the order's details and its QR code. */
-export function drawingPrintHtml(order: WorkOrder, drawingNumber: string) {
+export function drawingPrintHtml(order: OrderSummary, drawingNumber: string) {
   const heading = orderHeading(order);
   return printPage(
     P.drawingJob(heading),
@@ -101,7 +101,7 @@ export function drawingPrintHtml(order: WorkOrder, drawingNumber: string) {
  * yet prints as a sheet naming it, with the order's details and QR code, to
  * clip to the paper copy.
  */
-export function documentPrintHtml(order: WorkOrder, doc: Attachment) {
+export function documentPrintHtml(order: OrderSummary, doc: Attachment) {
   const heading = orderHeading(order);
   const meta = [doc.kind, formatFileSize(doc.sizeBytes)]
     .filter(Boolean)
@@ -118,10 +118,10 @@ export function documentPrintHtml(order: WorkOrder, doc: Attachment) {
 }
 
 /** The order QR on its own, large, to stick on a part or a tote. */
-export function qrPrintHtml(order: WorkOrder) {
+export function qrPrintHtml(order: OrderSummary) {
   const heading = orderHeading(order);
   return printPage(
-    ORDER_STRINGS.details.orderQrFile(order.id),
+    ORDER_STRINGS.details.orderQrFile(order.number),
     `<h1>${escapeHtml(heading)}</h1>` +
       `<div class="figure">${qrSvg(order, PRINT_QR_SCALE * 2)}</div>` +
       `<div class="row">${orderDetails(order)}</div>`,

@@ -193,9 +193,10 @@ export function CustomerSectionForm({
           <>
             {text('address', F.address, F.addressPlaceholder, {
               multiline: true,
+              required: editing,
             })}
             <FormRow>
-              {text('city', F.city, F.cityPlaceholder)}
+              {text('city', F.city, F.cityPlaceholder, { required: editing })}
               <N1DropDown
                 label={F.state}
                 options={STATE_OPTIONS}
@@ -209,6 +210,7 @@ export function CustomerSectionForm({
               {text('pinCode', F.pinCode, F.pinCodePlaceholder, {
                 keyboardType: 'number-pad',
                 maxLength: 6,
+                required: editing,
               })}
               <N1DropDown
                 label={F.country}

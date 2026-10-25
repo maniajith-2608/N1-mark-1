@@ -71,21 +71,19 @@ function RawMaterialForm({ order, retest, header, onImported }: FormProps) {
 
   const save = useCallback(
     (v: RawMaterialInput) =>
-      importJob(
-        order.id,
-        {
-          rawMaterialGrade: v.rawMaterialGrade.trim(),
-          rawMaterialSize: v.rawMaterialSize.trim(),
-          heatNumber: v.heatNumber.trim(),
-          rmPartNumber: v.rmPartNumber.trim(),
-          materialSource: v.materialSource,
-        },
-        retest,
-      ),
-    [importJob, order.id, retest],
+      // Saved on the job card (saveJobCardRawMaterial); RM QC inspects it
+      // (again, after a rejection).
+      importJob(order.jobCardId, {
+        rawMaterialGrade: v.rawMaterialGrade.trim(),
+        rawMaterialSize: v.rawMaterialSize.trim(),
+        heatNumber: v.heatNumber.trim(),
+        rmPartNumber: v.rmPartNumber.trim(),
+        materialSource: v.materialSource,
+      }),
+    [importJob, order.jobCardId],
   );
 
-  const workOrder = ORDER_STRINGS.workOrder(order.id);
+  const workOrder = ORDER_STRINGS.workOrder(order.number);
   return (
     <UserScreen
       header={header}
@@ -143,8 +141,8 @@ function RawMaterialForm({ order, retest, header, onImported }: FormProps) {
 
 /**
  * Mandatory raw material details, opened as a modal from the order. Continue
- * saves them, creates the job card if needed, adds the job to My Jobs and
- * opens its job card (Back from there returns to My Jobs).
+ * saves them on the job card (opened with the order), adds the job to My
+ * Jobs (watchJob) and opens its job card (Back returns to My Jobs).
  */
 export function RawMaterialScreen({
   route,
@@ -154,10 +152,12 @@ export function RawMaterialScreen({
   const { order, status, error, reload } = useOrder(orderId);
 
   const openOverTabs = useOpenOverTabs();
-  const openJobCard = useCallback(
-    () => openOverTabs('JobCardDetails', { jobCardId: orderId }),
-    [openOverTabs, orderId],
-  );
+  const jobCardId = order?.jobCardId;
+  const openJobCard = useCallback(() => {
+    if (jobCardId) {
+      openOverTabs('JobCardDetails', { jobCardId });
+    }
+  }, [openOverTabs, jobCardId]);
 
   const header = (
     <N1Header

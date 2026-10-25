@@ -12,10 +12,7 @@ import {
   renderAdmin,
   typeInto,
 } from '../../../shared/testing/testUtils';
-import { jobCardsApi } from '../../jobCards/api/jobCardsApi';
 import { MOCK_ORDERS } from '../api/mockData';
-import { ordersApi } from '../api/ordersApi';
-import { orderActions } from '../store/ordersSlice';
 import {
   formValuesToOrderInput,
   orderToFormValues,
@@ -28,13 +25,8 @@ import type { JobCard, JobOperation } from '../../jobCards/types';
 import { statusFor } from '../../jobCards/utils';
 import { selectOrderById } from '../store/selectors';
 import type { WorkOrder } from '../types';
-import {
-  compareOrders,
-  orderQrValue,
-  orderStatus,
-  orderTitle,
-} from '../utils';
-import { parseJobCode } from '../../jobs/utils';
+import { compareOrders, orderQrValue, orderStatus, orderTitle } from '../utils';
+import { normaliseJobCode } from '../../jobCards/utils';
 
 let mockWidth = 1280;
 jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => ({
@@ -89,6 +81,7 @@ async function pickDate(
 async function fillOrderDetails(form: ReactTestInstance) {
   const fields: [string, string][] = [
     ['order-form-po-number', 'PO-9001'],
+    ['order-form-quantity', '25'],
     ['order-form-part-name', 'Spacer ring'],
     ['order-form-drawing-number', 'DRW-9001'],
     ['order-form-route-card', 'RC-9001'],
@@ -328,13 +321,12 @@ test('phone details: the order over swipeable tabs, Edit in the header', async (
   await press(byTestId(h.root, 'order-card-1043'));
   const screen = byTestId(h.root, 'order-details-screen');
   expect(allText(screen)).toContain('WO #1043');
-  // The tabs swipe between pages; 1043 has no job card, so its tab offers
-  // Create job card.
+  // The tabs swipe between pages; 1043's job card is gone.
   const details = byTestId(h.root, 'order-tab-page-details');
   expect(allText(details)).toContain('Customer details');
   await press(byTestId(h.root, 'order-tab-jobCard'));
   const jobCardPage = byTestId(h.root, 'order-tab-page-jobCard');
-  expect(hasTestId(jobCardPage, 'order-create-job-card')).toBe(true);
+  expect(allText(jobCardPage)).toContain('No job card');
   // Edit sits in the header (only there) and opens the form.
   expect(
     screen.findAll(
@@ -541,53 +533,39 @@ test('an order with a job card lists it; pressing it opens the job card', async 
   );
 });
 
-test('an order without a job card offers Create job card on top', async () => {
+test('an order without its job card says so; nothing creates a second one', async () => {
   const h = await renderAdmin('Orders');
   await h.navigate('OrderDetails', { orderId: '1043' });
   const screen = byTestId(h.root, 'order-details-screen');
-  await press(byTestId(screen, 'order-tab-jobCard'));
-  expect(allText(screen)).toContain('No job card yet');
-  // Create it from the top bar. Its material source is missing, so a popup
-  // collects the raw material details first (prefilled with the rest).
-  await press(byTestId(screen, 'order-tab-details'));
-  await press(byTestId(screen, 'order-create-job-card'));
-  const dialog = () => byTestId(h.root, 'rm-dialog');
-  expect(allText(dialog())).toContain('WO #1043 is missing some raw material');
-  expect(byTestId(dialog(), 'rm-dialog-heatNumber').props.value).toBe(
-    'HT-99214',
-  );
-  await press(byTestId(dialog(), 'rm-dialog-submit'));
-  // Material source is still empty: nothing is created yet.
-  expect(allText(dialog())).toContain('This field is required');
-  expect((await jobCardsApi.list()).some(c => c.id === '1043')).toBe(false);
-  await press(byLabel(dialog(), 'In-house'));
-  await press(byTestId(dialog(), 'rm-dialog-submit'));
-  // Saved on the order, then the job card is made and listed.
-  expect(h.store.getState().orders.entities['1043']?.materialSource).toBe(
-    'in_house',
-  );
-  expect((await jobCardsApi.list()).some(c => c.id === '1043')).toBe(true);
+  // createOrder opens every order's job card; there's no Create job card.
   expect(hasTestId(screen, 'order-create-job-card')).toBe(false);
-  expect(allText(byTestId(screen, 'order-job-card-1043'))).toContain(
-    'No process steps yet',
-  );
-  await press(byTestId(screen, 'order-job-card-1043'));
-  expect(h.currentRoute()).toBe('JobCardDetails');
+  await press(byTestId(screen, 'order-tab-jobCard'));
+  expect(allText(screen)).toContain('No job card');
 });
 
-test('Create job card skips the popup when nothing is missing', async () => {
+test('missing raw material is added on the job card, from a popup', async () => {
   const h = await renderAdmin('Orders');
-  // Give WO #1044 its material source, so every detail is there.
-  await ordersApi.update('1044', { materialSource: 'bought_out' });
-  await ReactTestRenderer.act(async () => {
-    h.store.dispatch(orderActions.fetchRequest());
-  });
-  await h.navigate('OrderDetails', { orderId: '1044' });
+  await h.navigate('OrderDetails', { orderId: '1040' });
   const screen = byTestId(h.root, 'order-details-screen');
-  await press(byTestId(screen, 'order-create-job-card'));
+  // Its material source is missing: a popup collects the raw material
+  // details (prefilled with the rest).
+  await press(byTestId(screen, 'order-add-raw-material'));
+  const dialog = () => byTestId(h.root, 'rm-dialog');
+  expect(allText(dialog())).toContain('WO #1040 is missing some raw material');
+  await press(byTestId(dialog(), 'rm-dialog-submit'));
+  // Material source is still empty: nothing is saved yet.
+  expect(allText(dialog())).toContain('This field is required');
+  await press(byLabel(dialog(), 'In-house'));
+  await press(byTestId(dialog(), 'rm-dialog-submit'));
+  // Saved on the job card, which fills it in on the order too.
+  expect(h.store.getState().jobCards.entities['1040']?.materialSource).toBe(
+    'in_house',
+  );
+  expect(h.store.getState().orders.entities['1040']?.materialSource).toBe(
+    'in_house',
+  );
   expect(hasTestId(h.root, 'rm-dialog-submit')).toBe(false);
-  expect((await jobCardsApi.list()).some(c => c.id === '1044')).toBe(true);
-  expect(hasTestId(screen, 'order-job-card-1044')).toBe(true);
+  expect(hasTestId(screen, 'order-add-raw-material')).toBe(false);
 });
 
 test('raw material shows pending until every detail is in', async () => {
@@ -684,15 +662,15 @@ test('creates an order over three steps', async () => {
   await press(byTestId(form, 'order-form-next'));
   expect(allText(form).split('Enter a number').length - 1).toBe(2);
 
-  // Required fields come first; PO number and DC no sit at the bottom.
+  // Required fields come first; DC no sits at the bottom.
   expect(allText(byTestId(form, 'order-form-step-2'))).toMatch(
     /Part name.*Drawing number.*Route card no.*DC date.*Delivery date.*Priority.*Quantity.*PO number.*PO amount.*DC no.*Part \/ job description/,
   );
   // Priority starts at Low.
   expect(allText(byTestId(form, 'order-form-priority'))).toBe('Low');
-  // The required fields stop Next until they're filled (PO and DC no are
-  // optional).
-  expect(allText(form).split('This field is required').length - 1).toBe(5);
+  // The required fields stop Next until they're filled (the server needs a
+  // PO number; DC no is optional).
+  expect(allText(form).split('This field is required').length - 1).toBe(6);
 
   await typeInto(byTestId(form, 'order-form-quantity'), '25');
   await typeInto(byTestId(form, 'order-form-po-amount'), '125000');
@@ -779,28 +757,36 @@ test('a typed part name wins over the description', () => {
   expect(input.partName).toBe('Hub');
 });
 
-test('a customer not in the list is kept as typed', async () => {
+test('an order is made for a saved customer: a new name must be added first', async () => {
   const h = await renderAdmin('Orders');
   await press(byTestId(h.root, 'create-order'));
   const form = byTestId(h.root, 'order-form-screen');
   await typeInto(byTestId(form, 'order-form-customer'), 'Zenith Tools');
   expect(hasTestId(form, 'order-form-customer-list')).toBe(false);
-  expect(allText(form)).toContain('Not in your customers');
-  // An exact name (any case) still counts as that customer.
-  await typeInto(byTestId(form, 'order-form-customer'), 'acme metalworks');
-  expect(allText(form)).not.toContain('Not in your customers');
-  expect(byTestId(form, 'order-form-email').props.value).not.toBe('');
-  await typeInto(byTestId(form, 'order-form-customer'), 'Zenith Tools');
   await press(byTestId(form, 'order-form-design'));
+  await press(byTestId(form, 'order-form-next'));
+  expect(allText(form)).toContain('Pick one of your customers.');
+  // An exact name (any case) counts as that customer.
+  await typeInto(byTestId(form, 'order-form-customer'), 'acme metalworks');
+  expect(byTestId(form, 'order-form-email').props.value).not.toBe('');
   await press(byTestId(form, 'order-form-next'));
   await fillOrderDetails(form);
   await press(byTestId(form, 'order-form-next'));
   await press(byTestId(form, 'order-form-submit'));
   const created = Object.values(h.store.getState().orders.entities).find(
-    o => o?.customerName === 'Zenith Tools',
+    o => o?.poNumber === 'PO-9001',
   );
   // Left at its default.
-  expect(created).toMatchObject({ customerId: '', priority: 'low' });
+  expect(created).toMatchObject({ customerId: 'CUS-1', priority: 'low' });
+});
+
+test('editing keeps the customer: it is shown, not changed', async () => {
+  const h = await renderAdmin('Orders');
+  await h.navigate('OrderForm', { orderId: '1040' });
+  const customer = byTestId(h.root, 'order-form-customer');
+  expect(customer.props.value).toBe('Bright Steel Co.');
+  expect(customer.props.editable).toBe(false);
+  expect(allText(h.root)).toContain('An order keeps its customer.');
 });
 
 test('the form keeps its buttons pinned and links back', async () => {
@@ -819,11 +805,11 @@ test('the form keeps its buttons pinned and links back', async () => {
   expect(h.currentRoute()).toBe('OrderDetails');
 });
 
-test('marking raw material arrived requires it and adds the job card', async () => {
+test('marking raw material arrived requires it; the job card comes with the order', async () => {
   const h = await renderAdmin('Orders');
   await press(byTestId(h.root, 'create-order'));
   const form = byTestId(h.root, 'order-form-screen');
-  await typeInto(byTestId(form, 'order-form-customer'), 'Zenith Tools');
+  await typeInto(byTestId(form, 'order-form-customer'), 'Nova Fabrication');
   await press(byTestId(form, 'order-form-design'));
   await press(byTestId(form, 'order-form-next'));
   await fillOrderDetails(form);
@@ -832,12 +818,10 @@ test('marking raw material arrived requires it and adds the job card', async () 
     allText(form).split('This field is required').length - 1;
   const toggle = () => press(byTestId(form, 'order-form-rm-arrived'));
 
-  // Off: optional, plain Create order.
+  // Off: optional. Either way it's plain Create order.
   expect(allText(byTestId(form, 'order-form-submit'))).toBe('Create order');
   await toggle();
-  expect(allText(byTestId(form, 'order-form-submit'))).toBe(
-    'Create order & add job card',
-  );
+  expect(allText(byTestId(form, 'order-form-submit'))).toBe('Create order');
   await press(byTestId(form, 'order-form-submit'));
   expect(required()).toBe(5);
   // Switching off drops the errors again.
@@ -853,35 +837,16 @@ test('marking raw material arrived requires it and adds the job card', async () 
   await press(byTestId(form, 'order-form-submit'));
 
   const created = Object.values(h.store.getState().orders.entities).find(
-    o => o?.customerName === 'Zenith Tools',
+    o => o?.poNumber === 'PO-9001',
   );
   expect(created).toMatchObject({
     materialSource: 'bought_out',
     rawMaterialGrade: 'EN8',
   });
-  // Its job card exists; like every save, it ends on the orders list.
-  expect((await jobCardsApi.list()).some(c => c.id === created!.id)).toBe(true);
+  // createOrder opened its job card; it's in the store already.
+  expect(h.store.getState().jobCards.entities[created!.jobCardId]).toBeTruthy();
   expect(h.currentRoute()).toBe('Orders');
   expect(hasTestId(h.root, 'order-form-screen')).toBe(false);
-});
-
-test('without arrived material, Create order adds no job card', async () => {
-  const h = await renderAdmin('Orders');
-  await press(byTestId(h.root, 'create-order'));
-  const form = byTestId(h.root, 'order-form-screen');
-  await typeInto(byTestId(form, 'order-form-customer'), 'Zenith Tools');
-  await press(byTestId(form, 'order-form-design'));
-  await press(byTestId(form, 'order-form-next'));
-  await fillOrderDetails(form);
-  await press(byTestId(form, 'order-form-next'));
-  await press(byTestId(form, 'order-form-submit'));
-  expect(h.currentRoute()).toBe('Orders');
-  const created = Object.values(h.store.getState().orders.entities).find(
-    o => o?.customerName === 'Zenith Tools',
-  );
-  expect((await jobCardsApi.list()).some(c => c.id === created!.id)).toBe(
-    false,
-  );
 });
 
 test('a pill says there are more fields below until the end', async () => {
@@ -1020,7 +985,7 @@ test('phone: cards with the table details, actions and step footer', async () =>
   expect(byTestId(form, 'order-form-email').props.value).toBe(
     'orders@novafab.co.in',
   );
-  // A name that matches none is kept as typed.
+  // A name that matches none isn't a customer yet: pick a saved one.
   await press(byTestId(form, 'order-form-customer'));
   await typeInto(
     byTestId(sheet(), 'order-form-customer-search'),
@@ -1028,10 +993,12 @@ test('phone: cards with the table details, actions and step footer', async () =>
   );
   await press(byTestId(sheet(), 'order-form-customer-use-typed'));
   expect(allText(byTestId(form, 'order-form-customer'))).toBe('Zenith Tools');
-  expect(allText(form)).toContain(
-    'Not in your customers — this name will be used as typed.',
-  );
   await press(byTestId(form, 'order-form-design'));
+  await press(byTestId(form, 'order-form-next'));
+  expect(allText(form)).toContain('Pick one of your customers.');
+  await press(byTestId(form, 'order-form-customer'));
+  await typeInto(byTestId(sheet(), 'order-form-customer-search'), 'Acme');
+  await press(byText(sheet(), 'Acme Metalworks'));
   await press(byTestId(form, 'order-form-next'));
   expect(allText(form)).toContain('Step 2 of 3 · Order details');
   // The header's back leaves the form; the footer's Back (last) steps back.
@@ -1063,8 +1030,8 @@ test('order helpers', () => {
     'Qty: 200',
     'Due: Oct 2, 2026',
   ]);
-  // The Scan QR screen still finds the order from it.
-  expect(parseJobCode(qr)).toBe('1042');
+  // The Scan QR screen reads its first line: the WO number.
+  expect(normaliseJobCode(qr)).toBe('WO-1042');
   // Blank details are left out.
   expect(
     orderQrValue({
@@ -1080,7 +1047,10 @@ test('order helpers', () => {
   const undated = { ...first, id: '1', dueDate: '', priority: 'high' as const };
   expect(compareOrders(first, undated)).toBeLessThan(0);
   expect(compareOrders(undated, first)).toBeGreaterThan(0);
-  expect(compareOrders(undated, { ...undated, id: '2' })).toBeGreaterThan(0);
+  // Undated orders: the newest first.
+  expect(
+    compareOrders(undated, { ...undated, createdAt: '2099-01-01' }),
+  ).toBeGreaterThan(0);
   const values = orderToFormValues(first);
   expect(validateOrderForm({ ...values, designFile: null })).toEqual({
     designFile: 'This field is required',
@@ -1093,8 +1063,11 @@ test('order helpers', () => {
   expect(validateOrderForm({ ...values, customerName: ' ' })).toEqual({
     customerName: 'This field is required',
   });
-  // PO number and DC no are optional.
-  expect(validateOrderForm({ ...values, poNumber: '', dcNo: '' })).toEqual({});
+  // DC no is optional; the server needs a PO number.
+  expect(validateOrderForm({ ...values, dcNo: '' })).toEqual({});
+  expect(validateOrderForm({ ...values, poNumber: '' })).toEqual({
+    poNumber: 'This field is required',
+  });
   expect(hasStepErrors(1, bad)).toBe(true);
   expect(hasStepErrors(3, bad)).toBe(false);
   expect(firstStepWithErrors(bad)).toBe(1);
@@ -1139,11 +1112,11 @@ describe('Orders list actions', () => {
     );
   });
 
-  test('a new order shows the job card button once it has one', async () => {
+  test('a new order comes with its job card, so it gets the button', async () => {
     const h = await renderAdmin('Orders');
-    // Created without the raw material: no job card, so no button.
+    // createOrder opens the job card too (no second call).
     await press(byTestId(h.root, 'create-order'));
-    await typeInto(byTestId(h.root, 'order-form-customer'), 'Zenith Tools');
+    await typeInto(byTestId(h.root, 'order-form-customer'), 'Nova Fabrication');
     await press(byTestId(h.root, 'order-form-design'));
     await press(byTestId(h.root, 'order-form-next'));
     await fillOrderDetails(h.root);
@@ -1154,7 +1127,7 @@ describe('Orders list actions', () => {
       'WO #1045',
     );
     expect(allText(byTestId(h.root, 'orders-table'))).toContain('WO #1045');
-    expect(hasTestId(h.root, 'job-card-1045')).toBe(false);
+    expect(hasTestId(h.root, 'job-card-1045')).toBe(true);
   });
 });
 

@@ -2,7 +2,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { call, put, takeLatest } from 'redux-saga/effects';
 import { errorMessage } from '../../../shared/store';
 import { employeeProfileApi } from '../api/employeeProfileApi';
-import type { EmployeeProfile, EmployeeRole } from '../types';
+import type { EmployeeProfile, EmployeeRole, EmployeeSession } from '../types';
 import {
   employeeProfileActions,
   type EmployeeProfileUpdate,
@@ -10,11 +10,11 @@ import {
 
 export function* fetchEmployeeProfile(action: PayloadAction<EmployeeRole>) {
   try {
-    const profile: EmployeeProfile = yield call(
+    const session: EmployeeSession = yield call(
       employeeProfileApi.fetchProfile,
       action.payload,
     );
-    yield put(employeeProfileActions.fetchSuccess(profile));
+    yield put(employeeProfileActions.fetchSuccess(session));
   } catch (error) {
     yield put(
       employeeProfileActions.fetchFailure(

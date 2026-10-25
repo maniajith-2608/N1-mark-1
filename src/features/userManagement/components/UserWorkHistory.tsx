@@ -142,7 +142,7 @@ function WorkRow({
             )}
           </N1Text>
           <N1Text variant="caption" color="secondary" numberOfLines={1}>
-            {W.workOrder(jobCard.id)}
+            {W.workOrder(jobCard.number)}
           </N1Text>
           <N1Text variant="caption" color="secondary" numberOfLines={1}>
             {details}

@@ -20,8 +20,8 @@ import { calculateTotals } from '../utils';
 const I = BILLING_STRINGS.invoice;
 
 /**
- * Phones: Edit invoice, sliding up over the invoice — only the status,
- * discount, GST rate and notes; the operations are edited from their own
+ * Phones: Edit invoice, sliding up over the invoice — only the discount,
+ * GST rate and notes (the status is the server's); the operations are edited from their own
  * screen. Save or Cancel slides back down.
  */
 export function InvoiceEditScreen({
@@ -72,7 +72,7 @@ export function InvoiceEditScreen({
         <DetailHeader
           sheet
           title={I.editTitle}
-          subtitle={invoiceId}
+          subtitle={invoice?.number}
           onBack={close}
         />
       }

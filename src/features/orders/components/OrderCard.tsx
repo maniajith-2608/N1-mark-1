@@ -64,7 +64,7 @@ export const OrderCard = memo(function OrderCardComponent({
     <View style={styles.card} testID={`order-card-${o.id}`}>
       <View style={styles.heading}>
         <N1Text variant="title" weight="bold" numberOfLines={1}>
-          {S.workOrder(o.id)}
+          {S.workOrder(o.number)}
         </N1Text>
         <N1Text variant="small" color="secondary" numberOfLines={1}>
           {orderTitle(o) || COMMON_STRINGS.dash}
@@ -111,7 +111,7 @@ export const OrderCard = memo(function OrderCardComponent({
           <N1IconButton
             icon="edit"
             variant="card"
-            accessibilityLabel={S.a11y.edit(o.id)}
+            accessibilityLabel={S.a11y.edit(o.number)}
             onPress={() => onEdit(o)}
             testID={`edit-order-${o.id}`}
           />

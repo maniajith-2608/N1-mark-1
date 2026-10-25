@@ -1,16 +1,25 @@
 import { isBlank } from '../../shared/utils';
 import type { WorkOrder } from '../orders/types';
-import type { RawMaterialInput } from './types';
+import type { JobCard } from '../jobCards/types';
+import type { OrderView, RawMaterialInput } from './types';
 
-/**
- * Work order id from a typed or scanned job code: "WO-01042", "WO #1042" and
- * "1042" all give "1042". Empty when there are no digits.
- */
-export function parseJobCode(code: string): string {
-  // An order's QR code lists its details under the WO number; read only that.
-  const [first = ''] = code.trim().split('\n');
-  return first.replace(/\D/g, '').replace(/^0+/, '');
-}
+/** The job view of a work order, from its job card (operator, QC). */
+export const jobViewOf = (c: JobCard): OrderView => ({
+  id: c.orderId,
+  number: c.number,
+  customerName: c.customerName,
+  partName: c.partName,
+  jobName: c.jobName,
+  description: '',
+  priority: c.priority,
+  dueDate: c.dueDate,
+  quantity: c.quantity,
+  partNumber: c.partNumber ?? '',
+  drawingNumber: c.drawingNumber ?? '',
+  poNumber: c.poNumber ?? '',
+  routeCardNo: c.routeCardNo ?? '',
+  materialSource: c.materialSource,
+});
 
 export const rawMaterialOf = (order: WorkOrder): RawMaterialInput => ({
   rawMaterialGrade: order.rawMaterialGrade,

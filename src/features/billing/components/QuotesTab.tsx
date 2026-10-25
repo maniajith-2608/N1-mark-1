@@ -26,8 +26,7 @@ import {
 } from '../../../shared/hooks';
 import { formatCurrency } from '../../../shared/utils';
 import { BILLING_STRINGS, QUOTE_STATUS_OPTIONS } from '../constants';
-import { useInvoices, useQuoteStats, useQuotes } from '../hooks/useBilling';
-import { isQuoteMapped } from '../workflow';
+import { useQuoteStats, useQuotes } from '../hooks/useBilling';
 import type { Quote, QuoteFilters } from '../types';
 import {
   INITIAL_QUOTE_FILTERS,
@@ -53,7 +52,6 @@ type Props = {
 export function QuotesTab({ toolbarStart }: Props) {
   const styles = useN1Styles(makeStyles);
   const navigation = useNavigation<BillingNavigation>();
-  const { items: invoices } = useInvoices();
   const { isCompact } = useN1Breakpoint();
   const { items, status, error, reload, remove, deletingId, deleteError } =
     useQuotes();
@@ -106,7 +104,7 @@ export function QuotesTab({ toolbarStart }: Props) {
       {
         key: 'id',
         title: S.columns.id,
-        render: q => <N1Text weight="bold">{q.id}</N1Text>,
+        render: q => <N1Text weight="bold">{q.number}</N1Text>,
       },
       { key: 'customerName', title: S.columns.customer, flex: 2 },
       {
@@ -127,35 +125,32 @@ export function QuotesTab({ toolbarStart }: Props) {
         key: 'actions',
         interactive: true,
         title: S.columns.actions,
-        render: q => (
-          <View style={styles.actions}>
-            <N1IconButton
-              icon="edit"
-              variant="primary"
-              size="sm"
-              accessibilityLabel={BILLING_STRINGS.a11y.edit(q.id)}
-              onPress={() => edit(q)}
-              testID={`edit-${q.id}`}
-            />
-            {/* Billed or converted quotes stay: an invoice or order uses them. */}
-            <N1IconButton
-              icon="trash"
-              variant="danger"
-              size="sm"
-              accessibilityLabel={
-                isQuoteMapped(q, invoices)
-                  ? S.deleteLocked(q.id)
-                  : BILLING_STRINGS.a11y.delete(q.id)
-              }
-              disabled={isQuoteMapped(q, invoices)}
-              onPress={() => requestDelete(q)}
-              testID={`delete-${q.id}`}
-            />
-          </View>
-        ),
+        // Only a draft is edited or deleted; a sent quote is the
+        // customer's copy (a change is a new quote).
+        render: q =>
+          q.status === 'draft' ? (
+            <View style={styles.actions}>
+              <N1IconButton
+                icon="edit"
+                variant="primary"
+                size="sm"
+                accessibilityLabel={BILLING_STRINGS.a11y.edit(q.number)}
+                onPress={() => edit(q)}
+                testID={`edit-${q.id}`}
+              />
+              <N1IconButton
+                icon="trash"
+                variant="danger"
+                size="sm"
+                accessibilityLabel={BILLING_STRINGS.a11y.delete(q.number)}
+                onPress={() => requestDelete(q)}
+                testID={`delete-${q.id}`}
+              />
+            </View>
+          ) : null,
       },
     ],
-    [edit, styles, invoices, requestDelete],
+    [edit, styles, requestDelete],
   );
 
   const renderCompactItem = useCallback(
@@ -165,10 +160,9 @@ export function QuotesTab({ toolbarStart }: Props) {
         onView={view}
         onEdit={edit}
         onDelete={requestDelete}
-        deleteLocked={isQuoteMapped(q, invoices)}
       />
     ),
-    [view, edit, requestDelete, invoices],
+    [view, edit, requestDelete],
   );
 
   const firstLoad =
@@ -268,7 +262,9 @@ export function QuotesTab({ toolbarStart }: Props) {
       <N1ConfirmDialog
         visible={deletion.target !== null}
         title={S.delete.title}
-        message={deletion.target ? S.delete.message(deletion.target.id) : ''}
+        message={
+          deletion.target ? S.delete.message(deletion.target.number) : ''
+        }
         confirmLabel={S.delete.confirm}
         tone="danger"
         icon="trash"

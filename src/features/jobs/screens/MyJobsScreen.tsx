@@ -19,7 +19,6 @@ import {
 import { FlowActionButton } from '../../jobCards/components/FlowActionButton';
 import { FlowEditorSheet } from '../../jobCards/components/FlowEditorSheet';
 import { JOB_CARD_STRINGS } from '../../jobCards/constants';
-import { useOrders } from '../../orders/hooks/useOrders';
 import { distinctOptions } from '../../jobCards/utils';
 import { UserJobCard } from '../components/UserJobCard';
 import { JobsSearchRow } from '../components/JobsSearchRow';
@@ -87,9 +86,8 @@ export function MyJobsScreen() {
   const closeFlow = useCallback(() => setFlowId(null), []);
   const openFlow = useCallback((c: JobCard) => setFlowId(c.id), []);
   const flowJobCard = items.find(c => c.id === flowId);
-  const { items: orders } = useOrders();
   const flowDrawingNumber = flowJobCard
-    ? orders.find(o => o.id === flowJobCard.id)?.drawingNumber ||
+    ? flowJobCard.drawingNumber ||
       flowJobCard.designFile?.name ||
       JOB_CARD_STRINGS.details.noDrawing
     : '';

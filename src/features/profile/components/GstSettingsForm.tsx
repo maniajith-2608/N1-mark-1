@@ -28,6 +28,7 @@ import {
   validateGstSettings,
   type GstSettings,
 } from '../gst';
+import { usePermission } from '../hooks/usePermission';
 import { useSession } from '../hooks/useSession';
 import { ORGANIZATION_SECTIONS, ORGANIZATION_STRINGS } from '../organization';
 import type { Organization, TaxRate } from '../types';
@@ -98,6 +99,8 @@ export function GstSettingsForm({
 }: Props) {
   const styles = useN1Styles(makeStyles);
   const { updateOrganization, saving, saveError } = useSession();
+  // Only org.manage may save (an accountant sees the details read-only).
+  const canManage = usePermission('org.manage');
   const form = useForm<GstSettings>(
     toGstSettings(organization),
     validateGstSettings,
@@ -242,6 +245,7 @@ export function GstSettingsForm({
   return (
     <View style={styles.panel} testID="gst-settings">
       <EditableSectionHeader
+        actionsInFooter={!canManage}
         title={meta.title}
         icon={meta.icon}
         editing={editing}

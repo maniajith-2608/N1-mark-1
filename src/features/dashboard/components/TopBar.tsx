@@ -4,7 +4,6 @@ import { N1Avatar, N1Text, useN1Styles } from '../../../shared/components';
 import { NAV_STRINGS } from '../../../shared/constants';
 import { useSession } from '../../profile';
 import { ORGANIZATION_STRINGS } from '../../profile/organization';
-import { CURRENT_USER } from '../constants';
 import { makeTopBarStyles } from '../styles';
 import type { TopBarAction } from '../types';
 import CompactTopBar from './CompactTopBar';
@@ -42,7 +41,7 @@ function TopBar({
   if (compact) {
     return (
       <CompactTopBar
-        userName={shellUser?.name ?? CURRENT_USER.name}
+        userName={shellUser?.name ?? ''}
         title={title}
         action={action}
         onMenuPress={onMenuPress}
@@ -74,11 +73,11 @@ function TopBar({
         style={({ pressed }) => [styles.user, pressed && styles.pressed]}
         testID="open-profile"
       >
-        <N1Avatar name={CURRENT_USER.name} />
+        <N1Avatar name={shellUser?.name ?? ''} />
         <View>
-          <N1Text variant="title">{CURRENT_USER.name}</N1Text>
+          <N1Text variant="title">{shellUser?.name}</N1Text>
           <N1Text variant="small" color="secondary">
-            {CURRENT_USER.email}
+            {shellUser?.email}
           </N1Text>
         </View>
       </Pressable>

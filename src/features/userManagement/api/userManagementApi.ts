@@ -1,51 +1,211 @@
+import { graphqlRequest, textOrNull } from '../../../services/api';
 import {
-  createMockCollection,
-  nextSequentialId,
-} from '../../../services/mock/mockServer';
-import { DEFAULT_PERMISSIONS } from '../constants';
-import type { AdminUser, UserInput } from '../types';
-import { MOCK_USERS } from './mockData';
+  fromFileReference,
+  uploadAttachments,
+} from '../../../services/files/fileStorage';
+import { isBlank, toE164Phone } from '../../../shared/utils';
+import {
+  APP_ROLE_TO_BACKEND,
+  BACKEND_ROLE_TO_APP,
+  type BackendRole,
+} from '../../auth/constants';
+import type { AdminUser, UserInput, UserStatus } from '../types';
 
-// Mock backend. Replace with apiClient calls (GET/POST/PATCH/DELETE /users) later.
-const users = createMockCollection<AdminUser, UserInput>({
-  seed: MOCK_USERS,
-  nextId: rows => nextSequentialId(rows, 'USR-'),
-  build: ({ password: _password, ...input }, id) => ({
-    id,
-    name: input.name.trim(),
-    email: input.email.trim(),
-    designation: input.designation.trim(),
-    phone: input.phone ?? '',
-    department: input.department ?? '',
-    address: input.address ?? '',
-    city: input.city ?? '',
-    state: input.state ?? '',
-    pinCode: input.pinCode ?? '',
-    country: input.country ?? '',
-    role: input.role,
-    status: input.status,
-    joinedAt: new Date().toISOString(),
-    permissions: input.permissions ?? DEFAULT_PERMISSIONS[input.role],
-    attachments: [],
-    activity: [
-      {
-        id: 'a1',
-        label: 'Account created',
-        at: new Date().toISOString(),
-        tone: 'neutral',
-      },
-    ],
-  }),
-});
+// N1 Core API: users / createUser / updateUser / resetUserPassword /
+// setUserStatus on POST /graphql (schema: packages/schema/app.graphql).
 
-export const userManagementApi = {
-  list: users.list,
-  create: users.create,
-  // The password is sent to the server but never stored on the record.
-  update: (
-    id: string,
-    { password: _password, ...changes }: Partial<UserInput>,
-  ) => users.update(id, changes),
-  remove: users.remove,
-  reset: users.reset,
+const USER_FIELDS = `
+  fragment UserFields on User {
+    id name email phone designation department
+    address city state pinCode country
+    role status joinedAt
+    permissions { viewOrders manageUsers exportReports }
+    documents { id name kind sizeBytes }
+  }
+`;
+// No activity: no users screen shows it, and 100 rows of it break the app's
+// query cost limit (1,000).
+
+type UserNode = Omit<
+  AdminUser,
+  'email' | 'phone' | 'role' | 'status' | 'attachments' | 'activity'
+> & {
+  email: string | null;
+  phone: string | null;
+  role: BackendRole;
+  status: Uppercase<UserStatus>;
+  documents: {
+    id: string;
+    name: string;
+    kind: string | null;
+    sizeBytes: number;
+  }[];
 };
+
+// Each user's backend role, so an edit only sends a role the admin changed:
+// the app shows owners and accountants as "Admin", and saving that back would
+// demote the owner.
+const backendRoles = new Map<string, BackendRole>();
+
+function toAdminUser(node: UserNode): AdminUser {
+  backendRoles.set(node.id, node.role);
+  return {
+    ...node,
+    email: node.email ?? '',
+    phone: node.phone ?? '',
+    role: BACKEND_ROLE_TO_APP[node.role],
+    status: node.status.toLowerCase() as UserStatus,
+    attachments: node.documents.map(fromFileReference),
+    activity: [],
+  };
+}
+
+/** The profile fields of a create or update, leaving out what wasn't given. */
+function profileFields(input: Partial<UserInput>) {
+  const fields: Record<string, unknown> = {};
+  if (input.name !== undefined) {
+    fields.name = input.name.trim();
+  }
+  (
+    [
+      'designation',
+      'department',
+      'address',
+      'city',
+      'state',
+      'pinCode',
+      'country',
+      'email',
+    ] as const
+  ).forEach(key => {
+    if (input[key] !== undefined) {
+      fields[key] = textOrNull(input[key]);
+    }
+  });
+  if (input.phone !== undefined) {
+    fields.phone = isBlank(input.phone) ? null : toE164Phone(input.phone);
+  }
+  if (input.status !== undefined) {
+    fields.status = input.status.toUpperCase();
+  }
+  if (input.permissions !== undefined) {
+    fields.permissions = input.permissions;
+  }
+  return fields;
+}
+
+// A literal: the cost check counts a page size passed as a variable as 100,
+// and 100 rows of these fields cost more than the app may ask for.
+const PAGE_SIZE = 50;
+
+async function list(): Promise<AdminUser[]> {
+  const users: AdminUser[] = [];
+  let after: string | null = null;
+  do {
+    const data: {
+      users: {
+        edges: { node: UserNode }[];
+        pageInfo: { hasNextPage: boolean; endCursor: string | null };
+      };
+    } = await graphqlRequest(
+      `query Users($after: String) {
+        users(first: ${PAGE_SIZE}, after: $after) {
+          edges { node { ...UserFields } }
+          pageInfo { hasNextPage endCursor }
+        }
+      }
+      ${USER_FIELDS}`,
+      { after },
+    );
+    users.push(...data.users.edges.map(edge => toAdminUser(edge.node)));
+    after = data.users.pageInfo.hasNextPage
+      ? data.users.pageInfo.endCursor
+      : null;
+  } while (after);
+  return users;
+}
+
+async function create({
+  attachments,
+  ...input
+}: UserInput): Promise<AdminUser> {
+  const data = await graphqlRequest<{ createUser: UserNode }>(
+    `mutation CreateUser($input: CreateUserInput!) {
+      createUser(input: $input) { ...UserFields }
+    }
+    ${USER_FIELDS}`,
+    {
+      input: {
+        ...profileFields(input),
+        role: APP_ROLE_TO_BACKEND[input.role],
+        initialPassword: input.password,
+      },
+    },
+  );
+  const user = toAdminUser(data.createUser);
+  // Files are uploaded against the person, so they need the new id first.
+  return attachments?.length ? update(user.id, { attachments }) : user;
+}
+
+async function fetchUser(id: string): Promise<AdminUser> {
+  const data = await graphqlRequest<{ user: UserNode }>(
+    `query User($id: ID!) { user(id: $id) { ...UserFields } }
+    ${USER_FIELDS}`,
+    { id },
+  );
+  return toAdminUser(data.user);
+}
+
+/**
+ * updateUser for the profile; a new password goes through resetUserPassword,
+ * the only way an admin may set someone else's.
+ */
+async function update(
+  id: string,
+  { password, role, attachments, ...changes }: Partial<UserInput>,
+): Promise<AdminUser> {
+  const input = profileFields(changes);
+  if (attachments !== undefined) {
+    input.documents = await uploadAttachments('user', id, attachments);
+  }
+  const current = backendRoles.get(id);
+  if (role && (!current || BACKEND_ROLE_TO_APP[current] !== role)) {
+    input.role = APP_ROLE_TO_BACKEND[role];
+  }
+  let user: AdminUser | undefined;
+  if (Object.keys(input).length > 0) {
+    const data = await graphqlRequest<{ updateUser: UserNode }>(
+      `mutation UpdateUser($id: ID!, $input: UpdateUserInput!) {
+        updateUser(id: $id, input: $input) { ...UserFields }
+      }
+      ${USER_FIELDS}`,
+      { id, input },
+    );
+    user = toAdminUser(data.updateUser);
+  }
+  if (password) {
+    await graphqlRequest(
+      `mutation ResetUserPassword($id: ID!, $newPassword: String!) {
+        resetUserPassword(id: $id, newPassword: $newPassword)
+      }`,
+      { id, newPassword: password },
+    );
+  }
+  return user ?? fetchUser(id);
+}
+
+/**
+ * People are deactivated, never deleted: they can't sign in, their history
+ * stays, and they show in the list as Inactive.
+ */
+async function remove(id: string): Promise<string> {
+  await graphqlRequest(
+    `mutation DeactivateUser($id: ID!) {
+      setUserStatus(id: $id, status: INACTIVE) { id }
+    }`,
+    { id },
+  );
+  return id;
+}
+
+export const userManagementApi = { list, create, update, remove };

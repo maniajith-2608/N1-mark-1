@@ -11,8 +11,12 @@ type Props = JobCardsScreenProps<'JobCardDetails'>;
  * employee, dashboard or order that pushed it; the Job Cards list; My Jobs
  * on the shop floor), else the admin screen named by `from`.
  */
-export function useJobCardBack({ route, navigation }: Props) {
-  const { jobCardId, from, fromUserId } = route.params;
+export function useJobCardBack(
+  { route, navigation }: Props,
+  /** The card's order, once the card has loaded. */
+  orderId: string | undefined,
+) {
+  const { from, fromUserId } = route.params;
   const goBack = useCallback(() => {
     // Pushed onto another module's stack (an employee, the dashboard, an
     // order): the screen that opened it is right below.
@@ -25,12 +29,15 @@ export function useJobCardBack({ route, navigation }: Props) {
         navigation.navigate('Overview');
         return;
       case 'order':
-        navigation.navigate('Orders', {
-          screen: 'OrderDetails',
-          params: { orderId: jobCardId },
-          initial: false,
-        });
-        return;
+        if (orderId) {
+          navigation.navigate('Orders', {
+            screen: 'OrderDetails',
+            params: { orderId },
+            initial: false,
+          });
+          return;
+        }
+        break;
       case 'employee':
         if (fromUserId) {
           navigation.navigate('Users', {
@@ -43,7 +50,7 @@ export function useJobCardBack({ route, navigation }: Props) {
         break;
     }
     navigation.goBack();
-  }, [navigation, from, fromUserId, jobCardId]);
+  }, [navigation, from, fromUserId, orderId]);
 
   const label = from ? D.backTo[from] : D.back;
   return { goBack, label };

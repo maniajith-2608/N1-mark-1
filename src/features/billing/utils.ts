@@ -5,6 +5,7 @@ import {
   workOrderSearchTerms,
   type GstSupply,
 } from '../../shared/utils';
+import { ApiError } from '../../services/api';
 import { BILLING_STRINGS } from './constants';
 import { matchesAny } from '../../shared/hooks';
 import type {
@@ -17,9 +18,8 @@ import type {
   Totals,
 } from './types';
 
-/** Pieces × minutes per piece × rate per minute, to the rupee. */
 /** (pieces × running time + setup time) × rate: setup is once per batch. */
-export const lineAmount = (
+const workedOutAmount = (
   item: Pick<LineItem, 'minutesPerPiece' | 'setupMinutes' | 'ratePerMinute'>,
   quantity: number,
 ) =>
@@ -28,7 +28,20 @@ export const lineAmount = (
   );
 
 /**
- * GST is charged on the subtotal after discount, at the document's rate:
+ * A line's amount: the server's for a saved line, worked out only for a
+ * line being edited.
+ */
+export const lineAmount = (
+  item: Pick<
+    LineItem,
+    'minutesPerPiece' | 'setupMinutes' | 'ratePerMinute' | 'amount'
+  >,
+  quantity: number,
+) => item.amount ?? workedOutAmount(item, quantity);
+
+/**
+ * The live preview while editing (saved documents show the server's
+ * totals). GST is charged on the subtotal after discount, at the document's rate:
  * CGST + SGST within the organization's state, IGST across states. The total
  * is the same either way.
  */
@@ -40,7 +53,7 @@ export function calculateTotals(
   supply: GstSupply = 'intra',
 ): Totals {
   const subtotal = items.reduce(
-    (sum, item) => sum + lineAmount(item, quantity),
+    (sum, item) => sum + workedOutAmount(item, quantity),
     0,
   );
   const applied = Math.min(Math.max(0, discount), subtotal);
@@ -60,10 +73,9 @@ export function calculateTotals(
   };
 }
 
-export const invoiceTotal = (i: Invoice) =>
-  calculateTotals(i.lineItems, i.quantity, i.discount, i.gstRate).total;
-export const quoteTotal = (q: Quote) =>
-  calculateTotals(q.lineItems, q.quantity, 0, q.gstRate).total;
+/** The server's totals: never worked out again on the device. */
+export const invoiceTotal = (i: Invoice) => i.totals.total;
+export const quoteTotal = (q: Quote) => q.totals.total;
 
 export const toDraft = (item: LineItem): LineItemDraft => ({
   id: item.id,
@@ -140,13 +152,11 @@ export const jobIdSearchTerms = (jobId: string) => {
 };
 
 export const invoiceSearchText = (i: Invoice) =>
-  `${i.id} ${i.customerName} ${jobIdSearchTerms(i.jobId)} ${i.routeCard} ${
+  `${i.number} ${i.customerName} ${jobIdSearchTerms(i.jobId)} ${i.routeCard} ${
     i.partName
   }`;
 export const quoteSearchText = (q: Quote) =>
-  `${q.id} ${q.customerName} ${q.partName} ${q.material} ${workOrderSearchTerms(
-    q.orderId ?? '',
-  )}`;
+  `${q.number} ${q.customerName} ${q.partName} ${q.material}`;
 
 /** Status filters: an empty list shows everything. */
 export const matchesInvoiceFilters = (i: Invoice, f: InvoiceFilters) =>
@@ -155,3 +165,7 @@ export const matchesQuoteFilters = (q: Quote, f: QuoteFilters) =>
   matchesAny(f.status, q.status);
 export const INITIAL_INVOICE_FILTERS: InvoiceFilters = { status: [] };
 export const INITIAL_QUOTE_FILTERS: QuoteFilters = { status: [] };
+
+/** The customer has no email on file: ask for one and send again with `to`. */
+export const isEmailMissing = (error: unknown) =>
+  error instanceof ApiError && error.code === 'CUSTOMER_EMAIL_MISSING';

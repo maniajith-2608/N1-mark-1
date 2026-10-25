@@ -18,6 +18,8 @@ export type LineItem = {
   /** One-off setup before the batch runs. */
   setupMinutes: number;
   ratePerMinute: number;
+  /** The server's amount for the line; edits are previewed without it. */
+  amount?: number;
 };
 
 /** Editable copy of a line item; numbers stay as text while typing. */
@@ -37,11 +39,33 @@ export type InvoiceStatus = 'new' | 'overdue' | 'paid';
 /** A quote is a Draft until it's sent to the customer. */
 export type QuoteStatus = 'draft' | 'sent';
 
+/** A recorded payment; TDS is what the customer withheld. */
+export type Payment = {
+  /** YYYY-MM-DD. */
+  paidOn: string;
+  receivedAmount: number;
+  tdsAmount: number;
+  tdsSection: string | null;
+};
+
+/** Mark as Paid: the day it was paid, and the TDS withheld if any. */
+export type PaymentInput = {
+  paidOn: string;
+  tds: { amount: number; section: string } | null;
+};
+
 export type Invoice = {
   id: string;
+  /** The invoice number shown everywhere, e.g. "CBE/26-27/0002". */
+  number: string;
+  customerId: string;
   customerName: string;
-  /** e.g. "WO-00125". */
+  /** The work order, e.g. "WO-12"; blank for an invoice made by hand. */
   jobId: string;
+  /** The job card billed, if any. */
+  jobCardId: string | null;
+  /** The job card's order, if any. */
+  orderId: string | null;
   routeCard: string;
   partName: string;
   quantity: number;
@@ -56,12 +80,35 @@ export type Invoice = {
   poAmount: number | null;
   notes: string;
   issuedAt: ISODateString;
+  /** YYYY-MM-DD; past it, unpaid, the server makes the invoice Overdue. */
+  dueDate: string;
+  payment: Payment | null;
+  /** The amounts, worked out by the server. */
+  totals: Totals;
 };
 
-export type InvoiceInput = Omit<Invoice, 'id' | 'issuedAt'>;
+/**
+ * What the app sends. The number, status, dates, payment and totals are the
+ * server's: an invoice is paid with markPaid, never by setting its status.
+ */
+export type InvoiceInput = Omit<
+  Invoice,
+  | 'id'
+  | 'number'
+  | 'status'
+  | 'orderId'
+  | 'issuedAt'
+  | 'dueDate'
+  | 'payment'
+  | 'totals'
+>;
 
 export type Quote = {
   id: string;
+  /** The quote number shown everywhere, e.g. "QTN/26-27/0002". */
+  number: string;
+  /** Fixed once the quote is made: a quote keeps its customer. */
+  customerId: string;
   customerName: string;
   partName: string;
   quantity: number;
@@ -73,9 +120,22 @@ export type Quote = {
   /** The work order this quote was converted to. */
   orderId: string | null;
   createdAt: ISODateString;
+  /** The amounts, worked out by the server. */
+  totals: Totals;
 };
 
-export type QuoteInput = Omit<Quote, 'id' | 'createdAt'>;
+/**
+ * What the app sends. Status only moves Draft → Sent (sendQuote), and the
+ * order is linked by convertQuoteToOrder.
+ */
+export type QuoteInput = Omit<Quote, 'id' | 'number' | 'createdAt' | 'totals'>;
+
+/** Convert to Order: the customer's PO and when the order is due. */
+export type ConvertQuoteInput = {
+  poNumber: string;
+  /** YYYY-MM-DD. */
+  dueDate: string;
+};
 
 export type Totals = {
   subtotal: number;
@@ -92,6 +152,23 @@ export type Totals = {
   gst: number;
   total: number;
 };
+
+/** The server's "who can do what": the session keeps only the app role. */
+export type BillingPermissions = { markPaid: boolean };
+
+/** The Billing summary, in rupees. */
+export type InvoiceSummary = {
+  total: number;
+  new: number;
+  overdue: number;
+  paid: number;
+  billedThisMonth: number;
+  outstanding: number;
+  overdueAmount: number;
+};
+
+/** Send to another address than the customer's, and copies. */
+export type SendInput = { to?: string; cc?: string[] };
 
 export type BillingTab = 'invoices' | 'quotes';
 

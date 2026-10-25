@@ -1,7 +1,6 @@
+import { useEffect } from 'react';
 import { useCrudResource } from '../../../shared/store';
-import { useAppSelector } from '../../../app/store/hooks';
-import { useInvoices } from '../../billing/hooks/useBilling';
-import { useJobCards } from '../../jobCards/hooks/useJobCards';
+import { useAppDispatch, useAppSelector } from '../../../app/store/hooks';
 import { orderActions } from '../store/ordersSlice';
 import {
   selectAllOrders,
@@ -13,20 +12,25 @@ import {
 } from '../store/selectors';
 
 /**
- * Work orders, load state and create / update. Loads on first use, with the
- * job cards and invoices each order's status is worked out from.
+ * Work orders, load state and create / update. Loads on first use. Each
+ * order's status is the server's.
  */
 export function useOrders() {
-  useJobCards();
-  useInvoices();
   return useCrudResource(orderActions, selectOrdersState, selectAllOrders);
 }
 
+/** One order; read again on open, as its status moves with the work. */
 export function useOrder(id: string | undefined) {
   const resource = useOrders();
+  const dispatch = useAppDispatch();
   const order = useAppSelector(state =>
     id ? selectOrderById(state, id) : undefined,
   );
+  useEffect(() => {
+    if (id) {
+      dispatch(orderActions.refreshRequest(id));
+    }
+  }, [dispatch, id]);
   return { ...resource, order };
 }
 

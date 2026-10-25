@@ -20,9 +20,13 @@ import {
 import { COMMON_STRINGS } from '../../../shared/constants';
 import { useOnSettled } from '../../../shared/hooks';
 import { printOrNotify } from '../../../services/print';
-import { notifyUnavailable, toNumber } from '../../../shared/utils';
+import { toNumber } from '../../../shared/utils';
 import { useSession } from '../../profile';
 import { QuoteStatusBadge } from '../components/BillingBadges';
+import {
+  ConvertQuoteDialog,
+  SendEmailDialog,
+} from '../components/BillingDialogs';
 import { InvoicePreviewModal } from '../components/InvoicePreviewModal';
 import {
   BillingBackLink,
@@ -33,8 +37,13 @@ import { LineItemsEditor } from '../components/LineItemsEditor';
 import { LineItemsTable } from '../components/LineItemsTable';
 import { QuoteOverview } from '../components/QuoteOverview';
 import { TotalsSummary } from '../components/TotalsSummary';
-import { BILLING_STRINGS, QUOTE_STATUS_OPTIONS } from '../constants';
+import { BILLING_STRINGS } from '../constants';
 import { useQuote } from '../hooks/useBilling';
+import {
+  useConvertDialog,
+  useDownloadPdf,
+  useSendByEmail,
+} from '../hooks/useBillingActions';
 import { useConvertToOrder } from '../hooks/useBillingWorkflow';
 import { gstRateOptions, useGst } from '../hooks/useGst';
 import { useQuoteForm } from '../hooks/useQuoteForm';
@@ -147,8 +156,26 @@ export function QuoteDetailsScreen({
   }, [navigation, fromCustomerId]);
   const backLabel = fromCustomerId ? Q.backToCustomer : Q.back;
 
-  // Opens the order a converted quote is linked to.
+  // Opens the order a converted quote is linked to, or converts a sent one.
   const toOrder = useConvertToOrder();
+  const { convert } = toOrder;
+  const converting = useConvertDialog(
+    useCallback(
+      input => {
+        if (quote) {
+          convert(quote, input);
+        }
+      },
+      [quote, convert],
+    ),
+  );
+  // Send: Draft → Sent, emailing the PDF. There's no way back to Draft.
+  const emailed = useMemo(
+    () =>
+      quote && { kind: 'quote' as const, id: quote.id, number: quote.number },
+    [quote],
+  );
+  const sending = useSendByEmail(emailed || undefined);
   // Preview Quote: the quote as it prints, from what's saved.
   const { organization } = useSession();
   const [preview, setPreview] = useState<InvoiceDocument | null>(null);
@@ -158,10 +185,7 @@ export function QuoteDetailsScreen({
       printOrNotify(invoiceHtml(doc), doc.title, doc.printAction),
     [],
   );
-  const downloadPdf = useCallback(
-    () => notifyUnavailable(BILLING_STRINGS.invoice.downloadAction),
-    [],
-  );
+  const { download: downloadPdf } = useDownloadPdf(emailed || undefined);
 
   // While editing, the amounts follow the inputs.
   const gst = useGst(
@@ -170,19 +194,14 @@ export function QuoteDetailsScreen({
   const quantity = editing
     ? toNumber(form.values.quantity)
     : quote?.quantity ?? 0;
+  // The server's totals; the preview only while editing.
   const totals = useMemo(() => {
     if (!quote) {
       return null;
     }
     return editing
       ? calculateTotals(form.lines.items, quantity, 0, form.gstRate, gst.supply)
-      : calculateTotals(
-          quote.lineItems,
-          quantity,
-          0,
-          quote.gstRate,
-          gst.supply,
-        );
+      : quote.totals;
   }, [quote, editing, form.lines.items, quantity, form.gstRate, gst.supply]);
 
   const backLink = (
@@ -203,13 +222,20 @@ export function QuoteDetailsScreen({
     );
   }
 
+  // Only a draft is edited, sent or deleted; a sent one is converted.
+  const isDraft = quote.status === 'draft';
+  const canConvert = quote.status === 'sent' && !quote.orderId;
   const previewModal = (
-    <InvoicePreviewModal
-      doc={preview}
-      onClose={closePreview}
-      onPrint={print}
-      onDownload={downloadPdf}
-    />
+    <>
+      <InvoicePreviewModal
+        doc={preview}
+        onClose={closePreview}
+        onPrint={print}
+        onDownload={downloadPdf}
+      />
+      <SendEmailDialog {...sending.dialog} />
+      <ConvertQuoteDialog quote={quote} {...converting.dialog} />
+    </>
   );
 
   // Phones: the quote at a glance in small cards, like the invoice. The
@@ -224,13 +250,15 @@ export function QuoteDetailsScreen({
               title={Q.title}
               onBack={goBack}
               compactRight={
-                <N1IconButton
-                  icon="edit"
-                  variant="tile"
-                  accessibilityLabel={COMMON_STRINGS.edit}
-                  onPress={openEdit}
-                  testID="edit-quote"
-                />
+                isDraft && (
+                  <N1IconButton
+                    icon="edit"
+                    variant="tile"
+                    accessibilityLabel={COMMON_STRINGS.edit}
+                    onPress={openEdit}
+                    testID="edit-quote"
+                  />
+                )
               }
             />
           }
@@ -266,6 +294,9 @@ export function QuoteDetailsScreen({
             totals={totals}
             onOpenOrder={() => toOrder.convert(quote)}
             onOpenOperations={openOperations}
+            onSend={isDraft ? sending.send : undefined}
+            onConvert={canConvert ? converting.show : undefined}
+            busy={sending.sending}
           />
         </AdminScreen>
         {previewModal}
@@ -306,7 +337,7 @@ export function QuoteDetailsScreen({
   );
   const headerRight = editing ? (
     saveFooter
-  ) : (
+  ) : !isDraft ? null : (
     <N1Button
       title={COMMON_STRINGS.edit}
       leftIcon="edit"
@@ -327,6 +358,8 @@ export function QuoteDetailsScreen({
         value={values.customerName}
         onChangeText={bind('customerName')}
         errorText={errors.customerName}
+        // A quote keeps its customer: a new one is a new quote.
+        disabled
         testID="quote-customer"
       />
       <N1TextInput
@@ -372,7 +405,7 @@ export function QuoteDetailsScreen({
                     testID="quote-order"
                   >
                     <N1Text weight="bold" style={styles.underline}>
-                      {Q.orderValue(quote.orderId)}
+                      {Q.orderValue}
                     </N1Text>
                   </Pressable>
                 ),
@@ -415,14 +448,6 @@ export function QuoteDetailsScreen({
       {editing ? (
         <View style={styles.fields}>
           <View style={styles.fieldRow}>
-            <N1DropDown
-              label={Q.status}
-              options={QUOTE_STATUS_OPTIONS}
-              value={values.status}
-              onChange={bind('status')}
-              containerStyle={styles.grow}
-              testID="quote-status"
-            />
             {gst.registered && (
               <N1DropDown
                 label={T.gstRate}
@@ -443,6 +468,25 @@ export function QuoteDetailsScreen({
         </View>
       ) : (
         <View style={styles.asideActions}>
+          {isDraft && (
+            <N1Button
+              title={Q.send}
+              leftIcon="arrow-right"
+              onPress={sending.send}
+              loading={sending.sending}
+              fullWidth
+              testID="send-quote"
+            />
+          )}
+          {canConvert && (
+            <N1Button
+              title={Q.convert}
+              leftIcon="package"
+              onPress={converting.show}
+              fullWidth
+              testID="convert-quote"
+            />
+          )}
           {previewButton}
           {pdfButton}
         </View>
@@ -458,7 +502,7 @@ export function QuoteDetailsScreen({
         back={backLink}
         title={Q.heading}
         badge={<QuoteStatusBadge status={quote.status} />}
-        subtitle={quote.id}
+        subtitle={quote.number}
         headerRight={headerRight}
         summary={summary}
         operations={operations}

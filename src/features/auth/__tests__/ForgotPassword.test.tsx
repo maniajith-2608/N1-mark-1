@@ -5,8 +5,12 @@
 import { useState } from 'react';
 import * as RN from 'react-native';
 import ReactTestRenderer, { type ReactTestInstance } from 'react-test-renderer';
+import { authApi, MOCK_RESET_CODE } from '../api/mockAuthApi';
 import CodeInput from '../components/CodeInput';
-import { ForgotPasswordProvider } from '../context/ForgotPasswordContext';
+import {
+  ForgotPasswordProvider,
+  useForgotPassword,
+} from '../context/ForgotPasswordContext';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import ResetPasswordScreen from '../screens/ResetPasswordScreen';
 import VerifyCodeScreen from '../screens/VerifyCodeScreen';
@@ -41,6 +45,7 @@ jest.mock('../../../shared/hooks/useN1Breakpoint', () => ({
 }));
 
 beforeEach(() => jest.clearAllMocks());
+afterEach(() => jest.restoreAllMocks());
 
 function digitBoxes(root: ReactTestInstance) {
   return root.findAll(
@@ -82,13 +87,28 @@ describe('ForgotPasswordScreen', () => {
     expect(mockNavigation.navigate).not.toHaveBeenCalled();
   });
 
-  test('a valid email moves on to the code step', async () => {
+  test('a valid email sends the code and moves on to the code step', async () => {
+    const spy = jest.spyOn(authApi, 'forgotPassword');
+    const root = await renderScreen();
+
+    await type(root, 'you@company.com', ' owner@abc.com ');
+    await press(findText(root, 'Send code'));
+
+    expect(spy).toHaveBeenCalledWith('owner@abc.com');
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('VerifyCode');
+  });
+
+  test('a failed send shows why and stays put', async () => {
+    jest
+      .spyOn(authApi, 'forgotPassword')
+      .mockRejectedValue(new Error('Too many requests'));
     const root = await renderScreen();
 
     await type(root, 'you@company.com', 'owner@abc.com');
     await press(findText(root, 'Send code'));
 
-    expect(mockNavigation.navigate).toHaveBeenCalledWith('VerifyCode');
+    expect(allText(root)).toContain('Too many requests');
+    expect(mockNavigation.navigate).not.toHaveBeenCalled();
   });
 
   test('"Back to log in" returns to Login in the auth stack', async () => {
@@ -138,21 +158,37 @@ describe('VerifyCodeScreen', () => {
     expect(mockNavigation.navigate).not.toHaveBeenCalled();
   });
 
-  test('a complete code moves on to set a new password', async () => {
+  test('the right code is checked and moves on to set a new password', async () => {
+    const spy = jest.spyOn(authApi, 'verifyResetCode');
     const root = await renderScreen(PHONE);
 
-    await typeInBox(root, 0, '123456');
+    await typeInBox(root, 0, MOCK_RESET_CODE);
     await press(findText(root, 'Verify code'));
 
+    expect(spy).toHaveBeenCalledWith('', MOCK_RESET_CODE);
     expect(mockNavigation.navigate).toHaveBeenCalledWith('ResetPassword');
   });
 
-  test('resend clears the code and confirms it was sent', async () => {
+  test('a wrong code says so and stays put', async () => {
+    const root = await renderScreen();
+
+    await typeInBox(root, 0, '000000');
+    await press(findText(root, 'Verify code'));
+
+    expect(allText(root)).toContain(
+      'That code is not right or has expired. Ask for a new one.',
+    );
+    expect(mockNavigation.navigate).not.toHaveBeenCalled();
+  });
+
+  test('resend asks for a new code, clears the boxes and confirms', async () => {
+    const spy = jest.spyOn(authApi, 'forgotPassword');
     const root = await renderScreen();
 
     await typeInBox(root, 0, '12');
     await press(findText(root, 'Resend code'));
 
+    expect(spy).toHaveBeenCalledTimes(1);
     expect(allText(root)).toContain('A new code is on its way.');
     expect(digitBoxes(root).map(box => box.props.value)).toEqual([
       '',
@@ -176,8 +212,27 @@ describe('VerifyCodeScreen', () => {
 });
 
 describe('ResetPasswordScreen', () => {
+  /** The email and code as the earlier steps leave them. */
+  function Verified({ email = 'owner@abc.com', code = MOCK_RESET_CODE }) {
+    const flow = useForgotPassword();
+    const [ready, setReady] = useState(false);
+    if (!ready) {
+      flow.setEmail(email);
+      flow.setCode(code);
+      setReady(true);
+    }
+    return ready ? <ResetPasswordScreen /> : null;
+  }
+  const renderScreen = (width = WIDE, code = MOCK_RESET_CODE) =>
+    render(
+      <ForgotPasswordProvider>
+        <Verified code={code} />
+      </ForgotPasswordProvider>,
+      width,
+    );
+
   test('"Back to log in" returns to Login without saving', async () => {
-    const root = await render(<ResetPasswordScreen />, PHONE);
+    const root = await renderScreen(PHONE);
 
     await press(findText(root, 'Back to log in'));
 
@@ -185,7 +240,7 @@ describe('ResetPasswordScreen', () => {
   });
 
   test('weak or mismatched passwords show errors and stay put', async () => {
-    const root = await render(<ResetPasswordScreen />, WIDE);
+    const root = await renderScreen();
 
     await type(root, 'Create a new password', 'short');
     await type(root, 'Re-enter new password', 'other');
@@ -196,14 +251,48 @@ describe('ResetPasswordScreen', () => {
     expect(mockParent.popTo).not.toHaveBeenCalled();
   });
 
-  test('a valid new password returns to Login', async () => {
-    const root = await render(<ResetPasswordScreen />, WIDE);
+  test('a valid new password is saved with the email and code, then Login', async () => {
+    const spy = jest.spyOn(authApi, 'resetPassword');
+    const root = await renderScreen();
 
     await type(root, 'Create a new password', 'newpass123');
     await type(root, 'Re-enter new password', 'newpass123');
     await press(findText(root, 'Confirm new password'));
 
+    expect(spy).toHaveBeenCalledWith(
+      'owner@abc.com',
+      MOCK_RESET_CODE,
+      'newpass123',
+    );
     expect(mockParent.popTo).toHaveBeenCalledWith('Login');
+  });
+
+  test('an expired code shows the error and stays put', async () => {
+    const root = await renderScreen(WIDE, '999999');
+
+    await type(root, 'Create a new password', 'newpass123');
+    await type(root, 'Re-enter new password', 'newpass123');
+    await press(findText(root, 'Confirm new password'));
+
+    expect(allText(root)).toContain(
+      'That code is not right or has expired. Ask for a new one.',
+    );
+    expect(mockParent.popTo).not.toHaveBeenCalled();
+  });
+
+  test('opened without a code: back to the email step', async () => {
+    const root = await render(
+      <ForgotPasswordProvider>
+        <ResetPasswordScreen />
+      </ForgotPasswordProvider>,
+      WIDE,
+    );
+
+    await type(root, 'Create a new password', 'newpass123');
+    await type(root, 'Re-enter new password', 'newpass123');
+    await press(findText(root, 'Confirm new password'));
+
+    expect(mockNavigation.popTo).toHaveBeenCalledWith('ForgotPassword');
   });
 });
 

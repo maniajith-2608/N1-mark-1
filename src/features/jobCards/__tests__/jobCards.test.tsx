@@ -13,18 +13,16 @@ import {
 } from '../../../shared/testing/testUtils';
 import { MOCK_ORDERS } from '../../orders/api/mockData';
 import type { WorkOrder } from '../../orders/types';
-import { jobCardsApi } from '../api/jobCardsApi';
+import { jobCardsApi } from '../api/mockJobCardsApi';
 import { jobCardActions } from '../store/jobCardsSlice';
 import { MOCK_JOB_CARDS } from '../api/mockData';
 import type { JobCard, JobOperation } from '../types';
 import {
   canPauseOrComplete,
   canStart,
-  canCompleteFlow,
-  completeFlow,
   completeOperation,
   currentOperation,
-  flowInput,
+  flowSteps,
   initialFlowSteps,
   jobCardFromOrder,
   jobCardStage,
@@ -32,7 +30,8 @@ import {
   startBlockedReason,
   jobProgress,
   nextJobCardNumber,
-  redoOperation,
+  reopenOperation,
+  routeInput,
   optionsFrom,
   pauseOperation,
   progressTone,
@@ -147,8 +146,12 @@ describe('job card rules', () => {
       { ...steps[3], name: 'Drilling' },
       { key: 'x', name: 'Packing' },
     ];
-    const { operations, status } = flowInput(edited);
-    expect(operations[0]).toBe(card.operations[0]);
+    // Saved steps keep their ids; the server keeps their progress.
+    const steps2 = flowSteps(edited);
+    expect(steps2[0]).toEqual({ id: '1042-op1', name: 'Cutting' });
+    expect(steps2[4]).toEqual({ name: 'Packing' });
+    const { operations, status } = routeInput(card, steps2);
+    expect(operations[0]).toEqual(card.operations[0]);
     expect(operations[2]).toMatchObject({
       name: 'CNC Turning',
       status: 'running',
@@ -418,7 +421,7 @@ describe('Job Cards list', () => {
     // No View button: the card opens it; flow and Delete as in the table.
     expect(() => byLabel(card, 'View job card WO #1042')).toThrow();
     expect(byLabel(card, 'Edit flow for WO #1042')).toBeTruthy();
-    expect(byLabel(card, 'Delete job card WO #1042')).toBeTruthy();
+    expect(byLabel(card, 'Cancel job card WO #1042')).toBeTruthy();
     // The thumbnail opens the drawing.
     await press(byLabel(card, 'Open drawing for WO #1042'));
     expect(h.currentRoute()).toBe('JobCards');
@@ -442,6 +445,8 @@ describe('Job Cards list', () => {
     const machining = byTestId(screen, 'job-card-tab-page-machining');
     expect(hasTestId(machining, 'pause-operation')).toBe(false);
     await press(byTestId(bar(), 'pause-operation'));
+    await press(byLabel(byTestId(h.root, 'pause-step-dialog'), 'Break'));
+    await press(byTestId(h.root, 'pause-step-submit'));
     expect(
       h.store
         .getState()
@@ -465,13 +470,18 @@ describe('Job Cards list actions', () => {
     expect(() => byLabel(h.root, 'View job card WO #1042')).toThrow();
     expect(byLabel(h.root, 'Edit flow for WO #1042')).toBeTruthy();
     expect(byLabel(h.root, 'Create flow for WO #1036')).toBeTruthy();
-    expect(byLabel(h.root, 'Delete job card WO #1042')).toBeTruthy();
+    expect(byLabel(h.root, 'Cancel job card WO #1042')).toBeTruthy();
   });
 
-  test('delete asks first, then removes the job card', async () => {
+  test('cancel (no deleting) asks first, and only before any step starts', async () => {
     const h = await renderAdmin('JobCards');
-    await press(byLabel(h.root, 'Delete job card WO #1042'));
-    expect(allText(h.root)).toContain('Delete job card?');
+    // Work has begun on 1042: it can't be cancelled.
+    expect(
+      byLabel(h.root, 'Cancel job card WO #1042').props.accessibilityState,
+    ).toMatchObject({ disabled: true });
+
+    await press(byLabel(h.root, 'Cancel job card WO #1036'));
+    expect(allText(h.root)).toContain('Cancel job card?');
 
     // Cancel keeps it.
     const cancel = h.root.findAll(
@@ -479,16 +489,16 @@ describe('Job Cards list actions', () => {
         typeof n.type === 'string' && n.props.accessibilityLabel === 'Cancel',
     );
     await press(cancel[cancel.length - 1]);
-    expect(allText(h.root)).toContain('WO #1042');
+    expect(allText(h.root)).toContain('WO #1036');
 
-    await press(byLabel(h.root, 'Delete job card WO #1042'));
+    await press(byLabel(h.root, 'Cancel job card WO #1036'));
     const confirm = h.root.findAll(
       n =>
         typeof n.type === 'string' &&
-        n.props.accessibilityLabel === 'Delete job card',
+        n.props.accessibilityLabel === 'Cancel job card',
     );
     await press(confirm[confirm.length - 1]);
-    expect(allText(h.root)).not.toContain('WO #1042');
+    expect(allText(h.root)).not.toContain('WO #1036');
     // Confirming doesn't count as a row click.
     expect(h.currentRoute()).not.toBe('JobCardDetails');
   });
@@ -531,6 +541,7 @@ describe('Job card details', () => {
         'Due date|02 Oct 2026',
         'Quantity|200 pcs',
         'Material QC|Accepted',
+        'Design approval|Approved',
       ].join('|'),
     );
     // The drawing opens full size.
@@ -659,7 +670,7 @@ describe('Job card details', () => {
     expect(hasTestId(sheet, 'qc-report-open')).toBe(false);
   });
 
-  test('quick actions pause and resume the running step; Complete finishes the whole flow', async () => {
+  test('quick actions pause (with a reason), resume, then complete the running step', async () => {
     const h = await renderAdmin('JobCards');
     await h.navigate('JobCardDetails', { jobCardId: '1042' });
     const screen = () => byTestId(h.root, 'job-card-details-screen');
@@ -671,78 +682,63 @@ describe('Job card details', () => {
     expect(disabled('pause-operation')).toBe(false);
     expect(disabled('complete-operation')).toBe(false);
 
+    // Pause asks why; "Other" needs the details.
     await press(byTestId(screen(), 'pause-operation'));
+    const pauseDialog = () => byTestId(h.root, 'pause-step-dialog');
+    await press(byTestId(pauseDialog(), 'pause-step-submit'));
+    expect(allText(pauseDialog())).toContain('This field is required');
+    await press(byLabel(pauseDialog(), 'Tool change'));
+    await press(byTestId(pauseDialog(), 'pause-step-submit'));
     expect(h.store.getState().jobCards.entities['1042'].status).toBe('paused');
     expect(allText(byTestId(screen(), 'operation-1042-op3'))).toContain(
       'Paused',
     );
+    // Start resumes it on its machine; nothing to complete while paused.
     expect(disabled('start-operation')).toBe(false);
-    // The flow can still be finished while a step is paused.
-    expect(disabled('complete-operation')).toBe(false);
-
-    // Complete asks first; cancelling changes nothing.
-    await press(byTestId(screen(), 'complete-operation'));
-    const dialog = () => byTestId(h.root, 'complete-flow-dialog');
-    expect(allText(dialog())).toContain('the 4 remaining steps');
-    await press(byText(dialog(), 'Cancel'));
+    expect(disabled('complete-operation')).toBe(true);
+    await press(byTestId(screen(), 'start-operation'));
     expect(
-      h.store.getState().jobCards.entities['1042'].operations[3].status,
-    ).toBe('pending');
+      h.store.getState().jobCards.entities['1042'].operations[2].status,
+    ).toBe('running');
 
-    // Confirming completes every step left, not just the current one.
+    // Complete accounts for every piece the step started with.
     await press(byTestId(screen(), 'complete-operation'));
-    await press(byText(dialog(), 'Complete all'));
+    const dialog = () => byTestId(h.root, 'complete-step-dialog');
+    expect(allText(dialog())).toContain('Account for all 200 pieces');
+    await typeInto(byTestId(dialog(), 'complete-step-scrap'), '5');
+    await press(byTestId(dialog(), 'complete-step-submit'));
+    expect(allText(dialog())).toContain(
+      'These add up to 205; they must add up to 200.',
+    );
+    await typeInto(byTestId(dialog(), 'complete-step-good'), '195');
+    await press(byTestId(dialog(), 'complete-step-submit'));
     const ops = h.store.getState().jobCards.entities['1042'].operations;
-    expect(ops.every(o => o.status === 'completed')).toBe(true);
-    expect(allText(byTestId(screen(), 'overall-progress'))).toContain('100%');
-    expect(allText(byTestId(screen(), 'job-card-stage-1042'))).toBe('Final QC');
+    expect(ops[2].status).toBe('completed');
+    expect(ops[3].status).toBe('pending');
+    // Only that step: the next one waits for its QC check.
+    expect(allText(byTestId(screen(), 'job-card-stage-1042'))).toBe(
+      'Turning (Lathe) QC',
+    );
     expect(disabled('start-operation')).toBe(true);
     expect(disabled('complete-operation')).toBe(true);
   });
 
-  test('completeFlow finishes every step left; canCompleteFlow needs RM QC', () => {
-    const card = {
-      materialQc: 'accepted',
-      operations: [
-        { id: 'a', status: 'completed', startedAt: 's', completedAt: 'c' },
-        { id: 'b', status: 'running', startedAt: 's2', completedAt: null },
-        { id: 'c', status: 'pending', startedAt: null, completedAt: null },
-      ],
-    } as unknown as JobCard;
-    expect(canCompleteFlow(card)).toBe(true);
-    expect(canCompleteFlow({ ...card, materialQc: 'pending' })).toBe(false);
-    const done = completeFlow(card, 'now');
-    expect(done.status).toBe('completed');
-    expect(done.operations).toEqual([
-      card.operations[0],
-      expect.objectContaining({
-        status: 'completed',
-        startedAt: 's2',
-        completedAt: 'now',
-      }),
-      expect.objectContaining({
-        status: 'completed',
-        startedAt: 'now',
-        completedAt: 'now',
-      }),
-    ]);
-    expect(canCompleteFlow({ ...card, ...done })).toBe(false);
-  });
-
-  test('a step that failed its QC can be redone, then started again', async () => {
+  test('a step that failed its QC is redone: Redo starts it again on a machine', async () => {
     const h = await renderAdmin('JobCards');
     await h.navigate('JobCardDetails', { jobCardId: '1042' });
-    // Turning finished, then failed its QC check.
+    // Turning finished, then failed its QC check: the server reopens it.
     const card = h.store.getState().jobCards.entities['1042'];
+    const done = { ...card, ...completeOperation(card, '2026-09-25T11:00:00') };
     await act(async () => {
       h.store.dispatch(
         jobCardActions.saveSuccess({
-          ...card,
-          ...completeOperation(card, '2026-09-25T11:00:00'),
+          ...done,
+          ...reopenOperation(done, '1042-op3'),
           qcHistory: [
             ...card.qcHistory,
             {
               id: 'qc3',
+              kind: 'machine',
               stage: 'Turning - QC',
               result: 'failed',
               remark: 'Oversize',
@@ -755,25 +751,26 @@ describe('Job card details', () => {
     });
     const screen = () => byTestId(h.root, 'job-card-details-screen');
     expect(allText(byTestId(screen(), 'job-card-stage-1042'))).toBe(
-      'Turning (Lathe) QC failed',
+      'Redo Turning (Lathe)',
     );
+    expect(
+      h.store.getState().jobCards.entities['1042'].operations[2],
+    ).toMatchObject({ status: 'pending', isRework: true });
 
+    // Redo picks the operator and an idle machine, then starts it.
     await press(byTestId(screen(), 'redo-operation'));
-    const turning = h.store.getState().jobCards.entities['1042'].operations[2];
-    expect(turning).toMatchObject({
-      name: 'Turning (Lathe)',
-      status: 'pending',
+    const dialog = () => byTestId(h.root, 'start-step-dialog');
+    expect(allText(dialog())).toContain('Start Turning (Lathe)');
+    await choose(h.root, 'start-step-operator', 'Ravi Kumar');
+    await choose(h.root, 'start-step-machine', 'Manual Lathe 1 · LATHE-01');
+    await press(byTestId(dialog(), 'start-step-submit'));
+    expect(
+      h.store.getState().jobCards.entities['1042'].operations[2],
+    ).toMatchObject({
+      status: 'running',
+      machine: 'LATHE-01',
+      operator: 'Ravi Kumar',
     });
-    expect(allText(byTestId(screen(), 'job-card-stage-1042'))).toBe(
-      'Turning (Lathe) (up next)',
-    );
-    expect(
-      byTestId(screen(), 'start-operation').props.accessibilityState.disabled,
-    ).toBe(false);
-    // Only the steps change: the failed check stays in the QC history.
-    expect(
-      Object.keys(redoOperation(card, '1042-op3', '2026-09-25T12:00:00')),
-    ).toEqual(['operations', 'status']);
   });
 
   test('dispatch asks to confirm, then bills the job from its operations', async () => {
@@ -1049,7 +1046,7 @@ describe('Create / Edit flow, in place on the job card', () => {
     await press(byTestId(screen(), 'open-flow'));
     const text = allText(screen());
     expect(text).toMatch(/Edit flow\|Cancel\|Save changes/);
-    expect(text).toContain('Completed steps are locked.');
+    expect(text).toContain('Steps already started are locked.');
     expect(text).toContain('In progress');
     expect(text).toContain('Upcoming');
     expect(byLabel(byTestId(screen(), 'flow-step-1'), 'Locked')).toBeTruthy();

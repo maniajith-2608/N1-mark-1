@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 import {
   N1Card,
+  N1Combobox,
   N1Divider,
   N1DropDown,
   N1Text,
@@ -9,6 +10,8 @@ import {
   createN1Styles,
   useN1Breakpoint,
   useN1Styles,
+  findOptionByLabel,
+  type N1DropDownOption,
 } from '../../../shared/components';
 import {
   AdminScreen,
@@ -24,7 +27,8 @@ import { toNumber } from '../../../shared/utils';
 import { BillingSection } from '../components/BillingSection';
 import { LineItemsEditor } from '../components/LineItemsEditor';
 import { TotalsSummary } from '../components/TotalsSummary';
-import { BILLING_STRINGS, QUOTE_STATUS_OPTIONS } from '../constants';
+import { useCustomers } from '../../customers';
+import { BILLING_STRINGS } from '../constants';
 import { useQuote } from '../hooks/useBilling';
 import { useLineItems } from '../hooks/useLineItems';
 import {
@@ -97,6 +101,22 @@ export function QuoteFormScreen({
   );
   const gstRate = pickedRate ?? gst.defaultRate;
 
+  // A quote is for a saved customer (createQuote takes its id); an edited
+  // quote keeps its customer.
+  const { items: customers } = useCustomers();
+  const customerOptions = useMemo<N1DropDownOption<string>[]>(
+    () => customers.map(c => ({ value: c.id, label: c.name })),
+    [customers],
+  );
+  const [customerError, setCustomerError] = useState<string>();
+  const pickCustomer = useCallback(
+    (option: N1DropDownOption<string>) => {
+      setCustomerError(undefined);
+      bind('customerName')(option.label);
+    },
+    [bind],
+  );
+
   const { reset: resetLines } = lines;
   const loadedId = useRef<string | null>(null);
   useEffect(() => {
@@ -128,27 +148,36 @@ export function QuoteFormScreen({
         return;
       }
       const input = {
-        customerName: v.customerName.trim(),
         partName: v.partName.trim(),
         quantity: toNumber(v.quantity),
         material: v.material.trim(),
-        status: v.status,
         lineItems: lines.items,
         gstRate,
       };
       if (quoteId) {
         update(quoteId, input);
-      } else {
-        create({ ...input, orderId: null });
+        return;
       }
+      const customer = findOptionByLabel(customerOptions, v.customerName);
+      if (!customer) {
+        setCustomerError(Q.customerUnknown);
+        return;
+      }
+      create({
+        ...input,
+        customerId: customer.value,
+        customerName: customer.label,
+        status: 'draft',
+        orderId: null,
+      });
     },
-    [lines.items, quoteId, gstRate, create, update],
+    [lines.items, quoteId, gstRate, create, update, customerOptions],
   );
 
   const header = (
     <DetailHeader
       title={Q.addTitle}
-      subtitle={quoteId ?? Q.newSubtitle}
+      subtitle={quote?.number ?? Q.newSubtitle}
       onBack={goBack}
     />
   );
@@ -178,17 +207,24 @@ export function QuoteFormScreen({
     <View style={styles.body}>
       {isCompact && (
         <N1Text variant="small" color="secondary">
-          {quoteId ?? Q.newSubtitle}
+          {quote?.number ?? Q.newSubtitle}
         </N1Text>
       )}
       <FormRow>
-        <N1TextInput
+        <N1Combobox
           label={Q.customer}
           required
           placeholder={Q.customerPlaceholder}
+          leftIcon="search"
+          options={customerOptions}
           value={values.customerName}
-          onChangeText={bind('customerName')}
-          errorText={errors.customerName}
+          onChangeText={text => {
+            setCustomerError(undefined);
+            bind('customerName')(text);
+          }}
+          onSelect={pickCustomer}
+          errorText={errors.customerName ?? customerError}
+          disabled={Boolean(quoteId)}
           testID="quote-customer"
         />
         <N1TextInput
@@ -211,17 +247,6 @@ export function QuoteFormScreen({
           testID="quote-quantity"
         />
       </FormRow>
-      {quoteId && (
-        <FormRow>
-          <N1DropDown
-            label={Q.status}
-            options={QUOTE_STATUS_OPTIONS}
-            value={values.status}
-            onChange={bind('status')}
-          />
-          <View />
-        </FormRow>
-      )}
       {gst.registered && (
         <FormRow>
           <N1DropDown

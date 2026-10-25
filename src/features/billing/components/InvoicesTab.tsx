@@ -18,13 +18,10 @@ import type { BillingNavigation } from '../types';
 import { AsyncContent, ListToolbar } from '../../../shared/components';
 import { COMMON_STRINGS } from '../../../shared/constants';
 import { useListFilter, usePagination } from '../../../shared/hooks';
-import {
-  formatCompactCurrency,
-  formatCurrency,
-  notifyUnavailable,
-} from '../../../shared/utils';
+import { formatCompactCurrency, formatCurrency } from '../../../shared/utils';
 import { BILLING_STRINGS, INVOICE_STATUS_OPTIONS } from '../constants';
 import { useInvoiceStats, useInvoices } from '../hooks/useBilling';
+import { openPdf } from '../hooks/useBillingActions';
 import type { Invoice, InvoiceFilters } from '../types';
 import {
   INITIAL_INVOICE_FILTERS,
@@ -37,9 +34,8 @@ import { InvoiceCard } from './BillingCards';
 import { useBillingHeader } from './BillingHeaderSlot';
 
 const S = BILLING_STRINGS.invoices;
-/** Downloading PDFs isn't available yet; the invoice page says the same. */
-const downloadPdf = () =>
-  notifyUnavailable(BILLING_STRINGS.invoice.downloadAction);
+/** The server's PDF of the invoice. */
+const downloadPdf = (i: Invoice) => openPdf({ kind: 'invoice', id: i.id });
 
 const makeStyles = createN1Styles(t => ({
   actions: { flexDirection: 'row', gap: t.spacing.sm },
@@ -99,7 +95,7 @@ export function InvoicesTab({ toolbarStart }: Props) {
         key: 'id',
         title: S.columns.invoice,
         flex: 1.3,
-        render: i => <N1Text weight="bold">{i.id}</N1Text>,
+        render: i => <N1Text weight="bold">{i.number}</N1Text>,
       },
       { key: 'customerName', title: S.columns.customer, flex: 1.5 },
       { key: 'jobId', title: S.columns.job },
@@ -127,16 +123,19 @@ export function InvoicesTab({ toolbarStart }: Props) {
             <N1IconButton
               icon="eye"
               size="sm"
-              accessibilityLabel={BILLING_STRINGS.a11y.view(i.id)}
+              accessibilityLabel={BILLING_STRINGS.a11y.view(i.number)}
               onPress={() => view(i)}
             />
-            <N1IconButton
-              icon="edit"
-              variant="primary"
-              size="sm"
-              accessibilityLabel={BILLING_STRINGS.a11y.edit(i.id)}
-              onPress={() => edit(i)}
-            />
+            {/* A paid invoice is final: no Edit. */}
+            {i.status !== 'paid' && (
+              <N1IconButton
+                icon="edit"
+                variant="primary"
+                size="sm"
+                accessibilityLabel={BILLING_STRINGS.a11y.edit(i.number)}
+                onPress={() => edit(i)}
+              />
+            )}
           </View>
         ),
       },

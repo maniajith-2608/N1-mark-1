@@ -18,7 +18,7 @@ import { PROFILE_STRINGS } from '../../profile/constants';
 import { useOrganizationName, useSession } from '../../profile';
 import { useToggle } from '../../../shared/hooks';
 import { ORGANIZATION_STRINGS } from '../../profile/organization';
-import { CURRENT_USER, MENU_ITEMS, ORGANIZATION } from '../constants';
+import { MENU_ITEMS } from '../constants';
 import { makeSidebarStyles } from '../styles';
 import type { MenuItem } from '../types';
 import { visibleMenuItems } from '../utils';
@@ -74,7 +74,7 @@ function Sidebar({
   };
 
   const organizationName = useOrganizationName();
-  const { logout } = useSession();
+  const { logout, shellUser } = useSession();
   const { signOut } = useAuthSession();
   const [logoutOpen, openLogout, closeLogout] = useToggle(false);
   // Same as My profile's Log out: the root navigator then shows Login.
@@ -213,14 +213,14 @@ function Sidebar({
         ]}
         testID="sidebar-open-profile"
       >
-        <N1Avatar name={CURRENT_USER.name} tone="info" size="sm" />
+        <N1Avatar name={shellUser?.name ?? ''} tone="info" size="sm" />
         {collapsed ? null : (
           <View style={styles.userCardText}>
             <N1Text variant="label" color="inverse" numberOfLines={1}>
-              {CURRENT_USER.name}
+              {shellUser?.name}
             </N1Text>
             <N1Text variant="caption" color="tertiary" numberOfLines={1}>
-              {`${CURRENT_USER.roleLabel} · ${ORGANIZATION.shortName}`}
+              {shellUser?.subtitle}
             </N1Text>
           </View>
         )}

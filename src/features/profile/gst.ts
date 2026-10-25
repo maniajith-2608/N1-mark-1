@@ -137,8 +137,10 @@ export function validateTaxRate(
   return undefined;
 }
 
-let rateCounter = 0;
-export const newTaxRateId = () => {
-  rateCounter += 1;
-  return `rate-${Date.now()}-${rateCounter}`;
-};
+/** A new rate's id: the backend keeps rate ids as UUIDs (v4 here). */
+export const newTaxRateId = () =>
+  'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const n = Math.floor(Math.random() * 16);
+    // "y" is the variant digit: 8, 9, a or b.
+    return (c === 'x' ? n : 8 + (n % 4)).toString(16);
+  });

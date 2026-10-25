@@ -1,5 +1,5 @@
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Platform, Pressable, View } from 'react-native';
 import type { ReactNode } from 'react';
 import {
@@ -29,7 +29,6 @@ import {
   ComingSoon,
 } from '../../../shared/components';
 import { COMMON_STRINGS, DETAIL_COLUMNS } from '../../../shared/constants';
-import { useOnSettled } from '../../../shared/hooks';
 import {
   formatCurrency,
   formatLongDate,
@@ -40,8 +39,7 @@ import {
   BILLING_META,
   MetaBadge,
   QUOTATION_META,
-  jobCardFromOrder,
-  useJobCards,
+  useJobCard,
   type JobCard,
 } from '../../jobCards';
 import { OrderJobCardItem } from '../components/OrderJobCardItem';
@@ -49,10 +47,8 @@ import {
   DocumentViewer,
   type ViewerTarget,
 } from '../components/DocumentViewer';
-import {
-  openDocument,
-  printDocument,
-} from '../../../services/files/viewDocument';
+import { printDocument } from '../../../services/files/viewDocument';
+import { openStoredFile } from '../../../services/files/fileStorage';
 import { printOrNotify } from '../../../services/print';
 import type { Attachment } from '../../../shared/types';
 import {
@@ -151,8 +147,8 @@ export function OrderDetailsScreen({
   const { order, status, error, reload } = useOrder(route.params.orderId);
   const { items: customers } = useCustomers();
   const [tab, setTab] = useState<Tab>('details');
-  const jobCards = useJobCards();
-  const jobCard = jobCards.items.find(c => c.id === route.params.orderId);
+  // createOrder opened the order's job card with it.
+  const { jobCard } = useJobCard(order?.jobCardId || undefined);
 
   // Back to where the order was opened from: the customer, job card or
   // invoice it was opened on (keeping that page's own Back), else the
@@ -244,42 +240,27 @@ export function OrderDetailsScreen({
     },
     [navigation],
   );
-  // No job card yet: make one from the order, then show it on its tab. If
-  // raw material details are missing, a popup collects them first.
-  const creating = useRef(false);
+  // Raw material still missing: a popup collects it and saves it on the job
+  // card (saveJobCardRawMaterial), which RM QC then inspects.
   const [askRawMaterial, setAskRawMaterial] = useState(false);
-  const makeJobCard = useCallback(() => {
-    if (order) {
-      creating.current = true;
-      jobCards.create(jobCardFromOrder(order));
-    }
-  }, [order, jobCards]);
-  const createJobCard = useCallback(() => {
-    if (order && isRawMaterialMissing(order)) {
-      setAskRawMaterial(true);
-    } else {
-      makeJobCard();
-    }
-  }, [order, makeJobCard]);
+  const openRawMaterial = useCallback(() => setAskRawMaterial(true), []);
   const closeRawMaterial = useCallback(() => setAskRawMaterial(false), []);
-  // The order now has its details (and `order` is the saved one).
-  const rawMaterialSaved = useCallback(() => {
-    setAskRawMaterial(false);
-    makeJobCard();
-  }, [makeJobCard]);
-  useOnSettled(jobCards.saving, jobCards.saveError, () => {
-    if (creating.current) {
-      creating.current = false;
-      setTab('jobCard');
-    }
-  });
   const printDrawing = useCallback(() => {
     if (order) {
       const html = drawingPrintHtml(order, orDash(order.drawingNumber));
       printOrNotify(html, P.drawingJob(orderHeading(order)), D.printDrawing);
     }
   }, [order]);
-  const download = useCallback(() => notifyUnavailable(D.downloadAction), []);
+  // Stored files open (or download) from a short-lived link.
+  const download = useCallback((doc?: Attachment) => {
+    if (!doc) {
+      notifyUnavailable(D.downloadAction);
+      return;
+    }
+    openStoredFile(doc)
+      .then(opened => opened || notifyUnavailable(D.downloadAction))
+      .catch(() => notifyUnavailable(D.downloadAction));
+  }, []);
   // View / print a document or the drawing. A PDF picked this session on web
   // prints in the browser's own viewer; anything else prints as a page.
   const [viewing, setViewing] = useState<ViewerTarget | null>(null);
@@ -303,7 +284,11 @@ export function OrderDetailsScreen({
   );
   const printQr = useCallback(() => {
     if (order) {
-      printOrNotify(qrPrintHtml(order), D.orderQrFile(order.id), D.printAction);
+      printOrNotify(
+        qrPrintHtml(order),
+        D.orderQrFile(order.number),
+        D.printAction,
+      );
     }
   }, [order]);
   const printTarget = useCallback(
@@ -315,7 +300,22 @@ export function OrderDetailsScreen({
         : printFile(target.doc),
     [printDrawing, printQr, printFile],
   );
-  const openFile = Platform.OS === 'web' ? openDocument : null;
+  const openFile = download;
+
+  // The drawing row downloads the design file; the QR is drawn here, not
+  // stored, so it prints instead.
+  const designFile = order?.designFile ?? undefined;
+  const downloadDoc = useCallback(
+    (doc: Attachment) =>
+      download(
+        doc.id === DRAWING_DOC_ID
+          ? designFile
+          : doc.id === ORDER_QR_DOC_ID
+          ? undefined
+          : doc,
+      ),
+    [download, designFile],
+  );
 
   const customer = useMemo(
     () => customers.find(c => c.id === order?.customerId),
@@ -348,7 +348,7 @@ export function OrderDetailsScreen({
           <N1IconButton
             icon="edit"
             variant="tile"
-            accessibilityLabel={ORDER_STRINGS.a11y.edit(order.id)}
+            accessibilityLabel={ORDER_STRINGS.a11y.edit(order.number)}
             onPress={edit}
             testID="edit-order"
           />
@@ -368,17 +368,14 @@ export function OrderDetailsScreen({
     );
   }
 
-  const createJobCardButton = (
+  const rawMaterialButton = jobCard && isRawMaterialMissing(order) && (
     <N1Button
-      title={D.createJobCard}
+      title={D.addRawMaterial}
       leftIcon="plus"
       variant="secondary"
       size="sm"
-      loading={jobCards.saving}
-      // Wait for the job cards, so an existing one is never made twice.
-      disabled={jobCards.status !== 'succeeded'}
-      onPress={createJobCard}
-      testID="order-create-job-card"
+      onPress={openRawMaterial}
+      testID="order-add-raw-material"
     />
   );
 
@@ -397,13 +394,13 @@ export function OrderDetailsScreen({
           <PriorityBadge priority={order.priority} suffix="priority" />
           <OrderStatusBadge status={order.status} />
         </View>
-        {/* Phones: Edit is in the header and Create job card on the Job
-            card tab. */}
+        {/* Phones: Edit is in the header and Add raw material on the Raw
+            material tab. */}
         {!isCompact && (
           <>
             <View style={styles.spacer} />
             <View style={styles.actions}>
-              {!jobCard && createJobCardButton}
+              {rawMaterialButton}
               <N1Button
                 title={D.edit}
                 leftIcon="edit"
@@ -583,6 +580,7 @@ export function OrderDetailsScreen({
           {D.materialPendingHelp}
         </N1Text>
       )}
+      {isCompact && rawMaterialButton}
       <N1DetailGrid
         columns={isCompact ? 2 : DETAIL_COLUMNS}
         items={[
@@ -614,7 +612,7 @@ export function OrderDetailsScreen({
     : null;
   const qrDoc: Attachment = {
     id: ORDER_QR_DOC_ID,
-    name: D.orderQrFile(order.id),
+    name: D.orderQrFile(order.number),
     kind: D.orderQr,
     sizeBytes: 0,
   };
@@ -628,7 +626,7 @@ export function OrderDetailsScreen({
           ...(order.designFile ? [order.designFile] : []),
           ...order.documents,
         ]}
-        onDownload={download}
+        onDownload={downloadDoc}
         onView={doc =>
           doc.id === DRAWING_DOC_ID
             ? viewDrawing()
@@ -659,12 +657,6 @@ export function OrderDetailsScreen({
           <N1Text variant="small" color="secondary" align="center">
             {D.noJobCardHelp}
           </N1Text>
-          {isCompact && createJobCardButton}
-          {jobCards.saveError && (
-            <N1Text variant="small" color="danger">
-              {jobCards.saveError}
-            </N1Text>
-          )}
         </View>
       )}
     </View>
@@ -693,7 +685,7 @@ export function OrderDetailsScreen({
       target={viewing}
       onClose={closeViewer}
       onPrint={printTarget}
-      onDownload={download}
+      onDownload={downloadDoc}
       onOpen={openFile}
     />
   );
@@ -702,8 +694,9 @@ export function OrderDetailsScreen({
     <RawMaterialDialog
       visible={askRawMaterial}
       order={order}
+      jobCardId={order.jobCardId}
       onClose={closeRawMaterial}
-      onSaved={rawMaterialSaved}
+      onSaved={closeRawMaterial}
     />
   );
 

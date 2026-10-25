@@ -115,7 +115,7 @@ export const UserJobCard = memo(function UserJobCardComponent({
   const op = currentOperation(c);
   const where =
     whereOverride ?? [op?.name, op?.machine].filter(Boolean).join(' · ');
-  const title = jobTitle(c) || JOB_CARD_STRINGS.workOrder(c.id);
+  const title = jobTitle(c) || JOB_CARD_STRINGS.workOrder(c.number);
   const progress = jobProgress(c);
   // The stage already says "RM QC failed": show it once.
   const rmFailed = c.materialQc === 'rejected';
@@ -124,7 +124,7 @@ export const UserJobCard = memo(function UserJobCardComponent({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={JOB_CARD_STRINGS.a11y.view(c.id)}
+      accessibilityLabel={JOB_CARD_STRINGS.a11y.view(c.number)}
       onPress={() => onPress(c)}
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}
       testID={testID}
@@ -166,7 +166,7 @@ export const UserJobCard = memo(function UserJobCardComponent({
             testID={`rm-qc-failed-${c.id}`}
           />
         )}
-        <Chip label={JOB_CARD_STRINGS.workOrder(c.id)} />
+        <Chip label={JOB_CARD_STRINGS.workOrder(c.number)} />
         {!!c.code && <Chip label={JOB_CARD_STRINGS.jobCardNumber(c.code)} />}
         <Chip label={C.priority(PRIORITY_META[c.priority].label)} />
         <Chip label={C.quantity(c.quantity)} />

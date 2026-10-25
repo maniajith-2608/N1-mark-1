@@ -44,6 +44,8 @@ type Props = {
   showBrand?: boolean;
   /** Shown under the password field, e.g. for wrong credentials. */
   errorText?: string;
+  /** Sign-in in flight: the button spins and can't be pressed again. */
+  submitting?: boolean;
   onSubmit: (email: string, password: string) => void;
   onForgotPassword?: () => void;
 };
@@ -54,6 +56,7 @@ function LoginForm({
   showRememberMe = false,
   showBrand = false,
   errorText,
+  submitting = false,
   onSubmit,
   onForgotPassword,
 }: Props) {
@@ -139,6 +142,7 @@ function LoginForm({
         title="Log in"
         size="lg"
         fullWidth
+        loading={submitting}
         onPress={submit}
         testID="login-submit"
       />

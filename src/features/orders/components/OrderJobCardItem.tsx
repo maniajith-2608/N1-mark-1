@@ -54,7 +54,7 @@ export const OrderJobCardItem = memo(function OrderJobCardItemComponent({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={D.openJobCard(jobCard.id)}
+      accessibilityLabel={D.openJobCard(jobCard.number)}
       onPress={() => onPress(jobCard)}
       onHoverIn={() => setHovered(true)}
       onHoverOut={() => setHovered(false)}

@@ -64,7 +64,7 @@ export const JobCardCard = memo(function JobCardCardComponent({
             {jobCardTitle(jobCard)}
           </N1Text>
           <N1Text variant="caption" color="secondary">
-            {S.workOrder(jobCard.id)}
+            {S.workOrder(jobCard.number)}
           </N1Text>
         </View>
         <View style={styles.badges}>
@@ -96,7 +96,7 @@ export const JobCardCard = memo(function JobCardCardComponent({
             variant="secondary"
             fullWidth
             onPress={() => onView(jobCard)}
-            accessibilityLabel={S.a11y.view(jobCard.id)}
+            accessibilityLabel={S.a11y.view(jobCard.number)}
           />
         </View>
         <FlowActionButton jobCard={jobCard} onPress={onFlow} />

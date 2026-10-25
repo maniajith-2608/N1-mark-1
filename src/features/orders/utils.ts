@@ -4,7 +4,12 @@ import { ORDER_STRINGS, PRIORITY_META } from './constants';
 import type { JobCard } from '../jobCards/types';
 import { jobCardStage } from '../jobCards/utils';
 import { RAW_MATERIAL_FIELDS } from './components/orderForm';
-import type { OrderFilters, OrderStatus, WorkOrder } from './types';
+import type {
+  OrderFilters,
+  OrderStatus,
+  OrderSummary,
+  WorkOrder,
+} from './types';
 
 /** "Bracket — Job A"; falls back to the description for new orders. */
 export function orderTitle(
@@ -15,15 +20,19 @@ export function orderTitle(
 }
 
 /** "WO #1042 · Bracket — Job A" */
-export const orderHeading = (o: WorkOrder) =>
-  [ORDER_STRINGS.workOrder(o.id), orderTitle(o)].filter(Boolean).join(' · ');
+export const orderHeading = (
+  o: Pick<WorkOrder, 'number' | 'partName' | 'jobName' | 'description'>,
+) =>
+  [ORDER_STRINGS.workOrder(o.number), orderTitle(o)]
+    .filter(Boolean)
+    .join(' · ');
 
 /**
  * What an order's QR code holds: the WO number on the first line, which is all
  * the Scan QR screen reads, then the entered details for anyone scanning it
  * with a phone camera. Blank details are left out.
  */
-export function orderQrValue(o: WorkOrder): string {
+export function orderQrValue(o: OrderSummary): string {
   const Q = ORDER_STRINGS.qr;
   const details: [string, string][] = [
     [Q.customer, o.customerName],
@@ -35,7 +44,7 @@ export function orderQrValue(o: WorkOrder): string {
     [Q.dueDate, formatDate(o.dueDate)],
   ];
   return [
-    ORDER_STRINGS.workOrder(o.id),
+    ORDER_STRINGS.workOrder(o.number),
     ...details
       .filter(([, value]) => value.trim())
       .map(([label, value]) => `${label}: ${value.trim()}`),
@@ -52,13 +61,17 @@ export function compareOrders(a: WorkOrder, b: WorkOrder): number {
   if (a.dueDate && b.dueDate) {
     return a.dueDate.localeCompare(b.dueDate);
   }
-  return a.dueDate ? -1 : b.dueDate ? 1 : b.id.localeCompare(a.id);
+  return a.dueDate
+    ? -1
+    : b.dueDate
+    ? 1
+    : b.createdAt.localeCompare(a.createdAt);
 }
 
 export const orderSearchText = (o: WorkOrder) =>
-  `${workOrderSearchTerms(o.id)} ${o.partName} ${o.jobName} ${o.customerName} ${
-    o.poNumber
-  } ${o.routeCardNo} ${o.description}`;
+  `${workOrderSearchTerms(o.number.replace(/^WO-?/i, ''))} ${o.partName} ${
+    o.jobName
+  } ${o.customerName} ${o.poNumber} ${o.routeCardNo} ${o.description}`;
 
 export const matchesOrderFilters = (o: WorkOrder, f: OrderFilters) =>
   matchesAny(f.priority, o.priority) && matchesAny(f.status, o.status);
@@ -75,7 +88,8 @@ export const rawMaterialArrived = (o: WorkOrder) =>
   RAW_MATERIAL_FIELDS.every(key => o[key] !== '');
 
 /**
- * The order's status from its job card's stage and its invoice:
+ * The status the server gives an order, from its job card's stage and its
+ * invoice (the in-memory API uses this to play the server's part):
  * - Completed: the invoice is paid.
  * - Payment due: ready to dispatch or dispatched; not paid yet.
  * - Paused: an operation is paused, or RM QC rejected the material.

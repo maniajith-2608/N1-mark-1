@@ -13,7 +13,7 @@ import { DrawingPreview } from '../../orders/components/DrawingPreview';
 import { PriorityBadge } from '../../orders/components/OrderBadges';
 import { JOB_CARD_STRINGS as S } from '../constants';
 import type { JobCard } from '../types';
-import { currentOperation, jobProgress, jobTitle } from '../utils';
+import { currentOperation, hasStarted, jobProgress, jobTitle } from '../utils';
 import { FlowActionButton } from './FlowActionButton';
 import { JobCardStatusBadge } from './JobCardBadges';
 import { JobProgress } from './JobProgress';
@@ -93,7 +93,7 @@ export const JobCardListCard = memo(function JobCardListCardComponent({
         {c.designFile ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={S.a11y.diagram(c.id)}
+            accessibilityLabel={S.a11y.diagram(c.number)}
             onPress={() => onOpenDrawing(c)}
             style={({ pressed }) => pressed && styles.pressed}
             testID={`diagram-${c.id}`}
@@ -116,7 +116,7 @@ export const JobCardListCard = memo(function JobCardListCardComponent({
             {jobTitle(c) || COMMON_STRINGS.dash}
           </N1Text>
           <N1Text variant="caption" color="tertiary">
-            {S.workOrder(c.id)}
+            {S.workOrder(c.number)}
           </N1Text>
         </View>
         <PriorityBadge priority={c.priority} />
@@ -150,8 +150,9 @@ export const JobCardListCard = memo(function JobCardListCardComponent({
           <N1IconButton
             icon="trash"
             variant="cardDanger"
-            accessibilityLabel={S.a11y.delete(c.id)}
+            accessibilityLabel={S.a11y.delete(c.number)}
             onPress={() => onDelete(c)}
+            disabled={hasStarted(c)}
             testID={`delete-${c.id}`}
           />
         </View>

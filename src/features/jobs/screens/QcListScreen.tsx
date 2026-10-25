@@ -1,7 +1,7 @@
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { useCallback, useMemo, useState } from 'react';
 import { View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import {
   AsyncContent,
   N1Badge,
@@ -20,7 +20,7 @@ import { jobCardSearchText, type JobCard } from '../../jobCards';
 import { distinctOptions } from '../../jobCards/utils';
 import { JOBS_STRINGS, QC_STATUS_META, QC_STRINGS } from '../constants';
 import { useMyJobs } from '../hooks/useMyJobs';
-import { qcItem, type QcKind } from '../qc';
+import { queuedQcItem, type QcKind, type QcQueueEntry } from '../qc';
 import { JobsSearchRow } from '../components/JobsSearchRow';
 import { UserJobCard } from '../components/UserJobCard';
 import type { JobsScreenProps } from '../types';
@@ -42,9 +42,11 @@ const TABS: { key: QcKind; label: string }[] = [
 
 type Navigation = JobsScreenProps<'QcCheck'>['navigation'];
 
+type Queue = ReadonlyMap<string, QcQueueEntry>;
+
 /** QC status label of a job for a tab, as shown on its row. */
-const statusOf = (c: JobCard, kind: QcKind) =>
-  QC_STATUS_META[qcItem(c, kind).status].label;
+const statusOf = (c: JobCard, kind: QcKind, queue: Queue) =>
+  QC_STATUS_META[queuedQcItem(c, kind, queue).status].label;
 
 /** One tab's page: its pending count, then its checks. */
 function QcTabPage({
@@ -56,8 +58,11 @@ function QcTabPage({
   error,
   reload,
   onOpen,
+  queue,
 }: {
   kind: QcKind;
+  /** The server's QC queue for these jobs (qcQueue). */
+  queue: Queue;
   items: JobCard[];
   /** After the search. */
   filtered: JobCard[];
@@ -72,12 +77,14 @@ function QcTabPage({
     () =>
       statuses.length === 0
         ? filtered
-        : filtered.filter(c => statuses.includes(statusOf(c, kind))),
-    [filtered, statuses, kind],
+        : filtered.filter(c => statuses.includes(statusOf(c, kind, queue))),
+    [filtered, statuses, kind, queue],
   );
   const pending = useMemo(
-    () => items.filter(c => qcItem(c, kind).status === 'pending').length,
-    [items, kind],
+    () =>
+      items.filter(c => queuedQcItem(c, kind, queue).status === 'pending')
+        .length,
+    [items, kind, queue],
   );
   return (
     <UserScreen background="muted" testID={`qc-tab-page-${kind}`}>
@@ -96,7 +103,7 @@ function QcTabPage({
           </N1Text>
         ) : (
           shown.map(c => {
-            const item = qcItem(c, kind);
+            const item = queuedQcItem(c, kind, queue);
             const meta = QC_STATUS_META[item.status];
             return (
               <UserJobCard
@@ -124,7 +131,13 @@ function QcTabPage({
 export function QcListScreen() {
   const styles = useN1Styles(makeStyles);
   const navigation = useNavigation<Navigation>();
-  const { items, status, error, reload } = useMyJobs();
+  const { items, status, error, reload, qcQueue } = useMyJobs();
+  // A check just recorded moves the job on: read the list again on return.
+  useFocusEffect(
+    useCallback(() => {
+      reload();
+    }, [reload]),
+  );
   const [kind, setKind] = useState<QcKind>('rm');
   const [filters, setFilters] = useState<FilterValues>({});
   const { query, setQuery, filtered } = useListFilter(items, {
@@ -146,10 +159,10 @@ export function QcListScreen() {
       {
         key: 'status',
         label: S.statusFilter,
-        options: distinctOptions(items.map(c => statusOf(c, kind))),
+        options: distinctOptions(items.map(c => statusOf(c, kind, qcQueue))),
       },
     ],
-    [items, kind],
+    [items, kind, qcQueue],
   );
   const statuses = filters.status ?? [];
   const openCheck = useCallback(
@@ -199,6 +212,7 @@ export function QcListScreen() {
                 error={error}
                 reload={reload}
                 onOpen={openCheck}
+                queue={qcQueue}
               />
             )}
           </QcTabs.Screen>

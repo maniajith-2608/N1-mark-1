@@ -31,12 +31,37 @@ export type JobOperation = {
   id: string;
   /** Operation name, one of JOB_OPERATIONS. */
   name: string;
-  /** Machine or station code; blank until the step is assigned. */
+  /** Machine or station code; blank until the step starts. */
   machine: string;
+  /** The machine's id (startJobStep); blank until the step starts. */
+  machineId?: string;
+  /** The assigned operator's name; blank until one is assigned. */
   operator: string;
+  /** The assigned operator's user id (assignJobOperation). */
+  operatorId?: string;
   status: OperationStatus;
+  /** Reopened by a failed QC check, to be done again. */
+  isRework?: boolean;
+  /** Pieces the step started with; Complete accounts for every one. */
+  quantityStarted?: number | null;
   startedAt: ISODateString | null;
   completedAt: ISODateString | null;
+};
+
+/** Why a running step was paused (pauseJobStep). */
+export type PauseReason =
+  | 'tool_change'
+  | 'material'
+  | 'breakdown'
+  | 'break'
+  | 'other';
+
+/** What a finished step produced; the counts add up to quantityStarted. */
+export type StepCounts = {
+  good: number;
+  reject: number;
+  rework: number;
+  scrap: number;
 };
 
 /** What RM QC recorded about material it rejected. */
@@ -48,6 +73,8 @@ export type RejectedMaterial = {
 
 export type QcEntry = {
   id: string;
+  /** Raw material (incoming) or machine (after a step) check. */
+  kind?: 'rm' | 'machine';
   stage: string;
   result: QcResult;
   remark: string;
@@ -63,12 +90,17 @@ export type QcEntry = {
 };
 
 /**
- * Shop-floor view of a work order. One job card per order, so the id is the
- * work order number. Order details are copied in, as the API returns them.
+ * Shop-floor view of a work order: one job card per order, opened with it.
+ * The job's order details are copied in, as the API returns them (the "job
+ * view": no prices or client data).
  */
 export type JobCard = {
-  /** Work order number, e.g. "1042". */
+  /** The job card's own id; not the order's. */
   id: string;
+  /** The order it was opened with. */
+  orderId: string;
+  /** The order's work order number as the server gives it, e.g. "WO-12". */
+  number: string;
   /** Job card number, e.g. "JOB1". Given when the card is created. */
   code: string;
   customerId: string;
@@ -90,10 +122,64 @@ export type JobCard = {
   qcHistory: QcEntry[];
   quotation: QuotationStatus;
   billing: BillingState;
+  // From the order, for the shop floor's job view.
+  partNumber?: string;
+  drawingNumber?: string;
+  poNumber?: string;
+  routeCardNo?: string;
 };
 
 /** What the screens change: the flow and the operation progress. */
 export type JobCardInput = Pick<JobCard, 'operations' | 'status'>;
+
+/** One step of a flow being saved: a saved step keeps its id. */
+export type RouteStep = { id?: string; name: string };
+
+/** QC's verdict on a check (recordQc). */
+export type QcRecordInput = {
+  jobCardId: string;
+  kind: 'rm' | 'machine';
+  /** Machine QC: the step inspected. */
+  operationId?: string;
+  passed: boolean;
+  remark: string;
+  inspector: string;
+  rejectedMaterial?: RejectedMaterial;
+  report?: Attachment;
+};
+
+/**
+ * Production moves on a job card, each its own mutation. The server answers
+ * with the job card, statuses and all.
+ */
+export type JobCardCommand =
+  | { type: 'route'; steps: RouteStep[] }
+  | { type: 'assign'; operationId: string; operatorId: string }
+  | {
+      type: 'start';
+      operationId: string;
+      machineId: string;
+      /** Assigns this operator first when the step has another (or none). */
+      operatorId?: string;
+    }
+  | { type: 'pause'; operationId: string; reason: PauseReason; note: string }
+  | { type: 'resume'; operationId: string }
+  | ({ type: 'complete'; operationId: string } & StepCounts)
+  | { type: 'designApproval'; approval: DesignApproval }
+  | { type: 'rawMaterial'; rawMaterial: RawMaterialDetails }
+  | ({ type: 'recordQc' } & Omit<QcRecordInput, 'jobCardId'>)
+  | { type: 'attachQcReport'; qcId: string; report: Attachment }
+  | { type: 'watch' }
+  | { type: 'unwatch' };
+
+/** Raw material details saved on the job card (saveJobCardRawMaterial). */
+export type RawMaterialDetails = {
+  rawMaterialGrade: string;
+  rawMaterialSize: string;
+  heatNumber: string;
+  rmPartNumber: string;
+  materialSource: MaterialSource | '';
+};
 
 /** Multi-select filters; an empty list shows every card. */
 export type JobCardFilters = {

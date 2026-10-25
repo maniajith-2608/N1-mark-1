@@ -7,6 +7,11 @@ import {
 } from '../../../shared/testing/testUtils';
 import { sessionActions } from '../../auth/store/sessionSlice';
 
+// Until jest.setup.js maps it: the dashboard reads the in-memory version.
+jest.mock('../api/dashboardApi', () =>
+  jest.requireActual('../api/mockDashboardApi'),
+);
+
 // Desktop: permanent sidebar, no top bar.
 jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => ({
   __esModule: true,

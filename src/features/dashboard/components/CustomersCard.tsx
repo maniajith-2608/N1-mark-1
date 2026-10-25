@@ -93,6 +93,9 @@ const makeStyles = createN1Styles(t => ({
   },
   line: { flexDirection: 'row', alignItems: 'center', gap: t.spacing.sm },
   grow: { flex: 1 },
+  // Nothing in the period: the message sits in the middle of the card.
+  empty: { padding: t.spacing.xxl, alignItems: 'center' },
+  emptyFill: { flex: 1, justifyContent: 'center' },
   pressed: { opacity: t.opacity.pressed },
 }));
 
@@ -238,7 +241,16 @@ export const CustomersCard = memo(function CustomersCardComponent({
         </View>
       )}
 
-      {scrollable ? (
+      {customers.length === 0 ? (
+        <View
+          style={[styles.empty, scrollable && styles.emptyFill]}
+          testID="customers-empty"
+        >
+          <N1Text color="secondary" align="center">
+            {S.empty}
+          </N1Text>
+        </View>
+      ) : scrollable ? (
         <ScrollView style={styles.scroll} testID="customers-scroll">
           {rows}
         </ScrollView>

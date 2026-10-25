@@ -81,3 +81,11 @@ export const MACHINE_TYPE_OPTIONS: N1DropDownOption<MachineType>[] = (
 export const MACHINE_STATUS_OPTIONS: N1DropDownOption<MachineStatus>[] = (
   Object.keys(MACHINE_STATUS_META) as MachineStatus[]
 ).map(value => ({ value, label: MACHINE_STATUS_META[value].label }));
+
+/**
+ * What the app may set: Running only comes from a started step, so a running
+ * machine's status is shown but can't be changed here.
+ */
+export const MACHINE_SETTABLE_STATUS_OPTIONS = MACHINE_STATUS_OPTIONS.filter(
+  option => option.value !== 'running',
+);

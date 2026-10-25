@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import {
   DetailHeader,
@@ -33,7 +33,6 @@ import { COMMON_STRINGS } from '../../../shared/constants';
 import { useForm, useOnSettled } from '../../../shared/hooks';
 import { formatFileSize } from '../../../shared/utils';
 import { useCustomers } from '../../customers';
-import { jobCardFromOrder, useJobCards } from '../../jobCards';
 import { FieldsScrollView } from '../components/FieldsScrollView';
 import { OrderStepper } from '../components/OrderStepper';
 import {
@@ -110,7 +109,6 @@ export function OrderFormScreen({
   const orderId = route.params?.orderId;
   const {
     order,
-    items,
     status,
     error,
     reload,
@@ -153,33 +151,9 @@ export function OrderFormScreen({
         : navigation.popTo('OrdersList'),
     [navigation, fromDetails, orderId],
   );
-  // Every save leaves the form (see `leave`). Creating with the raw material
-  // in adds its job card first; if that fails, the order still exists and
-  // its job card button on the list can retry.
-  const jobCards = useJobCards();
-  const idsBeforeCreate = useRef<Set<string> | null>(null);
-  const jobCardFor = useRef<string | null>(null);
-  const onOrderSaved = useCallback(() => {
-    const before = idsBeforeCreate.current;
-    idsBeforeCreate.current = null;
-    const created = before && items.find(o => !before.has(o.id));
-    if (created) {
-      jobCardFor.current = created.id;
-      jobCards.create(jobCardFromOrder(created));
-    } else {
-      leave();
-    }
-  }, [items, jobCards, leave]);
-  useOnSettled(saving, saveError, onOrderSaved);
-  const jobCardWasSaving = useRef(false);
-  useEffect(() => {
-    const id = jobCardFor.current;
-    if (jobCardWasSaving.current && !jobCards.saving && id) {
-      jobCardFor.current = null;
-      leave();
-    }
-    jobCardWasSaving.current = jobCards.saving;
-  }, [jobCards.saving, leave]);
+  // Every save leaves the form (see `leave`). createOrder opens the order's
+  // job card itself.
+  useOnSettled(saving, saveError, leave);
 
   const customerOptions = useMemo<N1DropDownOption<string>[]>(
     () => customers.map(c => ({ value: c.id, label: c.name })),
@@ -204,7 +178,8 @@ export function OrderFormScreen({
     [pickCustomer],
   );
   // Typing a saved customer's exact name counts as picking them; any other
-  // name is kept as a new customer's.
+  // name isn't a customer yet (validation asks to pick one: an order is
+  // made for a saved customer).
   const typeCustomer = useCallback(
     (text: string) => {
       const match = findOptionByLabel(customerOptions, text);
@@ -257,12 +232,9 @@ export function OrderFormScreen({
     if (orderId) {
       update(orderId, input);
     } else {
-      if (values.rawMaterialArrived) {
-        idsBeforeCreate.current = new Set(items.map(o => o.id));
-      }
       create(input);
     }
-  }, [values, order, orderId, items, create, update]);
+  }, [values, order, orderId, create, update]);
 
   const isLast = step === STEP_COUNT;
   const backLinkLabel = fromDetails ? F.backToOrder : F.backToOrders;
@@ -272,16 +244,14 @@ export function OrderFormScreen({
     <DetailHeader
       sheet
       title={isEdit ? F.editTitle : F.createTitle}
-      subtitle={isEdit && orderId ? F.editSubtitle(orderId) : F.createSubtitle}
+      subtitle={
+        isEdit && order ? F.editSubtitle(order.number) : F.createSubtitle
+      }
       onBack={leave}
     />
   );
-  const busy = saving || jobCards.saving;
-  const submitLabel = isEdit
-    ? F.submitEdit
-    : values.rawMaterialArrived
-    ? F.submitCreateWithJobCard
-    : F.submitCreate;
+  const busy = saving;
+  const submitLabel = isEdit ? F.submitEdit : F.submitCreate;
   const backLabel = step === 1 ? COMMON_STRINGS.cancel : F.back;
   const onBack = step === 1 ? leave : previous;
   // Saving checks every step; a problem opens the first step that has one.
@@ -339,23 +309,30 @@ export function OrderFormScreen({
         />
       </FormRow>
       <FormRow>
-        <N1Combobox
-          label={F.customer}
-          required
-          placeholder={F.customerPlaceholder}
-          leftIcon="search"
-          options={customerOptions}
-          value={values.customerName}
-          onChangeText={typeCustomer}
-          onSelect={selectCustomer}
-          errorText={errors.customerName}
-          helperText={
-            values.customerName.trim() && !values.customerId
-              ? F.newCustomer
-              : undefined
-          }
-          testID="order-form-customer"
-        />
+        {isEdit ? (
+          // An order keeps its customer.
+          <N1TextInput
+            label={F.customer}
+            required
+            value={values.customerName}
+            disabled
+            helperText={F.customerLocked}
+            testID="order-form-customer"
+          />
+        ) : (
+          <N1Combobox
+            label={F.customer}
+            required
+            placeholder={F.customerPlaceholder}
+            leftIcon="search"
+            options={customerOptions}
+            value={values.customerName}
+            onChangeText={typeCustomer}
+            onSelect={selectCustomer}
+            errorText={errors.customerName}
+            testID="order-form-customer"
+          />
+        )}
         <N1TextInput
           label={F.customerEmail}
           placeholder={F.customerEmailPlaceholder}

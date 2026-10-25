@@ -14,6 +14,7 @@ import { COUNTRY_OPTIONS } from '../../../shared/constants';
 import { useForm, useOnSettled } from '../../../shared/hooks';
 import { formatDate, formatFileSize } from '../../../shared/utils';
 import { pickDocument } from '../../../services/files/pickDocument';
+import { usePermission } from '../hooks/usePermission';
 import { useSession } from '../hooks/useSession';
 import {
   BUSINESS_TYPE_OPTIONS,
@@ -73,6 +74,8 @@ export function OrganizationSectionForm({
 }: Props) {
   const styles = useN1Styles(makeStyles);
   const { updateOrganization, saving, saveError } = useSession();
+  // Only org.manage may save (an accountant sees the details read-only).
+  const canManage = usePermission('org.manage');
   const validate = useCallback(
     (v: OrganizationFormValues) => validateSection(section, v),
     [section],
@@ -133,10 +136,12 @@ export function OrganizationSectionForm({
     <N1TextInput label={label} value={value} readOnly testID={testID} />
   );
 
-  const dropDown = (key: DropDownField) => (
+  const dropDown = (key: DropDownField, required = false) => (
     <N1DropDown
       key={key}
       label={F[key]}
+      required={required && editing}
+      errorText={errors[key]}
       options={DROPDOWN_OPTIONS[key]}
       value={values[key] || null}
       onChange={bind(key)}
@@ -203,13 +208,17 @@ export function OrganizationSectionForm({
       case 'address':
         return (
           <>
-            {text('address', { multiline: true })}
+            {text('address', { multiline: true, required: editing })}
             <FormRow>
-              {text('city')}
-              {dropDown('state')}
+              {text('city', { required: editing })}
+              {dropDown('state', true)}
             </FormRow>
             <FormRow>
-              {text('pinCode', { keyboardType: 'number-pad', maxLength: 6 })}
+              {text('pinCode', {
+                keyboardType: 'number-pad',
+                maxLength: 6,
+                required: editing,
+              })}
               {dropDown('country')}
             </FormRow>
           </>
@@ -242,6 +251,7 @@ export function OrganizationSectionForm({
   return (
     <View style={styles.panel} testID="organization-form">
       <EditableSectionHeader
+        actionsInFooter={!canManage}
         title={meta.title}
         icon={meta.icon}
         editing={editing}

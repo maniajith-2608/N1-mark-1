@@ -4,7 +4,7 @@ import type { N1DropDownOption } from '../../shared/components';
 export const AUTH_TAGLINE =
   'N1 brings your organization, your team, and your data together in one simple workspace. Stay on top of daily operations, keep your team aligned, and get a clear view of your business from one dashboard.';
 
-export const PASSWORD_MIN_LENGTH = 8;
+export { PASSWORD_MIN_LENGTH } from '../../config/constants';
 
 /** Digits in the emailed verification code. */
 export const VERIFICATION_CODE_LENGTH = 6;
@@ -30,6 +30,36 @@ export const USER_ROLES = {
 } as const;
 
 export type UserRole = (typeof USER_ROLES)[keyof typeof USER_ROLES];
+
+/** The backend's roles (RoleName); the app shows only the four above. */
+export type BackendRole =
+  | 'OWNER'
+  | 'ADMIN'
+  | 'ACCOUNTANT'
+  | 'SUPERVISOR'
+  | 'OPERATOR'
+  | 'QC';
+
+/**
+ * Owner and accountant use the admin dashboard (the accountant's billing
+ * lives there); the backend still limits what each may do.
+ */
+export const BACKEND_ROLE_TO_APP: Record<BackendRole, UserRole> = {
+  OWNER: USER_ROLES.ADMIN,
+  ADMIN: USER_ROLES.ADMIN,
+  ACCOUNTANT: USER_ROLES.ADMIN,
+  SUPERVISOR: USER_ROLES.SUPERVISOR,
+  OPERATOR: USER_ROLES.OPERATOR,
+  QC: USER_ROLES.QC,
+};
+
+/** The role a new person gets for each app role. */
+export const APP_ROLE_TO_BACKEND: Record<UserRole, BackendRole> = {
+  [USER_ROLES.ADMIN]: 'ADMIN',
+  [USER_ROLES.SUPERVISOR]: 'SUPERVISOR',
+  [USER_ROLES.OPERATOR]: 'OPERATOR',
+  [USER_ROLES.QC]: 'QC',
+};
 
 export const ROLE_LABELS: Record<UserRole, string> = {
   [USER_ROLES.ADMIN]: 'Admin',
@@ -57,7 +87,7 @@ export type MockUser = {
   role: UserRole;
 };
 
-/** Hardcoded logins until the auth API exists. */
+/** Logins for the Jest stand-in of the auth API (api/mockAuthApi.ts). */
 export const MOCK_USERS: MockUser[] = [
   {
     email: 'admin@n1.com',

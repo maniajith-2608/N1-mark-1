@@ -1,4 +1,6 @@
+import { PASSWORD_MIN_LENGTH } from '../../config/constants';
 import { ROLE_LABELS } from '../auth/constants';
+import { workOrderLabel } from '../orders/constants';
 import type { N1DropDownOption } from '../../shared/components';
 import { INDIAN_STATES } from '../../shared/constants';
 import type { StatusMeta } from '../../shared/types';
@@ -39,7 +41,7 @@ export const USER_STRINGS = {
       'As an admin, you’re setting this person’s initial password. They can change it after signing in.',
     passwordEditHelp:
       'As an admin, you can reset this person’s password here. Leave both blank to keep it unchanged.',
-    passwordWeak: 'Use at least 8 characters with letters and numbers',
+    passwordWeak: `Use at least ${PASSWORD_MIN_LENGTH} characters with letters and numbers`,
     role: 'Role',
     status: 'Status',
   },
@@ -74,7 +76,7 @@ export const USER_STRINGS = {
         `No job cards yet. They show here once ${name} runs a step.`,
       title: (jobCard: string, job: string) =>
         [jobCard, job].filter(Boolean).join(' · '),
-      workOrder: (wo: string) => `WO #${wo}`,
+      workOrder: workOrderLabel,
       routeCard: (id: string) => `RC #${id}`,
       started: (date: string) => `Started ${date}`,
     },
@@ -108,9 +110,9 @@ export const USER_STRINGS = {
     title: 'Delete employee?',
     message: (name: string) =>
       [
-        'This will permanently remove ',
+        'This will deactivate ',
         name,
-        ' and their access. This can’t be undone.',
+        ': they can no longer sign in. Their history is kept, and setting their status back to Active restores access.',
       ] as const,
     confirm: 'Delete employee',
   },

@@ -16,7 +16,7 @@ import {
 } from '../../../shared/hooks';
 import { isBlank } from '../../../shared/utils';
 import { MATERIAL_SOURCE_OPTIONS, ORDER_STRINGS } from '../constants';
-import { useOrders } from '../hooks/useOrders';
+import { useJobCardCommands } from '../../jobCards/hooks/useJobCards';
 import type { WorkOrder } from '../types';
 import { RAW_MATERIAL_FIELDS } from './orderForm';
 
@@ -52,24 +52,27 @@ type Props = {
   visible: boolean;
   order: WorkOrder | null;
   onClose: () => void;
-  /** The details are saved on the order; make the job card now. */
+  /** The order's job card, which the details are saved on. */
+  jobCardId: string;
+  /** The details are saved. */
   onSaved: () => void;
 };
 
 /**
- * Create job card on an order that's missing raw material details: collect
- * them (prefilled with what the order has), save them on the order, then
- * hand back so the job card can be made.
+ * Raw material for an order that's missing some: collect it (prefilled with
+ * what the order has) and save it on the job card (saveJobCardRawMaterial),
+ * which also fills it in on the order. RM QC then inspects it.
  */
 export function RawMaterialDialog({
   visible,
   order: orderProp,
+  jobCardId,
   onClose,
   onSaved,
 }: Props) {
   // Kept while the dialog fades out.
   const order = useHeldWhileVisible(visible, orderProp);
-  const { update, saving, saveError, clearErrors } = useOrders();
+  const { run, saving, saveError, clearErrors } = useJobCardCommands();
   const form = useForm<RawMaterial>(valuesOf(order), validate);
   const { reset, values, errors, bind } = form;
 
@@ -88,17 +91,18 @@ export function RawMaterialDialog({
 
   const save = useCallback(
     (v: RawMaterial) => {
-      if (order) {
-        update(order.id, {
+      run(jobCardId, {
+        type: 'rawMaterial',
+        rawMaterial: {
           materialSource: v.materialSource,
           rmPartNumber: v.rmPartNumber.trim(),
           rawMaterialSize: v.rawMaterialSize.trim(),
           heatNumber: v.heatNumber.trim(),
           rawMaterialGrade: v.rawMaterialGrade.trim(),
-        });
-      }
+        },
+      });
     },
-    [order, update],
+    [jobCardId, run],
   );
 
   const text = (
@@ -122,7 +126,7 @@ export function RawMaterialDialog({
       visible={visible}
       onClose={onClose}
       title={D.rawMaterialTitle}
-      subtitle={D.rawMaterialHelp(ORDER_STRINGS.workOrder(order?.id ?? ''))}
+      subtitle={D.rawMaterialHelp(ORDER_STRINGS.workOrder(order?.number ?? ''))}
       footer={
         <FormFooter
           onCancel={onClose}

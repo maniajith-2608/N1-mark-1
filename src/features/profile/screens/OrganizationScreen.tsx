@@ -24,6 +24,7 @@ import { useOnSettled } from '../../../shared/hooks';
 import { pickImage } from '../../../services/files/pickImage';
 import { GstSettingsForm } from '../components/GstSettingsForm';
 import { OrganizationSectionForm } from '../components/OrganizationSectionForm';
+import { usePermission } from '../hooks/usePermission';
 import { useSession } from '../hooks/useSession';
 import {
   INDUSTRY_OPTIONS,
@@ -146,6 +147,8 @@ export function OrganizationScreen() {
   const { isCompact } = useN1Breakpoint();
   const { organization, status, error, reload, updateOrganization, saving } =
     useSession();
+  // Only org.manage may change the logo (or any section).
+  const canManage = usePermission('org.manage');
   const [logoSaving, setLogoSaving] = useState(false);
   const [tab, setTab] = useState<OrganizationSection>('general');
   const [editing, setEditing] = useState(false);
@@ -243,7 +246,7 @@ export function OrganizationScreen() {
                   </View>
                 }
                 avatarUri={organization.logo?.uri}
-                onAvatarPress={changeLogo}
+                onAvatarPress={canManage ? changeLogo : undefined}
                 avatarLabel={S.changeLogo}
                 avatarLoading={logoSaving}
                 testID="organization-hero"
@@ -295,7 +298,7 @@ export function OrganizationScreen() {
                 subtitle={optionLabel(INDUSTRY_OPTIONS, organization.industry)}
                 badges={<N1Badge label={organization.code} tone="info" />}
                 avatarUri={organization.logo?.uri}
-                onAvatarPress={changeLogo}
+                onAvatarPress={canManage ? changeLogo : undefined}
                 avatarLabel={S.changeLogo}
                 avatarLoading={logoSaving}
                 testID="organization-hero"

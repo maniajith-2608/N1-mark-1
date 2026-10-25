@@ -3,9 +3,9 @@ import { createCrudSlice } from '../../../shared/store';
 import type { Invoice, InvoiceInput, Quote, QuoteInput } from '../types';
 import workflowReducer from './workflowSlice';
 
-// Newest number first.
-const byIdDesc = (a: { id: string }, b: { id: string }) =>
-  b.id.localeCompare(a.id);
+// Newest number first ("CBE/26-27/0012" before "…/0011").
+const byIdDesc = (a: { number: string }, b: { number: string }) =>
+  b.number.localeCompare(a.number, undefined, { numeric: true });
 
 export const invoicesCrud = createCrudSlice<Invoice, InvoiceInput>(
   'billing/invoices',

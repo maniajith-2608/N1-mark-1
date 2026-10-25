@@ -13,6 +13,7 @@ import type {
   JobOperation,
   QcEntry,
   RejectedMaterial,
+  RouteStep,
 } from './types';
 
 const isDone = (op: JobOperation) => op.status === 'completed';
@@ -25,7 +26,9 @@ export const jobTitle = (c: Pick<JobCard, 'partName' | 'jobName'>) =>
 
 /** "WO #1042 · Bracket — Job A" */
 export const jobHeading = (c: JobCard) =>
-  [JOB_CARD_STRINGS.workOrder(c.id), jobTitle(c)].filter(Boolean).join(' · ');
+  [JOB_CARD_STRINGS.workOrder(c.number), jobTitle(c)]
+    .filter(Boolean)
+    .join(' · ');
 
 /** "JOB12" */
 export const jobCardCode = (n: number) => `JOB${n}`;
@@ -51,7 +54,7 @@ export const jobCardHeading = (c: JobCard) =>
 
 /** "WO #1042 · Acme Metalworks" */
 export const jobCustomerHeading = (c: JobCard) =>
-  [JOB_CARD_STRINGS.workOrder(c.id), c.customerName]
+  [JOB_CARD_STRINGS.workOrder(c.number), c.customerName]
     .filter(Boolean)
     .join(' · ');
 
@@ -94,6 +97,19 @@ const withOperations = (operations: JobOperation[]): JobCardInput => ({
   status: statusFor(operations),
 });
 
+/**
+ * A typed or scanned code as the server knows it: "WO-12", the card code
+ * ("JOB12") or its QR value ("JC-00012"). People type "wo 12", "WO #12" or
+ * just "12" for the work order; those read as "WO-12". Only the first line
+ * counts: the order's QR lists its details under the number.
+ */
+export function normaliseJobCode(code: string): string {
+  const [first = ''] = code.trim().split('\n');
+  const value = first.trim().toUpperCase();
+  const workOrder = /^(?:WO\s*[#-]?\s*)?0*(\d+)$/.exec(value);
+  return workOrder ? `WO-${workOrder[1]}` : value.replace(/\s+/g, '');
+}
+
 // ---- Stage: where the job is ----
 
 /** The latest QC check logged against an operation. */
@@ -118,7 +134,8 @@ export type JobCardStage =
   | {
       key: 'operation';
       operation: JobOperation;
-      state: 'running' | 'paused' | 'next';
+      /** rework: a failed QC check reopened the step to be done again. */
+      state: 'running' | 'paused' | 'next' | 'rework';
     }
   /** An operation is finished and waiting for (or failed) its QC check. */
   | {
@@ -130,9 +147,10 @@ export type JobCardStage =
 
 /**
  * Where the job is, first match wins: dispatched (Done), RM QC failed, an
- * operation running or paused, the last finished operation's QC (Final QC
- * for the last step), Ready to dispatch, the next operation, then before any
- * work: RM received (RM QC pending), RM QC passed (no flow yet), Yet to start.
+ * operation running or paused, a step reopened by a failed QC check (redo),
+ * the last finished operation's QC (Final QC for the last step), Ready to
+ * dispatch, the next operation, then before any work: RM received (RM QC
+ * pending), RM QC passed (no flow yet), Yet to start.
  */
 export function jobCardStage(c: JobCard): JobCardStage {
   if (c.billing === 'invoiced') {
@@ -148,6 +166,10 @@ export function jobCardStage(c: JobCard): JobCardStage {
       operation: started,
       state: started.status === 'paused' ? 'paused' : 'running',
     };
+  }
+  const rework = c.operations.find(op => op.isRework && !isDone(op));
+  if (rework) {
+    return { key: 'operation', operation: rework, state: 'rework' };
   }
   const done = c.operations.filter(isDone);
   const last = done[done.length - 1];
@@ -179,6 +201,8 @@ export function stageMeta(stage: JobCardStage): StatusMeta {
         ? { label: name, tone: 'info' }
         : stage.state === 'paused'
         ? { label: ST.paused(name), tone: 'warning' }
+        : stage.state === 'rework'
+        ? { label: ST.redo(name), tone: 'danger' }
         : { label: ST.next(name), tone: 'neutral' };
     }
     case 'operation_qc': {
@@ -195,12 +219,16 @@ export function stageMeta(stage: JobCardStage): StatusMeta {
 }
 
 /**
- * Why the next operation can't start yet: RM QC hasn't passed, or the last
- * finished operation is still waiting for (or failed) its QC check.
+ * Why the next operation can't start yet: RM QC hasn't passed, the design
+ * isn't approved, or the last finished operation is still waiting for (or
+ * failed) its QC check. The server checks the same before startJobStep.
  */
 export function startBlockedReason(c: JobCard): string | undefined {
   if (c.materialQc !== 'accepted') {
     return ST.waitingForRmQc;
+  }
+  if (c.designApproval !== 'approved') {
+    return ST.waitingForDesign;
   }
   const next = c.operations.findIndex(op => !isDone(op));
   const previous = next > 0 ? c.operations[next - 1] : undefined;
@@ -216,31 +244,37 @@ export function startBlockedReason(c: JobCard): string | undefined {
 
 /**
  * Start (or resume) is allowed when nothing is running, a step is left, RM
- * QC passed and the last finished step passed its QC.
+ * QC passed, the design is approved and the last finished step passed its QC.
  */
 export const canStart = (c: JobCard) =>
   !c.operations.some(op => op.status === 'running') &&
   c.operations.some(op => !isDone(op)) &&
   !startBlockedReason(c);
 
+/** Work has begun on a step; the card can no longer be cancelled. */
+export const hasStarted = (c: JobCard) =>
+  c.operations.some(op => op.status !== 'pending' || op.isRework);
+
+/** The step Start / Resume acts on: the first one not done yet. */
+export const nextOperation = (c: JobCard) =>
+  c.operations.find(op => !isDone(op));
+
+/** The step that is running now, which Pause and Complete act on. */
+export const runningOperation = (c: JobCard) =>
+  c.operations.find(op => op.status === 'running');
+
 /**
- * Sends a step that failed its QC back to be done again: a fresh, pending
- * copy (new id, so its earlier QC checks stay in the history).
+ * A failed QC check reopens its step as rework (the server does this): the
+ * same step, pending again, keeping its history.
  */
-export function redoOperation(
-  c: JobCard,
-  operationId: string,
-  now: string,
-): JobCardInput {
+export function reopenOperation(c: JobCard, operationId: string): JobCardInput {
   return withOperations(
     c.operations.map(op =>
       op.id === operationId
         ? {
             ...op,
-            id: `${op.id}-redo-${Date.parse(now)}`,
-            machine: '',
-            operator: '',
             status: 'pending',
+            isRework: true,
             startedAt: null,
             completedAt: null,
           }
@@ -259,7 +293,12 @@ export const canPauseOrComplete = (c: JobCard) =>
 export function startOperation(
   c: JobCard,
   now: string,
-  assignment?: Pick<JobOperation, 'machine' | 'operator'>,
+  assignment?: Partial<
+    Pick<
+      JobOperation,
+      'machine' | 'machineId' | 'operator' | 'operatorId' | 'quantityStarted'
+    >
+  >,
 ): JobCardInput {
   const next = c.operations.findIndex(op => !isDone(op));
   return withOperations(
@@ -294,29 +333,6 @@ export function completeOperation(c: JobCard, now: string): JobCardInput {
   );
 }
 
-/**
- * Finishes the whole flow at once: every step not yet done is marked
- * completed, and the job moves on to its final QC.
- */
-export function completeFlow(c: JobCard, now: string): JobCardInput {
-  return withOperations(
-    c.operations.map(op =>
-      isDone(op)
-        ? op
-        : {
-            ...op,
-            status: 'completed',
-            startedAt: op.startedAt ?? now,
-            completedAt: now,
-          },
-    ),
-  );
-}
-
-/** The flow can be finished once RM QC passed and a step is left. */
-export const canCompleteFlow = (c: JobCard) =>
-  c.materialQc === 'accepted' && c.operations.some(op => !isDone(op));
-
 // ---- Create / Edit flow ----
 
 /** One row of the flow editor. `operation` is set for saved steps. */
@@ -348,38 +364,47 @@ export function stepStatus(step: FlowStep, editing: boolean): N1StepStatus {
   return status === 'running' || status === 'paused' ? 'current' : 'upcoming';
 }
 
-/** Saved steps keep their progress; renamed or new steps start fresh. */
-export const flowInput = (steps: FlowStep[]): JobCardInput =>
-  withOperations(flowToOperations(steps));
+/** The flow to save (updateJobCardRoute): saved steps keep their ids. */
+export const flowSteps = (steps: FlowStep[]): RouteStep[] =>
+  steps.map(step =>
+    step.operation
+      ? { id: step.operation.id, name: step.name }
+      : { name: step.name },
+  );
 
-function flowToOperations(steps: FlowStep[]): JobOperation[] {
-  return steps.map((step, i) => {
-    const op = step.operation;
-    if (op && op.name === step.name) {
-      return op;
-    }
-    if (op && isStarted(op)) {
-      return { ...op, name: step.name };
-    }
-    return {
-      id: op?.id ?? `op-${Date.now()}-${i}`,
-      name: step.name,
-      machine: '',
-      operator: '',
-      status: 'pending',
-      startedAt: null,
-      completedAt: null,
-    };
-  });
+/**
+ * The route after a save, as the server builds it: saved steps keep their
+ * progress (a renamed step not started yet is just renamed), new steps start
+ * pending. Used by the in-memory API.
+ */
+export function routeInput(c: JobCard, steps: RouteStep[]): JobCardInput {
+  return withOperations(
+    steps.map((step, i) => {
+      const op = step.id ? c.operations.find(o => o.id === step.id) : undefined;
+      return op
+        ? { ...op, name: step.name }
+        : {
+            id: `op-${Date.now()}-${i}`,
+            name: step.name,
+            machine: '',
+            operator: '',
+            status: 'pending',
+            startedAt: null,
+            completedAt: null,
+          };
+    }),
+  );
 }
 
 // ---- List filters ----
 
 export const jobCardSearchText = (c: JobCard) => {
   const op = currentOperation(c);
-  return `${c.code} ${workOrderSearchTerms(c.id)} ${jobTitle(c)} ${
-    c.customerName
-  } ${op?.name ?? ''} ${op?.machine ?? ''} ${op?.operator ?? ''}`;
+  return `${c.code} ${workOrderSearchTerms(
+    c.number.replace(/^WO-?/i, ''),
+  )} ${jobTitle(c)} ${c.customerName} ${op?.name ?? ''} ${op?.machine ?? ''} ${
+    op?.operator ?? ''
+  }`;
 };
 
 export const matchesJobCardFilters = (c: JobCard, f: JobCardFilters) => {
@@ -405,10 +430,15 @@ export function optionsFrom(
   return [{ value: ALL, label: allLabel }, ...distinctOptions(values)];
 }
 
-/** A new job card for a work order: no route card yet, nothing approved. */
+/**
+ * The job card the server opens with a new order: no route card yet,
+ * nothing approved. Used by the in-memory API.
+ */
 export function jobCardFromOrder(order: WorkOrder): JobCard {
   return {
-    id: order.id,
+    id: order.jobCardId || order.id,
+    orderId: order.id,
+    number: order.number,
     // The backend numbers it on create.
     code: '',
     customerId: order.customerId,
@@ -428,6 +458,10 @@ export function jobCardFromOrder(order: WorkOrder): JobCard {
     qcHistory: [],
     quotation: 'pending',
     billing: 'not_invoiced',
+    partNumber: order.partNumber,
+    drawingNumber: order.drawingNumber,
+    poNumber: order.poNumber,
+    routeCardNo: order.routeCardNo,
   };
 }
 

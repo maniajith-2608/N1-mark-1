@@ -1,44 +1,19 @@
 import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from '../../../app/store';
 import { DAY_MS } from '../../../services/mock/mockServer';
-import { selectAllInvoices } from '../../billing/store/selectors';
-import { jobReference } from '../../billing/workflow';
-import { selectAllJobCards } from '../../jobCards/store/selectors';
-import { isOpen, orderStatus } from '../utils';
+import { isOpen } from '../utils';
+import { ordersCrud } from './ordersSlice';
 
 const NEW_ORDER_WINDOW_MS = 7 * DAY_MS;
-import { ordersCrud } from './ordersSlice';
 
 export const selectOrdersState = (state: RootState) => state.orders;
 
-const { selectAll: selectStoredOrders } =
+/** Every order, with the status the server set. */
+export const { selectAll: selectAllOrders } =
   ordersCrud.adapter.getSelectors(selectOrdersState);
 
-// Each order's job card (same id) and whether its invoice is paid. Lambdas,
-// so the other features' selectors are read at call time, not import time.
-const selectStatusSources = createSelector(
-  [
-    (state: RootState) => selectAllJobCards(state),
-    (state: RootState) => selectAllInvoices(state),
-  ],
-  (jobCards, invoices) => ({
-    jobCards: new Map(jobCards.map(c => [c.id, c])),
-    paid: new Set(invoices.filter(i => i.status === 'paid').map(i => i.jobId)),
-  }),
-);
-
-/** Orders with their status worked out from the job card and invoice. */
-export const selectAllOrders = createSelector(
-  [selectStoredOrders, selectStatusSources],
-  (orders, { jobCards, paid }) =>
-    orders.map(o => ({
-      ...o,
-      status: orderStatus(o, jobCards.get(o.id), paid.has(jobReference(o.id))),
-    })),
-);
-
 export const selectOrderById = (state: RootState, id: string) =>
-  selectAllOrders(state).find(o => o.id === id);
+  ordersCrud.adapter.getSelectors(selectOrdersState).selectById(state, id);
 
 export const selectOrderStats = createSelector([selectAllOrders], orders => {
   const open = orders.filter(isOpen);

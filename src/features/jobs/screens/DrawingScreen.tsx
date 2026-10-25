@@ -11,15 +11,14 @@ import {
   useN1Styles,
 } from '../../../shared/components';
 import { printOrNotify } from '../../../services/print';
-import {
-  DrawingPreview,
-  ORDER_STRINGS,
-  orderHeading,
-  useOrder,
-} from '../../orders';
+import { openStoredFile } from '../../../services/files/fileStorage';
+import { notifyUnavailable } from '../../../shared/utils';
+import { useJobCardForOrder } from '../../jobCards';
+import { DrawingPreview, ORDER_STRINGS, orderHeading } from '../../orders';
 import { VIEW } from '../../orders/components/DrawingPreview';
 import { drawingPrintHtml } from '../../orders/printing';
 import type { JobsScreenProps } from '../types';
+import { jobViewOf } from '../utils';
 
 const D = ORDER_STRINGS.details;
 
@@ -31,7 +30,8 @@ const makeStyles = createN1Styles(t => ({
 
 /**
  * A work order's drawing, full screen (opened from the job's or order's
- * drawing), with Print drawing with QR.
+ * drawing), with Print drawing with QR and the stored design file. Read
+ * through the order's job card, which every shop-floor role may open.
  */
 export function DrawingScreen({
   route,
@@ -39,8 +39,17 @@ export function DrawingScreen({
 }: JobsScreenProps<'Drawing'>) {
   const styles = useN1Styles(makeStyles);
   const { orderId } = route.params;
-  const { order, status, error, reload } = useOrder(orderId);
+  const { jobCard, status, error, reload } = useJobCardForOrder(orderId);
+  const order = jobCard && jobViewOf(jobCard);
   const drawingNumber = order?.drawingNumber || D.noDrawing;
+  const designFile = jobCard?.designFile;
+  const openFile = useCallback(() => {
+    if (designFile) {
+      openStoredFile(designFile)
+        .then(opened => opened || notifyUnavailable(D.downloadAction))
+        .catch(() => notifyUnavailable(D.downloadAction));
+    }
+  }, [designFile]);
 
   const print = useCallback(() => {
     if (order) {
@@ -73,8 +82,23 @@ export function DrawingScreen({
   return (
     <UserScreen
       header={header}
-      footer={
+      footer={[
+        ...(designFile
+          ? [
+              <N1Button
+                key="open"
+                title={D.openInNewTab}
+                leftIcon="file"
+                variant="secondary"
+                size="lg"
+                fullWidth
+                onPress={openFile}
+                testID="drawing-open"
+              />,
+            ]
+          : []),
         <N1Button
+          key="print"
           title={D.printDrawing}
           leftIcon="printer"
           variant="secondary"
@@ -82,8 +106,8 @@ export function DrawingScreen({
           fullWidth
           onPress={print}
           testID="drawing-print"
-        />
-      }
+        />,
+      ]}
       testID="drawing-screen"
     >
       <View style={styles.heading}>

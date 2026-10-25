@@ -14,4 +14,5 @@ export const SEARCH_DEBOUNCE_MS = isTest ? 0 : 200;
 
 export const CURRENCY_SYMBOL = '₹';
 
-export const PASSWORD_MIN_LENGTH = 8;
+/** The backend rejects anything shorter (rule D15). */
+export const PASSWORD_MIN_LENGTH = 10;

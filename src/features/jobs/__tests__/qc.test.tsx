@@ -10,7 +10,7 @@ import {
   typeInto,
 } from '../../../shared/testing/testUtils';
 import { MOCK_JOB_CARDS } from '../../jobCards/api/mockData';
-import { jobCardsApi } from '../../jobCards/api/jobCardsApi';
+import { jobCardsApi } from '../../jobCards/api/mockJobCardsApi';
 import { QC_STRINGS } from '../constants';
 import { machineQc, qcResult, rawMaterialQc } from '../qc';
 
@@ -143,7 +143,8 @@ test('failing needs remarks, then marks the item failed', async () => {
   expect(allText(root)).not.toContain('Elapsed time');
   await press(byTestId(root, 'qc-fail'));
   expect(allText(root)).toContain('Fail Remarks');
-  expect(byLabel(root, 'Voice note')).toBeTruthy();
+  // No voice notes in phase 1: remarks are typed.
+  expect(() => byLabel(root, 'Voice note')).toThrow();
   expect(hasTestId(root, 'qc-rejected-grade')).toBe(false);
 
   await press(byTestId(root, 'qc-submit-fail'));
@@ -152,18 +153,23 @@ test('failing needs remarks, then marks the item failed', async () => {
   await typeInto(byTestId(root, 'qc-remarks'), 'Bore out of tolerance');
   await press(byTestId(root, 'qc-submit-fail'));
 
-  // Back on the list (Machine QC tab kept), the item is Failed.
+  // Back on the list (Machine QC tab kept). The failed check reopened the
+  // step as rework, so there's nothing to check until it's done again.
   expect(hasTestId(root, 'qc-list-screen')).toBe(true);
-  expect(rowText(root, '1039')).toContain('Failed');
-  expect((await card('1039')).qcHistory.at(-1)).toMatchObject({
+  expect(rowText(root, '1039')).not.toContain('Pending');
+  const failed = await card('1039');
+  expect(failed.qcHistory.at(-1)).toMatchObject({
+    kind: 'machine',
     result: 'failed',
     remark: 'Bore out of tolerance',
     operationId: '1039-op1',
   });
+  expect(failed.operations[0]).toMatchObject({
+    status: 'pending',
+    isRework: true,
+  });
 
-  // The check shows the remark and no longer offers Pass / Fail.
   await press(byTestId(root, 'qc-row-1039'));
-  expect(allText(root)).toContain('Bore out of tolerance');
   expect(hasTestId(root, 'qc-pass')).toBe(false);
 });
 
@@ -247,7 +253,9 @@ test('View Details opens the order behind a QC check', async () => {
   await press(byTestId(root, 'qc-row-1042'));
   await press(byTestId(root, 'view-order-details'));
 
+  // The job view: no prices or client details.
   const text = allText(byTestId(root, 'order-details-modal'));
   expect(text).toContain('Order Details');
-  expect(text).toContain('Shop order number');
+  expect(text).toContain('PO number');
+  expect(text).not.toContain('PO amount');
 });

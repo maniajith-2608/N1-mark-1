@@ -91,3 +91,38 @@ jest.mock('@react-native-community/datetimepicker', () => {
     DateTimePickerAndroid: { open: jest.fn(), dismiss: jest.fn() },
   };
 });
+
+// Tests never reach the N1 Core API: these features run on in-memory stand-ins.
+jest.mock('./src/features/auth/api/authApi', () =>
+  jest.requireActual('./src/features/auth/api/mockAuthApi'),
+);
+jest.mock('./src/features/userManagement/api/userManagementApi', () =>
+  jest.requireActual('./src/features/userManagement/api/mockUserManagementApi'),
+);
+jest.mock('./src/features/billing/api/billingApi', () =>
+  jest.requireActual('./src/features/billing/api/mockBillingApi'),
+);
+jest.mock('./src/features/customers/api/customersApi', () =>
+  jest.requireActual('./src/features/customers/api/mockCustomersApi'),
+);
+jest.mock('./src/features/jobCards/api/jobCardsApi', () =>
+  jest.requireActual('./src/features/jobCards/api/mockJobCardsApi'),
+);
+jest.mock('./src/features/jobs/api/myJobsApi', () =>
+  jest.requireActual('./src/features/jobs/api/mockMyJobsApi'),
+);
+jest.mock('./src/features/machines/api/machinesApi', () =>
+  jest.requireActual('./src/features/machines/api/mockMachinesApi'),
+);
+jest.mock('./src/features/orders/api/ordersApi', () =>
+  jest.requireActual('./src/features/orders/api/mockOrdersApi'),
+);
+jest.mock('./src/features/profile/api/profileApi', () =>
+  jest.requireActual('./src/features/profile/api/mockProfileApi'),
+);
+jest.mock('./src/features/profile/api/employeeProfileApi', () =>
+  jest.requireActual('./src/features/profile/api/mockEmployeeProfileApi'),
+);
+jest.mock('./src/features/dashboard/api/dashboardApi', () =>
+  jest.requireActual('./src/features/dashboard/api/mockDashboardApi'),
+);

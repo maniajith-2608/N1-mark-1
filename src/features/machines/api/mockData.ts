@@ -16,6 +16,7 @@ export const MOCK_MACHINES: Machine[] = [
     status: 'running',
     currentWork: {
       workOrderId: '1036',
+      workOrderNumber: '1036',
       title: 'Coupling — Job G',
       operator: 'Divya Ramesh',
     },
@@ -30,6 +31,7 @@ export const MOCK_MACHINES: Machine[] = [
     status: 'running',
     currentWork: {
       workOrderId: '1039',
+      workOrderNumber: '1039',
       title: 'Flange — Job C',
       operator: 'Karthik Iyer',
     },
@@ -55,6 +57,7 @@ export const MOCK_MACHINES: Machine[] = [
     status: 'running',
     currentWork: {
       workOrderId: '1042',
+      workOrderNumber: '1042',
       title: 'Bracket — Job A',
       operator: 'Arun Prakash',
     },
@@ -79,6 +82,7 @@ export const MOCK_MACHINES: Machine[] = [
     status: 'running',
     currentWork: {
       workOrderId: '1037',
+      workOrderNumber: '1037',
       title: 'Bracket — Job F',
       operator: 'Arun Prakash',
     },
@@ -103,6 +107,7 @@ export const MOCK_MACHINES: Machine[] = [
     status: 'running',
     currentWork: {
       workOrderId: '1040',
+      workOrderNumber: '1040',
       title: 'Bracket — Job B',
       operator: 'Suresh Babu',
     },

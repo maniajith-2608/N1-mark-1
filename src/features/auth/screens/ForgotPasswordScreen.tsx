@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { N1Button, N1TextInput } from '../../../shared/components';
+import { N1Button, N1Text, N1TextInput } from '../../../shared/components';
+import { errorMessage } from '../../../shared/store';
+import { authApi } from '../api/authApi';
 import AuthLayout from '../components/AuthLayout';
 import AuthStep from '../components/AuthStep';
 import { useForgotPassword } from '../context/ForgotPasswordContext';
@@ -18,6 +20,8 @@ function ForgotPasswordScreen() {
   // Pre-filled when the user comes back via "Use a different email".
   const [email, setEmail] = useState(savedEmail);
   const [submitted, setSubmitted] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string>();
   const valid = isValidEmail(email);
 
   // popTo also works when this screen was opened straight from a link.
@@ -26,14 +30,24 @@ function ForgotPasswordScreen() {
       .getParent<NativeStackNavigationProp<AuthStackParamList>>()
       ?.popTo('Login');
 
-  // No API yet: pretend the code was sent and move on.
-  const handleSendCode = () => {
+  // POST /auth/forgot. It answers the same for an unknown email, so the
+  // next step never reveals whether an account exists.
+  const handleSendCode = async () => {
     setSubmitted(true);
-    if (!valid) {
+    if (!valid || sending) {
       return;
     }
-    saveEmail(email.trim());
-    navigation.navigate('VerifyCode');
+    setSending(true);
+    setError(undefined);
+    try {
+      await authApi.forgotPassword(email.trim());
+      saveEmail(email.trim());
+      navigation.navigate('VerifyCode');
+    } catch (e) {
+      setError(errorMessage(e, 'Could not send the code. Try again.'));
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -57,10 +71,16 @@ function ForgotPasswordScreen() {
           errorText={submitted && !valid ? 'Enter a valid email' : undefined}
           onSubmitEditing={handleSendCode}
         />
+        {error ? (
+          <N1Text variant="small" color="danger">
+            {error}
+          </N1Text>
+        ) : null}
         <N1Button
           title="Send code"
           size="lg"
           fullWidth
+          loading={sending}
           onPress={handleSendCode}
         />
       </AuthStep>

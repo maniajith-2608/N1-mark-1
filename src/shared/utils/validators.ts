@@ -36,7 +36,19 @@ export function isPhone(value: string): boolean {
   return digits >= PHONE_DIGITS.min && digits <= PHONE_DIGITS.max;
 }
 
-export const isNumeric = (value: string) =>
+/**
+ * The +91… form the backend stores and signs in with: "98765 43210",
+ * "+91 98765-43210" and "919876543210" all become "+919876543210".
+ */
+export function toE164Phone(value: string): string {
+  const digits = value.replace(/\D/g, '');
+  if (value.trim().startsWith('+')) {
+    return `+${digits}`;
+  }
+  return digits.length === 10 ? `+91${digits}` : `+${digits}`;
+}
+
+export const isNumeric =(value: string) =>
   value.trim() !== '' && Number.isFinite(Number(value));
 
 export const isDisplayDate = (value: string) =>

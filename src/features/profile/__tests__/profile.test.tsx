@@ -5,6 +5,7 @@ import { runSaga } from 'redux-saga';
 import type { UnknownAction } from '@reduxjs/toolkit';
 import {
   allText,
+  flush,
   byLabel,
   byTestId,
   choose,
@@ -18,7 +19,7 @@ import {
 import RootNavigator from '../../../app/navigation/RootNavigator';
 import { createStore } from '../../../app/store';
 import { N1ThemeProvider } from '../../../shared/components';
-import { profileApi } from '../api/profileApi';
+import { MOCK_WRONG_PASSWORD, profileApi } from '../api/mockProfileApi';
 import {
   changePassword,
   fetchSession,
@@ -158,17 +159,25 @@ test('Security: the current password shows as set; Update password reveals the n
   expect(current.props.editable).toBe(false);
   expect(() => byLabel(h.root, 'New password')).toThrow();
 
-  // No need to type the current password.
+  // changeMyPassword needs the current password.
   await press(byTestId(h.root, 'password-form-start'));
   const newPassword = byLabel(h.root, 'New password');
   const confirm = byLabel(h.root, 'Confirm password');
-  await typeInto(newPassword, 'newpass12');
+  await typeInto(newPassword, 'newpass123');
+  await typeInto(confirm, 'newpass123');
+  await press(byTestId(h.root, 'password-form-submit'));
+  expect(spy).not.toHaveBeenCalled();
+  expect(allText(h.root)).toContain('This field is required');
+  await typeInto(byLabel(h.root, 'Current password'), 'oldpass123');
   await typeInto(confirm, 'different1');
   await press(byTestId(h.root, 'password-form-submit'));
   expect(spy).not.toHaveBeenCalled();
-  await typeInto(confirm, 'newpass12');
+  await typeInto(confirm, 'newpass123');
   await press(byTestId(h.root, 'password-form-submit'));
-  expect(spy).toHaveBeenCalledWith({ newPassword: 'newpass12' });
+  expect(spy).toHaveBeenCalledWith({
+    currentPassword: 'oldpass123',
+    newPassword: 'newpass123',
+  });
   // Saved: locked again and confirmed.
   expect(allText(byTestId(h.root, 'password-form-changed'))).toBe(
     'Password updated',
@@ -180,7 +189,7 @@ test('Security: Cancel clears and locks again', async () => {
   const h = await renderAdmin('MyProfile');
   await press(byTestId(h.root, 'profile-tab-security'));
   await press(byTestId(h.root, 'password-form-start'));
-  await typeInto(byLabel(h.root, 'New password'), 'newpass12');
+  await typeInto(byLabel(h.root, 'New password'), 'newpass123');
   await press(byTestId(h.root, 'password-form-cancel'));
   expect(() => byLabel(h.root, 'New password')).toThrow();
   await press(byTestId(h.root, 'password-form-start'));
@@ -203,13 +212,26 @@ test('Security: no password yet: empty field and Set password', async () => {
   expect(current.props.placeholder).toBe('No password set');
   expect(allText(byTestId(h.root, 'password-form-start'))).toBe('Set password');
   await press(byTestId(h.root, 'password-form-start'));
-  await typeInto(byLabel(h.root, 'New password'), 'newpass12');
-  await typeInto(byLabel(h.root, 'Confirm password'), 'newpass12');
+  await typeInto(byLabel(h.root, 'Current password'), 'oldpass123');
+  await typeInto(byLabel(h.root, 'New password'), 'newpass123');
+  await typeInto(byLabel(h.root, 'Confirm password'), 'newpass123');
   await press(byTestId(h.root, 'password-form-submit'));
   // Now it has one.
   expect(byTestId(h.root, 'password-form-current').props.value).toBe(
     '••••••••',
   );
+});
+
+test('Security: a wrong current password says so and stays open', async () => {
+  const h = await renderAdmin('MyProfile');
+  await press(byTestId(h.root, 'profile-tab-security'));
+  await press(byTestId(h.root, 'password-form-start'));
+  await typeInto(byLabel(h.root, 'Current password'), MOCK_WRONG_PASSWORD);
+  await typeInto(byLabel(h.root, 'New password'), 'newpass123');
+  await typeInto(byLabel(h.root, 'Confirm password'), 'newpass123');
+  await press(byTestId(h.root, 'password-form-submit'));
+  expect(allText(h.root)).toContain('Your current password is not right.');
+  expect(byLabel(h.root, 'New password')).toBeTruthy();
 });
 
 test('autofill: the browser never fills the password fields or the menu search', async () => {
@@ -247,6 +269,8 @@ test('log out asks first, then returns to the login screen', async () => {
     await typeInto(email, 'admin@n1.com');
     await typeInto(password, 'Admin@123');
     await press(byLabel(root, 'Log in'));
+    // Signing in is a request now; let it finish.
+    await flush();
   };
   await logInAsAdmin();
   await press(byLabel(root, 'Open my profile'));

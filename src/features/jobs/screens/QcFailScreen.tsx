@@ -16,11 +16,7 @@ import {
 } from '../../../shared/components';
 import { COMMON_STRINGS } from '../../../shared/constants';
 import { useOnSettled } from '../../../shared/hooks';
-import {
-  formatFileSize,
-  isBlank,
-  notifyUnavailable,
-} from '../../../shared/utils';
+import { formatFileSize, isBlank } from '../../../shared/utils';
 import type { Attachment } from '../../../shared/types';
 import { pickDocument } from '../../../services/files/pickDocument';
 import {
@@ -35,7 +31,7 @@ import {
   REJECTED_MATERIAL_FIELDS,
 } from '../constants';
 import { useEmployeeProfile } from '../../profile/hooks/useEmployeeProfile';
-import { qcResult } from '../qc';
+import { machineQc } from '../qc';
 import type { JobsScreenProps } from '../types';
 
 const S = QC_STRINGS.fail;
@@ -63,7 +59,7 @@ const NO_MATERIAL: RejectedMaterial = { grade: '', heatNumber: '', size: '' };
 export function QcFailScreen({ route, navigation }: JobsScreenProps<'QcFail'>) {
   const styles = useN1Styles(makeStyles);
   const { jobCardId, kind } = route.params;
-  const { jobCard, status, error, reload, update, saving, saveError } =
+  const { jobCard, status, error, reload, run, saving, saveError } =
     useJobCard(jobCardId);
   // Recorded on the check as who failed it.
   const { profile } = useEmployeeProfile();
@@ -112,25 +108,23 @@ export function QcFailScreen({ route, navigation }: JobsScreenProps<'QcFail'>) {
     if (isBlank(remarks) || blankMaterial.length) {
       return;
     }
-    update(
-      jobCard.id,
-      qcResult(
-        jobCard,
-        kind,
-        false,
-        remarks.trim(),
-        new Date().toISOString(),
-        profile?.name,
-        isRm
-          ? {
-              grade: material.grade.trim(),
-              heatNumber: material.heatNumber.trim(),
-              size: material.size.trim(),
-            }
-          : undefined,
-        report ?? undefined,
-      ),
-    );
+    // A failed machine check reopens its step as rework (the server does).
+    run({
+      type: 'recordQc',
+      kind,
+      operationId: isRm ? undefined : machineQc(jobCard).operation?.id,
+      passed: false,
+      remark: remarks.trim(),
+      inspector: profile?.name ?? '',
+      rejectedMaterial: isRm
+        ? {
+            grade: material.grade.trim(),
+            heatNumber: material.heatNumber.trim(),
+            size: material.size.trim(),
+          }
+        : undefined,
+      report: report ?? undefined,
+    });
   };
   const attach = async () => {
     setPicking(true);
@@ -206,15 +200,9 @@ export function QcFailScreen({ route, navigation }: JobsScreenProps<'QcFail'>) {
         </>
       )}
       <View style={styles.field}>
+        {/* No voice notes in phase 1: remarks are typed. */}
         <View style={styles.labelRow}>
           <N1FieldLabel label={S.remarks} required />
-          <N1Button
-            title={S.voiceNote}
-            leftIcon="mic"
-            variant="secondary"
-            size="sm"
-            onPress={() => notifyUnavailable(S.voiceNotes)}
-          />
         </View>
         <N1TextInput
           value={remarks}

@@ -1,5 +1,18 @@
 import { DAY_MS, isoAgo } from '../../../services/mock/mockServer';
 import type { Invoice, LineItem, Quote } from '../types';
+import { calculateTotals } from '../utils';
+
+/** The mock backend's totals: the real ones come from the server. */
+export const mockInvoiceTotals = (
+  i: Pick<Invoice, 'lineItems' | 'quantity' | 'discount' | 'gstRate'>,
+) => calculateTotals(i.lineItems, i.quantity, i.discount, i.gstRate);
+export const mockQuoteTotals = (
+  q: Pick<Quote, 'lineItems' | 'quantity' | 'gstRate'>,
+) => calculateTotals(q.lineItems, q.quantity, 0, q.gstRate);
+
+/** "WO-00125" → "125": the mock job card and order behind it. */
+export const mockJobNumber = (jobId: string) =>
+  jobId.replace(/\D/g, '').replace(/^0+/, '');
 
 // Rates are per minute; ₹80/3 shows as ₹26.67 and keeps the design's round amounts.
 const SHAFT_OPERATIONS: LineItem[] = [
@@ -131,7 +144,20 @@ const FLANGE_OPERATIONS: LineItem[] = [
 
 type InvoiceSeed = Omit<
   Invoice,
-  'discount' | 'notes' | 'lineItems' | 'gstRate' | 'quoteId' | 'poAmount'
+  | 'discount'
+  | 'notes'
+  | 'lineItems'
+  | 'gstRate'
+  | 'quoteId'
+  | 'poAmount'
+  // Filled in from the rest, as the server would.
+  | 'number'
+  | 'customerId'
+  | 'jobCardId'
+  | 'orderId'
+  | 'dueDate'
+  | 'payment'
+  | 'totals'
 > &
   Partial<
     Pick<Invoice, 'discount' | 'notes' | 'gstRate' | 'quoteId' | 'poAmount'>
@@ -142,15 +168,37 @@ type InvoiceSeed = Omit<
 // Seeded documents were issued at 5% GST.
 const SEED_GST_RATE = 5;
 
-const invoice = (seed: InvoiceSeed): Invoice => ({
-  discount: 0,
-  gstRate: SEED_GST_RATE,
-  quoteId: null,
-  poAmount: null,
-  notes: '',
-  lineItems: SHAFT_OPERATIONS,
-  ...seed,
-});
+const invoice = (seed: InvoiceSeed): Invoice => {
+  const base = {
+    discount: 0,
+    gstRate: SEED_GST_RATE,
+    quoteId: null,
+    poAmount: null,
+    notes: '',
+    lineItems: SHAFT_OPERATIONS,
+    ...seed,
+  };
+  const totals = mockInvoiceTotals(base);
+  const day = base.issuedAt.slice(0, 10);
+  return {
+    ...base,
+    number: base.id,
+    customerId: '',
+    jobCardId: mockJobNumber(base.jobId),
+    orderId: mockJobNumber(base.jobId),
+    dueDate: day,
+    payment:
+      base.status === 'paid'
+        ? {
+            paidOn: day,
+            receivedAmount: totals.total,
+            tdsAmount: 0,
+            tdsSection: null,
+          }
+        : null,
+    totals,
+  };
+};
 
 export const MOCK_INVOICES: Invoice[] = [
   invoice({
@@ -305,7 +353,15 @@ export const MOCK_INVOICES: Invoice[] = [
 
 type QuoteSeed = Omit<
   Quote,
-  'lineItems' | 'material' | 'partName' | 'quantity' | 'gstRate' | 'orderId'
+  | 'lineItems'
+  | 'material'
+  | 'partName'
+  | 'quantity'
+  | 'gstRate'
+  | 'orderId'
+  | 'number'
+  | 'customerId'
+  | 'totals'
 > &
   Partial<
     Pick<
@@ -314,15 +370,23 @@ type QuoteSeed = Omit<
     >
   >;
 
-const quote = (seed: QuoteSeed): Quote => ({
-  gstRate: SEED_GST_RATE,
-  orderId: null,
-  lineItems: SHAFT_OPERATIONS,
-  material: 'EN8',
-  partName: 'Machined Shaft',
-  quantity: 150,
-  ...seed,
-});
+const quote = (seed: QuoteSeed): Quote => {
+  const base = {
+    gstRate: SEED_GST_RATE,
+    orderId: null,
+    lineItems: SHAFT_OPERATIONS,
+    material: 'EN8',
+    partName: 'Machined Shaft',
+    quantity: 150,
+    ...seed,
+  };
+  return {
+    ...base,
+    number: base.id,
+    customerId: '',
+    totals: mockQuoteTotals(base),
+  };
+};
 
 export const MOCK_QUOTES: Quote[] = [
   quote({

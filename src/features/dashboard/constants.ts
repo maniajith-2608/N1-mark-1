@@ -28,17 +28,6 @@ export const MENU_ITEMS: MenuItem[] = [
 ];
 
 // Sample data until the API exists.
-export const ORGANIZATION = {
-  name: 'ABC Engineering Pvt Ltd',
-  shortName: 'ABC Engineering',
-};
-
-export const CURRENT_USER = {
-  name: 'Koushik Dasarathan',
-  email: 'kousigaratchagan.pd@foodhub.com',
-  roleLabel: 'Admin',
-};
-
 export const SAMPLE_USERS: OrgUser[] = [
   {
     id: '1',
@@ -121,6 +110,7 @@ export const DASHBOARD_STRINGS = {
   /** Greets the signed-in user; plain "Welcome back" until the name loads. */
   title: (name?: string) => (name ? `Welcome back, ${name}` : 'Welcome back'),
   subtitle: (org: string) => `Overview for ${org}.`,
+  loadFailed: 'Failed to load the dashboard',
   /** Phones: above the user's name. */
   greeting: 'Welcome back,',
   /** This calendar week (from Monday), month or year. */
@@ -139,6 +129,7 @@ export const DASHBOARD_STRINGS = {
     title: 'Customers',
     subtitle: 'Orders, billing and deliveries by customer.',
     viewAll: 'View all',
+    empty: 'No data',
     columns: {
       customer: 'Customer',
       orders: 'Total orders',
@@ -156,6 +147,7 @@ export const DASHBOARD_STRINGS = {
   jobs: {
     title: 'Priority jobs (by due date)',
     viewAll: (n: number) => `View all (${n})`,
+    empty: 'No jobs',
     open: (title: string) => `Open ${title}`,
     /** "RC-2210 (Acme Metalworks)" */
     heading: (routeCard: string, customer: string) =>

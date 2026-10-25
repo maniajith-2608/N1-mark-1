@@ -13,9 +13,9 @@ import {
   NEW_FLOW_STEPS,
   OPERATION_OPTIONS,
 } from '../constants';
-import type { JobCard, JobCardInput } from '../types';
+import type { JobCard, RouteStep } from '../types';
 import {
-  flowInput,
+  flowSteps,
   initialFlowSteps,
   stepStatus,
   type FlowStep,
@@ -55,9 +55,9 @@ export function useFlowEditor(jobCard: JobCard) {
     [],
   );
   const add = useCallback(() => setSteps(prev => [...prev, blankStep()]), []);
-  const submit = (): JobCardInput | null => {
+  const submit = (): RouteStep[] | null => {
     setSubmitted(true);
-    return steps.length && steps.every(s => s.name) ? flowInput(steps) : null;
+    return steps.length && steps.every(s => s.name) ? flowSteps(steps) : null;
   };
 
   return { steps, submitted, rename, remove, add, submit };
@@ -95,6 +95,8 @@ export const FlowEditor = memo(function FlowEditorComponent({
               key={step.key}
               number={i + 1}
               status={stepState}
+              // Only steps not started yet can change (the server's rule).
+              locked={stepState === 'completed' || stepState === 'current'}
               onRemove={() => remove(step.key)}
               testID={`flow-step-${i + 1}`}
             >
@@ -103,7 +105,7 @@ export const FlowEditor = memo(function FlowEditorComponent({
                 value={step.name || null}
                 onChange={name => rename(step.key, name)}
                 placeholder={F.stepPlaceholder}
-                disabled={stepState === 'completed'}
+                disabled={stepState === 'completed' || stepState === 'current'}
                 errorText={
                   submitted && !step.name ? COMMON_STRINGS.required : undefined
                 }

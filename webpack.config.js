@@ -91,6 +91,15 @@ module.exports = (env, argv) => {
       hot: true,
       historyApiFallback: true,
       static: path.resolve(appDirectory, 'public'),
+      // The backend allows CORS only from its docs site, so the web app calls
+      // it same-origin through /api (see src/config/env.ts).
+      proxy: [
+        {
+          context: ['/api'],
+          target: process.env.N1_API_URL || 'http://127.0.0.1:3000',
+          pathRewrite: { '^/api': '' },
+        },
+      ],
     },
   };
 };

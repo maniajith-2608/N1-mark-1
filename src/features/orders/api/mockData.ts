@@ -79,6 +79,9 @@ function order({ material, ...seed }: Seed): WorkOrder {
       },
     ],
     ...seed,
+    // Seeds use the same number for the order, its WO number and its job card.
+    number: seed.id,
+    jobCardId: seed.id,
     createdAt,
   };
 }
