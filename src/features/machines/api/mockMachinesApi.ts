@@ -10,7 +10,14 @@ const machines = createMockCollection<Machine, MachineInput>({
   seed: MOCK_MACHINES,
   nextId: rows => nextSequentialId(rows, 'MCH-'),
   // Like the API: a new machine starts idle; running comes from a started step.
-  build: (input, id) => ({ ...input, id, status: 'idle', currentWork: null }),
+  // The code doubles as the name, like machinesApi.
+  build: (input, id) => ({
+    ...input,
+    id,
+    name: input.code,
+    status: 'idle',
+    currentWork: null,
+  }),
 });
 
 export const machinesApi = {

@@ -16,10 +16,10 @@ import { MachineFields } from './MachineFields';
 const F = MACHINE_STRINGS.form;
 
 const EMPTY: MachineInput = {
-  name: '',
   code: '',
   model: '',
-  type: 'cnc_lathe',
+  type: 'cnc',
+  operation: '',
   location: '',
   status: 'idle',
   notes: '',
@@ -28,10 +28,10 @@ const EMPTY: MachineInput = {
 export const toMachineValues = (m?: Machine | null): MachineInput =>
   m
     ? {
-        name: m.name,
         code: m.code,
         model: m.model,
         type: m.type,
+        operation: m.operation,
         location: m.location,
         status: m.status,
         notes: m.notes,
@@ -43,7 +43,6 @@ const normaliseCode = (code: string) => code.trim().toUpperCase();
 /** Trimmed form values, with the code upper-cased. */
 export const trimMachine = (v: MachineInput): MachineInput => ({
   ...v,
-  name: v.name.trim(),
   code: normaliseCode(v.code),
   model: v.model.trim(),
   location: v.location.trim(),
@@ -60,9 +59,6 @@ export function makeMachineValidator(
   );
   return (v: MachineInput): FormErrors<MachineInput> => {
     const errors: FormErrors<MachineInput> = {};
-    if (isBlank(v.name)) {
-      errors.name = COMMON_STRINGS.required;
-    }
     if (isBlank(v.code)) {
       errors.code = COMMON_STRINGS.required;
     } else if (taken.has(normaliseCode(v.code))) {
@@ -119,7 +115,7 @@ export function MachineFormModal({
       visible={visible}
       onClose={onClose}
       title={isEdit ? F.editTitle : F.addTitle}
-      subtitle={isEdit ? F.editSubtitle(machine?.name ?? '') : F.addSubtitle}
+      subtitle={isEdit ? F.editSubtitle(machine?.code ?? '') : F.addSubtitle}
       footer={
         <FormFooter
           onCancel={onClose}

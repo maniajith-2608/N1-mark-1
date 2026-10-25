@@ -134,7 +134,7 @@ export function MachineDetailsScreen({
           <N1IconButton
             icon="edit"
             variant="tile"
-            accessibilityLabel={MACHINE_STRINGS.a11y.edit(machine.name)}
+            accessibilityLabel={MACHINE_STRINGS.a11y.edit(machine.code)}
             onPress={openEditor}
             testID="edit-machine"
           />
@@ -160,12 +160,10 @@ export function MachineDetailsScreen({
       <View style={styles.identity}>
         <View style={styles.titles}>
           <N1Text variant="h2" accessibilityRole="header">
-            {machine.name}
+            {machine.code}
           </N1Text>
           <N1Text variant="small" color="secondary">
-            {`${machine.code} · ${MACHINE_TYPE_LABELS[machine.type]} · ${
-              machine.location
-            }`}
+            {`${MACHINE_TYPE_LABELS[machine.type]} · ${machine.location}`}
           </N1Text>
         </View>
         <MachineStatusBadge status={machine.status} />
@@ -192,7 +190,7 @@ export function MachineDetailsScreen({
           actionsInFooter={isCompact}
           onCancel={stopEdit}
           onSave={form.submit(save)}
-          editLabel={MACHINE_STRINGS.a11y.edit(machine.name)}
+          editLabel={MACHINE_STRINGS.a11y.edit(machine.code)}
           editTestID="edit-machine"
           submitTestID="machine-form-submit"
         />

@@ -31,8 +31,13 @@ import {
 } from '../../../shared/components';
 import { COMMON_STRINGS } from '../../../shared/constants';
 import { useForm, useOnSettled } from '../../../shared/hooks';
-import { formatFileSize } from '../../../shared/utils';
-import { useCustomers } from '../../customers';
+import { formatFileSize, isBlank } from '../../../shared/utils';
+import {
+  CustomerFormModal,
+  useCustomers,
+  type CustomerInput,
+} from '../../customers';
+import { useOrganizationName } from '../../profile';
 import { FieldsScrollView } from '../components/FieldsScrollView';
 import { OrderStepper } from '../components/OrderStepper';
 import {
@@ -84,6 +89,7 @@ const makeStyles = createN1Styles(t => ({
   },
   pressed: { opacity: t.opacity.pressed },
   section: { gap: t.spacing.lg },
+  createCustomer: { alignSelf: 'flex-start' },
   arrived: {
     gap: t.spacing.xs,
     padding: t.spacing.md,
@@ -119,6 +125,7 @@ export function OrderFormScreen({
     clearErrors,
   } = useOrder(orderId);
   const { items: customers } = useCustomers();
+  const organizationName = useOrganizationName();
   const isEdit = Boolean(orderId);
   const [step, setStep] = useState(1);
   // The furthest step opened so far; editing can open any step.
@@ -178,8 +185,8 @@ export function OrderFormScreen({
     [pickCustomer],
   );
   // Typing a saved customer's exact name counts as picking them; any other
-  // name isn't a customer yet (validation asks to pick one: an order is
-  // made for a saved customer).
+  // name isn't a customer yet: validation asks to create them first (an
+  // order is made for a saved customer).
   const typeCustomer = useCallback(
     (text: string) => {
       const match = findOptionByLabel(customerOptions, text);
@@ -192,6 +199,28 @@ export function OrderFormScreen({
     },
     [customerOptions, pickCustomer, setField],
   );
+
+  // Create customer opens Add customer with the typed name and email. The ids
+  // known on open tell which customer the save added, so it gets picked.
+  const [newCustomer, setNewCustomer] = useState<Partial<CustomerInput>>();
+  const [knownIds, setKnownIds] = useState<Set<string>>();
+  const openCreateCustomer = useCallback(() => {
+    setNewCustomer({
+      name: values.customerName.trim(),
+      email: values.customerEmail.trim(),
+    });
+    setKnownIds(new Set(customers.map(c => c.id)));
+  }, [values.customerName, values.customerEmail, customers]);
+  const closeCreateCustomer = useCallback(() => setNewCustomer(undefined), []);
+  useEffect(() => {
+    const added = knownIds && customers.find(c => !knownIds.has(c.id));
+    if (added) {
+      setKnownIds(undefined);
+      pickCustomer(added.id, added.name);
+    }
+  }, [customers, knownIds, pickCustomer]);
+  const canCreateCustomer =
+    !isEdit && !values.customerId && !isBlank(values.customerName);
 
   const attach = useCallback(
     async (field: 'designFile' | 'purchaseOrder') => {
@@ -345,6 +374,16 @@ export function OrderFormScreen({
           testID="order-form-email"
         />
       </FormRow>
+      {canCreateCustomer && (
+        <N1Button
+          title={F.createCustomer(values.customerName.trim())}
+          variant="secondary"
+          leftIcon="plus"
+          onPress={openCreateCustomer}
+          style={styles.createCustomer}
+          testID="order-form-create-customer"
+        />
+      )}
     </View>
   );
 
@@ -402,13 +441,10 @@ export function OrderFormScreen({
         })}
       </FormRow>
       <FormRow>
-        {text('routeCardNo', F.routeCardNo, F.routeCardPlaceholder, {
-          testID: 'order-form-route-card',
-        })}
         {date('dcDate', F.dcDate, 'order-form-dc-date')}
+        {date('deliveryDate', F.deliveryDate, 'order-form-delivery')}
       </FormRow>
       <FormRow>
-        {date('deliveryDate', F.deliveryDate, 'order-form-delivery')}
         <N1DropDown
           label={F.priority}
           placeholder={F.priorityPlaceholder}
@@ -417,18 +453,18 @@ export function OrderFormScreen({
           onChange={bind('priority')}
           testID="order-form-priority"
         />
-      </FormRow>
-      <FormRow>
         {text('quantity', F.quantity, F.quantityPlaceholder, {
           keyboardType: 'number-pad',
           testID: 'order-form-quantity',
         })}
+      </FormRow>
+      <FormRow>
         {text('partNumber', F.partNumber, F.partNumberPlaceholder, {
           testID: 'order-form-part-number',
         })}
+        {text('projectId', F.projectId, F.projectIdPlaceholder)}
       </FormRow>
       <FormRow>
-        {text('projectId', F.projectId, F.projectIdPlaceholder)}
         {text('shopOrderNumber', F.shopOrderNumber, F.shopOrderPlaceholder)}
       </FormRow>
       <FormRow>
@@ -576,6 +612,15 @@ export function OrderFormScreen({
     </>
   );
 
+  const createCustomerModal = (
+    <CustomerFormModal
+      visible={newCustomer !== undefined}
+      initialValues={newCustomer}
+      organizationName={organizationName}
+      onClose={closeCreateCustomer}
+    />
+  );
+
   // Phones: a white sheet like Edit machine; the page scrolls and the
   // buttons sit in the bottom bar.
   if (isCompact) {
@@ -590,6 +635,7 @@ export function OrderFormScreen({
             {top}
             {fields}
           </View>
+          {createCustomerModal}
         </AdminScreen>
       </AdminScreenBackground.Provider>
     );
@@ -605,6 +651,7 @@ export function OrderFormScreen({
         </FieldsScrollView>
         {footer}
       </N1Card>
+      {createCustomerModal}
     </AdminScreen>
   );
 }

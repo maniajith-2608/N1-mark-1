@@ -122,6 +122,8 @@ export type CustomerFormModalProps = {
   visible: boolean;
   customer?: Customer | null;
   organizationName: string;
+  /** Adding: fields to start with, e.g. what was typed on the order form. */
+  initialValues?: Partial<CustomerInput>;
   onClose: () => void;
 };
 
@@ -130,6 +132,7 @@ export function CustomerFormModal({
   visible,
   customer: customerProp,
   organizationName,
+  initialValues,
   onClose,
 }: CustomerFormModalProps) {
   // Kept while the dialog fades out, so the title doesn't flip to Create.
@@ -144,10 +147,14 @@ export function CustomerFormModal({
 
   useEffect(() => {
     if (visible) {
-      reset(toCustomerValues(customer));
+      reset(
+        customer
+          ? toCustomerValues(customer)
+          : { ...toCustomerValues(), ...initialValues },
+      );
       clearErrors();
     }
-  }, [visible, customer, reset, clearErrors]);
+  }, [visible, customer, initialValues, reset, clearErrors]);
 
   useOnSettled(saving, saveError, onClose);
 

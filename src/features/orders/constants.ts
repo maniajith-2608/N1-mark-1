@@ -175,8 +175,9 @@ export const ORDER_STRINGS = {
     poAccept: '.pdf,.doc,.docx,.xls,.xlsx,image/*',
     customer: 'Customer',
     customerPlaceholder: 'Search or type a customer name',
-    /** An order is made for a saved customer; new ones are added first. */
-    pickCustomer: 'Pick one of your customers. Add a new customer first.',
+    /** An order is made for a saved customer; a new name is created first. */
+    pickCustomer: 'Not one of your customers yet. Create them to continue.',
+    createCustomer: (name: string) => `Create customer "${name}"`,
     /** Edit: an order keeps its customer. */
     customerLocked: 'An order keeps its customer.',
     customerEmail: 'Customer email',
@@ -195,7 +196,6 @@ export const ORDER_STRINGS = {
     datePlaceholder: 'DD/MM/YYYY',
     invalidDate: 'Use DD/MM/YYYY',
     routeCardNo: 'Route card no',
-    routeCardPlaceholder: 'e.g. RC-2210',
     dcNo: 'DC no',
     dcNoPlaceholder: 'e.g. DC-5561',
     dcDate: 'DC date',

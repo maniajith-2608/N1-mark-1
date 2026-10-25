@@ -1,7 +1,11 @@
 import type { Machine } from '../types';
 
-const m = (machine: Omit<Machine, 'notes'> & { notes?: string }): Machine => ({
+const m = (
+  machine: Omit<Machine, 'notes' | 'operation'> &
+    Partial<Pick<Machine, 'notes' | 'operation'>>,
+): Machine => ({
   notes: '',
+  operation: '',
   ...machine,
 });
 
@@ -11,7 +15,8 @@ export const MOCK_MACHINES: Machine[] = [
     code: 'CNC-01',
     name: 'Turning Center 1',
     model: 'Haas ST-20',
-    type: 'cnc_lathe',
+    type: 'cnc',
+    operation: 'turning',
     location: 'Bay 1',
     status: 'running',
     currentWork: {
@@ -26,7 +31,7 @@ export const MOCK_MACHINES: Machine[] = [
     code: 'CNC-02',
     name: 'Turning Center 2',
     model: 'Haas ST-20',
-    type: 'cnc_lathe',
+    type: 'cnc',
     location: 'Bay 1',
     status: 'running',
     currentWork: {
@@ -41,7 +46,7 @@ export const MOCK_MACHINES: Machine[] = [
     code: 'CNC-03',
     name: 'Milling Center 1',
     model: 'DMG Mori NVX',
-    type: 'cnc_mill',
+    type: 'vmc',
     location: 'Bay 2',
     status: 'maintenance',
     currentWork: null,
@@ -52,7 +57,7 @@ export const MOCK_MACHINES: Machine[] = [
     code: 'CNC-04',
     name: 'Milling Center 2',
     model: 'DMG Mori NVX',
-    type: 'cnc_mill',
+    type: 'vmc',
     location: 'Bay 2',
     status: 'running',
     currentWork: {
@@ -77,7 +82,7 @@ export const MOCK_MACHINES: Machine[] = [
     code: 'WELD-01',
     name: 'Weld Station 1',
     model: 'Miller Syncrowave',
-    type: 'welding',
+    type: 'lathe',
     location: 'Bay 3',
     status: 'running',
     currentWork: {
@@ -92,7 +97,7 @@ export const MOCK_MACHINES: Machine[] = [
     code: 'WELD-02',
     name: 'Weld Station 2',
     model: 'Miller Syncrowave',
-    type: 'welding',
+    type: 'lathe',
     location: 'Bay 3',
     status: 'idle',
     currentWork: null,
@@ -102,7 +107,7 @@ export const MOCK_MACHINES: Machine[] = [
     code: 'QC-01',
     name: 'QC Bay 1',
     model: 'Mitutoyo CMM',
-    type: 'inspection',
+    type: 'lathe',
     location: 'QC Zone',
     status: 'running',
     currentWork: {
@@ -117,7 +122,7 @@ export const MOCK_MACHINES: Machine[] = [
     code: 'QC-02',
     name: 'QC Bay 2',
     model: 'Mitutoyo CMM',
-    type: 'inspection',
+    type: 'lathe',
     location: 'QC Zone',
     status: 'idle',
     currentWork: null,
@@ -127,7 +132,7 @@ export const MOCK_MACHINES: Machine[] = [
     code: 'PACK-01',
     name: 'Pack Station 1',
     model: 'Manual line',
-    type: 'packing',
+    type: 'lathe',
     location: 'Bay 4',
     status: 'maintenance',
     currentWork: null,

@@ -31,13 +31,14 @@ test('the totals sit in the pagination bar and the table lists machines', async 
   );
   expect(text).toContain('WO #1036 · Coupling — Job G');
   expect(text).toContain('Divya Ramesh');
-  expect(text).toContain('CNC Lathe');
+  expect(text).toContain('Turning');
+  expect(text).toContain('VMC');
   expect(text).toContain('Kirloskar Turnmaster');
   // Title and Add live in the toolbar; only the rows scroll.
   expect(text).toContain('Machines');
   expect(hasTestId(table, 'add-machine')).toBe(true);
   const scroll = byTestId(table, 'machines-table-scroll');
-  expect(allText(scroll)).toContain('Turning Center 1');
+  expect(allText(scroll)).toContain('CNC-01');
   expect(allText(scroll)).not.toContain('Showing 10 of 10 machines');
 });
 
@@ -47,7 +48,7 @@ test('search and the multi-select status filter narrow the list', async () => {
   const showing = () =>
     allText(byTestId(root, 'machines-table')).match(/Showing \d+ of \d+/)?.[0];
 
-  await typeInto(byLabel(root, 'Search by WO #, machine or code'), 'cnc mill');
+  await typeInto(byLabel(root, 'Search by WO #, machine or code'), 'vmc');
   expect(showing()).toBe('Showing 2 of 2');
   await typeInto(byLabel(root, 'Search by WO #, machine or code'), '');
 
@@ -56,7 +57,7 @@ test('search and the multi-select status filter narrow the list', async () => {
   await press(byLabel(panel(), 'Maintenance'));
   await press(byTestId(root, 'machines-filter-apply'));
   expect(showing()).toBe('Showing 5 of 5');
-  expect(allText(root)).not.toContain('Turning Center 1');
+  expect(allText(root)).not.toContain('CNC-01');
   expect(byLabel(root, 'Filter (2)')).toBeTruthy();
 });
 
@@ -64,8 +65,11 @@ test('adds a machine with required fields and a unique code', async () => {
   const { root, store } = await renderAdmin('Machines');
   await press(byTestId(root, 'add-machine'));
   await press(byTestId(root, 'machine-form-submit'));
-  expect(allText(root).split('This field is required').length - 1).toBe(3);
-  await typeInto(byTestId(root, 'machine-form-name'), 'Turning Center 3');
+  // Code and location; there is no name field (the code is the name).
+  expect(allText(root).split('This field is required').length - 1).toBe(2);
+  expect(hasTestId(root, 'machine-form-name')).toBe(false);
+  await choose(root, 'machine-form-type', 'VMC');
+  await choose(root, 'machine-form-operation', 'Pattern repeating');
   await typeInto(byTestId(root, 'machine-form-code'), 'cnc-01');
   await typeInto(byTestId(root, 'machine-form-location'), 'Bay 1');
   await press(byTestId(root, 'machine-form-submit'));
@@ -78,7 +82,9 @@ test('adds a machine with required fields and a unique code', async () => {
   // A new machine starts idle: Add machine has no status field.
   expect(hasTestId(root, 'machine-form-status')).toBe(false);
   expect(created).toMatchObject({
-    name: 'Turning Center 3',
+    name: 'CNC-05',
+    type: 'vmc',
+    operation: 'pattern_repeating',
     status: 'idle',
     currentWork: null,
   });
@@ -90,9 +96,9 @@ test('adds a machine with required fields and a unique code', async () => {
 
 test('edits a machine status in the dialog; its own code is allowed', async () => {
   const { root, store } = await renderAdmin('Machines');
-  await press(byLabel(root, 'Edit Milling Center 1'));
+  await press(byLabel(root, 'Edit CNC-03'));
   expect(hasTestId(root, 'machine-details-screen')).toBe(false);
-  expect(allText(root)).toContain("Update Milling Center 1's details.");
+  expect(allText(root)).toContain("Update CNC-03's details.");
   expect(byTestId(root, 'machine-form-code').props.value).toBe('CNC-03');
   await choose(root, 'machine-form-status', 'Idle');
   await press(byTestId(root, 'machine-form-submit'));
@@ -104,14 +110,14 @@ test('edits a machine status in the dialog; its own code is allowed', async () =
 
 test('clicking a row opens the machine details, locked until Edit', async () => {
   const { root } = await renderAdmin('Machines');
-  await press(byText(root, 'Milling Center 1'));
+  await press(byText(root, 'CNC-03'));
   expect(hasTestId(root, 'machine-details-screen')).toBe(true);
   expect(hasTestId(root, 'machine-form')).toBe(false);
   // Wide screens: the heading sits outside the scrolling content.
   const scroll = byTestId(root, 'machine-details-scroll');
   expect(hasTestId(scroll, 'machine-details-heading')).toBe(false);
   expect(hasTestId(scroll, 'machine-form-notes')).toBe(true);
-  expect(allText(root)).toContain('CNC-03 · CNC Mill');
+  expect(allText(root)).toContain('VMC · Bay 2');
   expect(byTestId(root, 'machine-form-code').props.value).toBe('CNC-03');
   expect(byTestId(root, 'machine-form-code').props.editable).toBe(false);
   expect(byTestId(root, 'machine-form-notes').props.value).toBe(
@@ -121,7 +127,7 @@ test('clicking a row opens the machine details, locked until Edit', async () => 
 
 test('clicking a row opens its details with the current work', async () => {
   const { root } = await renderAdmin('Machines');
-  await press(byText(root, 'Turning Center 1'));
+  await press(byText(root, 'CNC-01'));
   expect(allText(byTestId(root, 'machine-current-work'))).toContain(
     'WO #1036 · Coupling — Job G',
   ); // No notes: the locked field says so.
@@ -132,7 +138,7 @@ test('clicking a row opens its details with the current work', async () => {
 
 test('edits a machine in place on its details', async () => {
   const { root, store } = await renderAdmin('Machines');
-  await press(byText(root, 'Milling Center 1'));
+  await press(byText(root, 'CNC-03'));
   await press(byTestId(root, 'edit-machine'));
   expect(byTestId(root, 'machine-form-code').props.editable).toBe(true);
   await choose(root, 'machine-form-status', 'Idle');
@@ -147,7 +153,7 @@ test('edits a machine in place on its details', async () => {
 
 test('details edit rejects a code another machine uses; Cancel drops it', async () => {
   const { root, store } = await renderAdmin('Machines');
-  await press(byText(root, 'Milling Center 1'));
+  await press(byText(root, 'CNC-03'));
   await press(byTestId(root, 'edit-machine'));
   await typeInto(byTestId(root, 'machine-form-code'), 'cnc-01');
   await press(byTestId(root, 'machine-form-submit'));
@@ -175,9 +181,9 @@ test('phone lists machine cards with titled values and an edit button', async ()
   const { root } = await renderAdmin('Machines');
   expect(hasTestId(root, 'machine-stats')).toBe(false);
   const row = allText(byTestId(root, 'machine-card-MCH-1'));
-  expect(row).toContain('Turning Center 1');
   expect(row).toContain('CNC-01');
-  expect(row).toContain('CNC Lathe');
+  expect(row).toContain('Turning');
+  expect(row).toContain('CNC');
   expect(row).toContain('Bay 1');
   expect(row).toContain('Running');
   expect(row).toContain('WO #1036 · Coupling — Job G');
@@ -187,7 +193,7 @@ test('phone lists machine cards with titled values and an edit button', async ()
     expect(row).toContain(title),
   );
   // The pencil opens the Edit dialog, not the details.
-  await press(byLabel(root, 'Edit Turning Center 1'));
+  await press(byLabel(root, 'Edit CNC-01'));
   expect(allText(root)).toContain('Edit machine');
   expect(hasTestId(root, 'machine-details-screen')).toBe(false);
 });
@@ -195,14 +201,14 @@ test('phone lists machine cards with titled values and an edit button', async ()
 test('phone details sit on a white page; the header Edit slides up the edit sheet', async () => {
   mockWidth = 390;
   const { root, store } = await renderAdmin('Machines');
-  await press(byText(root, 'Milling Center 1'));
+  await press(byText(root, 'CNC-03'));
   expect(hasTestId(root, 'machine-details-screen')).toBe(true);
   expect(hasTestId(root, 'machine-form')).toBe(false);
   // One Edit, in the header; none on the Machine info section.
   expect(allText(byTestId(root, 'machine-details-form'))).not.toContain('Edit');
   await press(byTestId(root, 'edit-machine'));
   const sheet = byTestId(root, 'machine-form');
-  expect(allText(sheet)).toContain("Update Milling Center 1's details.");
+  expect(allText(sheet)).toContain("Update CNC-03's details.");
   await choose(sheet, 'machine-form-status', 'Idle');
   await press(byTestId(sheet, 'machine-form-submit'));
   expect(store.getState().machines.entities['MCH-3']).toMatchObject({
@@ -219,17 +225,17 @@ test('search finds the machine running a work order', async () => {
   await typeInto(byLabel(root, 'Search by WO #, machine or code'), 'WO #1039');
   const text = allText(byTestId(root, 'machines-table'));
   expect(text).toContain('Showing 1 of 1');
-  expect(text).toContain('Turning Center 2');
+  expect(text).toContain('CNC-02');
 });
 
 test('a running machine keeps its status; others choose idle or maintenance', async () => {
   const { root } = await renderAdmin('Machines');
-  await press(byLabel(root, 'Edit Turning Center 1'));
+  await press(byLabel(root, 'Edit CNC-01'));
   expect(
     byTestId(root, 'machine-form-status').props.accessibilityState.disabled,
   ).toBe(true);
   await press(byTestId(root, 'machine-form-submit'));
-  await press(byLabel(root, 'Edit Milling Center 1'));
+  await press(byLabel(root, 'Edit CNC-03'));
   await press(byTestId(root, 'machine-form-status'));
   const options = root
     .findAll(
@@ -238,4 +244,30 @@ test('a running machine keeps its status; others choose idle or maintenance', as
     )
     .map(n => allText(n));
   expect(options).toEqual(['Idle', 'Maintenance']);
+});
+
+test('machine types are CNC, Lathe and VMC; operations list the seven', async () => {
+  const { root } = await renderAdmin('Machines');
+  await press(byTestId(root, 'add-machine'));
+  const menuItems = () =>
+    root
+      .findAll(
+        n =>
+          typeof n.type === 'string' &&
+          n.props.accessibilityRole === 'menuitem',
+      )
+      .map(n => allText(n));
+  await press(byTestId(root, 'machine-form-type'));
+  expect(menuItems()).toEqual(['CNC', 'Lathe', 'VMC']);
+  await choose(root, 'machine-form-type', 'CNC');
+  await press(byTestId(root, 'machine-form-operation'));
+  expect(menuItems()).toEqual([
+    'Facing',
+    'Turning',
+    'Drilling',
+    'Grooving',
+    'Tapping',
+    'Threading',
+    'Pattern repeating',
+  ]);
 });

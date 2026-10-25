@@ -32,6 +32,7 @@ import {
   INITIAL_MACHINE_FILTERS,
   machineSearchText,
   matchesMachineFilters,
+  operationLabel,
 } from '../utils';
 import { useTopBarAction } from '../../dashboard/hooks/useTopBarAction';
 
@@ -85,16 +86,10 @@ export function MachinesListScreen() {
       {
         key: 'code',
         title: S.columns.code,
-        flex: 0.8,
-        render: m => <N1Text color="secondary">{m.code}</N1Text>,
-      },
-      {
-        key: 'name',
-        title: S.columns.name,
-        flex: 1.4,
+        flex: 1.2,
         render: m => (
           <View>
-            <N1Text weight="bold">{m.name}</N1Text>
+            <N1Text weight="bold">{m.code}</N1Text>
             <N1Text variant="caption" color="secondary">
               {m.model}
             </N1Text>
@@ -105,6 +100,11 @@ export function MachinesListScreen() {
         key: 'type',
         title: S.columns.type,
         render: m => <N1Text>{MACHINE_TYPE_LABELS[m.type]}</N1Text>,
+      },
+      {
+        key: 'operation',
+        title: S.columns.operation,
+        render: m => <N1Text>{operationLabel(m)}</N1Text>,
       },
       { key: 'location', title: S.columns.location, flex: 0.8 },
       {
@@ -129,7 +129,7 @@ export function MachinesListScreen() {
             variant="primary"
             size="sm"
             onPress={() => openEdit(m)}
-            accessibilityLabel={S.a11y.edit(m.name)}
+            accessibilityLabel={S.a11y.edit(m.code)}
           />
         ),
       },

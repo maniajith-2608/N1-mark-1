@@ -33,7 +33,6 @@ export type OrderFormValues = {
   description: string;
   priority: OrderPriority | '';
   deliveryDate: string;
-  routeCardNo: string;
   dcNo: string;
   dcDate: string;
   partName: string;
@@ -62,7 +61,6 @@ export const EMPTY_ORDER_FORM: OrderFormValues = {
   description: '',
   priority: 'low',
   deliveryDate: '',
-  routeCardNo: '',
   dcNo: '',
   dcDate: '',
   partName: '',
@@ -103,7 +101,6 @@ export function orderToFormValues(order?: WorkOrder): OrderFormValues {
     description: order.description,
     priority: order.priority,
     deliveryDate: toDisplayDate(order.dueDate),
-    routeCardNo: order.routeCardNo,
     dcNo: order.dcNo,
     dcDate: toDisplayDate(order.dcDate),
     partName: order.partName,
@@ -138,7 +135,6 @@ export const ORDER_FORM_STEPS: (keyof OrderFormValues)[][] = [
     'drawingNumber',
     'projectId',
     'shopOrderNumber',
-    'routeCardNo',
     'dcNo',
     'dcDate',
     'priority',
@@ -158,7 +154,6 @@ export const REQUIRED_ORDER_FIELDS = [
   'quantity',
   'partName',
   'drawingNumber',
-  'routeCardNo',
   'deliveryDate',
   'dcDate',
 ] as const satisfies (keyof OrderFormValues)[];
@@ -250,7 +245,8 @@ export function formValuesToOrderInput(
     poNumber: v.poNumber.trim(),
     // Blank means not known yet.
     poAmount: isNumeric(v.poAmount) ? Number(v.poAmount) : null,
-    routeCardNo: v.routeCardNo.trim(),
+    // Not on the form: the route card comes with the order's job card.
+    routeCardNo: existing?.routeCardNo ?? '',
     dcNo: v.dcNo.trim(),
     dcDate: parseDisplayDate(v.dcDate) ?? '',
     partNumber: v.partNumber.trim(),

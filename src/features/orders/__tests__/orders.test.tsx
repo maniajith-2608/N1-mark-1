@@ -84,7 +84,6 @@ async function fillOrderDetails(form: ReactTestInstance) {
     ['order-form-quantity', '25'],
     ['order-form-part-name', 'Spacer ring'],
     ['order-form-drawing-number', 'DRW-9001'],
-    ['order-form-route-card', 'RC-9001'],
     ['order-form-dc-no', 'DC-9001'],
   ];
   for (const [id, value] of fields) {
@@ -664,13 +663,13 @@ test('creates an order over three steps', async () => {
 
   // Required fields come first; DC no sits at the bottom.
   expect(allText(byTestId(form, 'order-form-step-2'))).toMatch(
-    /Part name.*Drawing number.*Route card no.*DC date.*Delivery date.*Priority.*Quantity.*PO number.*PO amount.*DC no.*Part \/ job description/,
+    /Part name.*Drawing number.*DC date.*Delivery date.*Priority.*Quantity.*PO number.*PO amount.*DC no.*Part \/ job description/,
   );
   // Priority starts at Low.
   expect(allText(byTestId(form, 'order-form-priority'))).toBe('Low');
   // The required fields stop Next until they're filled (the server needs a
   // PO number; DC no is optional).
-  expect(allText(form).split('This field is required').length - 1).toBe(6);
+  expect(allText(form).split('This field is required').length - 1).toBe(5);
 
   await typeInto(byTestId(form, 'order-form-quantity'), '25');
   await typeInto(byTestId(form, 'order-form-po-amount'), '125000');
@@ -765,7 +764,7 @@ test('an order is made for a saved customer: a new name must be added first', as
   expect(hasTestId(form, 'order-form-customer-list')).toBe(false);
   await press(byTestId(form, 'order-form-design'));
   await press(byTestId(form, 'order-form-next'));
-  expect(allText(form)).toContain('Pick one of your customers.');
+  expect(allText(form)).toContain('Not one of your customers yet.');
   // An exact name (any case) counts as that customer.
   await typeInto(byTestId(form, 'order-form-customer'), 'acme metalworks');
   expect(byTestId(form, 'order-form-email').props.value).not.toBe('');
@@ -778,6 +777,39 @@ test('an order is made for a saved customer: a new name must be added first', as
   );
   // Left at its default.
   expect(created).toMatchObject({ customerId: 'CUS-1', priority: 'low' });
+});
+
+test('a new customer name can be created from the order form and is picked', async () => {
+  const h = await renderAdmin('Orders');
+  await press(byTestId(h.root, 'create-order'));
+  const form = byTestId(h.root, 'order-form-screen');
+  expect(hasTestId(form, 'order-form-create-customer')).toBe(false);
+  await typeInto(byTestId(form, 'order-form-customer'), 'Zenith Tools');
+  await typeInto(byTestId(form, 'order-form-email'), 'buy@zenith.in');
+  await press(byTestId(form, 'order-form-create-customer'));
+  // Add customer opens with what was typed.
+  expect(byTestId(h.root, 'customer-form-name').props.value).toBe(
+    'Zenith Tools',
+  );
+  expect(byTestId(h.root, 'customer-form-email').props.value).toBe(
+    'buy@zenith.in',
+  );
+  await typeInto(byTestId(h.root, 'customer-form-contact'), 'Ravi Kumar');
+  await typeInto(byTestId(h.root, 'customer-form-mobile'), '+91 98400 12345');
+  await typeInto(byTestId(h.root, 'customer-form-address'), '8 Mill Road');
+  await typeInto(byTestId(h.root, 'customer-form-city'), 'Erode');
+  await typeInto(byTestId(h.root, 'customer-form-pin'), '638001');
+  await press(byTestId(h.root, 'customer-form-submit'));
+  const created = Object.values(h.store.getState().customers.entities).find(
+    c => c?.name === 'Zenith Tools',
+  );
+  expect(created).toBeDefined();
+  // The order now uses the new customer: no error, no create button.
+  expect(hasTestId(form, 'order-form-create-customer')).toBe(false);
+  await press(byTestId(form, 'order-form-design'));
+  await press(byTestId(form, 'order-form-next'));
+  expect(allText(form)).not.toContain('Not one of your customers yet.');
+  expect(hasTestId(form, 'order-form-step-2')).toBe(true);
 });
 
 test('editing keeps the customer: it is shown, not changed', async () => {
@@ -995,7 +1027,7 @@ test('phone: cards with the table details, actions and step footer', async () =>
   expect(allText(byTestId(form, 'order-form-customer'))).toBe('Zenith Tools');
   await press(byTestId(form, 'order-form-design'));
   await press(byTestId(form, 'order-form-next'));
-  expect(allText(form)).toContain('Pick one of your customers.');
+  expect(allText(form)).toContain('Not one of your customers yet.');
   await press(byTestId(form, 'order-form-customer'));
   await typeInto(byTestId(sheet(), 'order-form-customer-search'), 'Acme');
   await press(byText(sheet(), 'Acme Metalworks'));

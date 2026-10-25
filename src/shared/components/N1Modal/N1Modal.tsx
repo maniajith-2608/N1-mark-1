@@ -9,12 +9,8 @@ import {
   View,
 } from 'react-native';
 import { KeyboardScrollView } from '../KeyboardScrollView/KeyboardScrollView';
-import {
-  SafeAreaProvider,
-  SafeAreaView,
-  initialWindowMetrics,
-  type Metrics,
-} from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { ModalSafeAreaProvider } from '../ModalSafeAreaProvider/ModalSafeAreaProvider';
 import { useN1Breakpoint } from '../../hooks/useN1Breakpoint';
 import {
   createN1Styles,
@@ -24,12 +20,6 @@ import {
 import type { modalWidth } from '../../../theme/tokens';
 import { N1IconButton } from '../N1IconButton/N1IconButton';
 import { N1Text } from '../N1Text/N1Text';
-
-/** Before the native window reports (and in tests): no insets yet. */
-const NO_INSETS: Metrics = {
-  frame: { x: 0, y: 0, width: 0, height: 0 },
-  insets: { top: 0, left: 0, right: 0, bottom: 0 },
-};
 
 export type N1ModalProps = {
   visible: boolean;
@@ -148,7 +138,7 @@ export const N1Modal = React.memo(function N1ModalComponent({
         <StatusBar
           barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'}
         />
-        <SafeAreaProvider initialMetrics={initialWindowMetrics ?? NO_INSETS}>
+        <ModalSafeAreaProvider>
           <SafeAreaView style={styles.screen}>
             {/* The footer rides above the keyboard. */}
             <KeyboardAvoidingView
@@ -173,7 +163,7 @@ export const N1Modal = React.memo(function N1ModalComponent({
               {footer && <View style={styles.screenFooter}>{footer}</View>}
             </KeyboardAvoidingView>
           </SafeAreaView>
-        </SafeAreaProvider>
+        </ModalSafeAreaProvider>
       </Modal>
     );
   }
