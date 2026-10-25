@@ -10,5 +10,6 @@ export type ForgotPasswordStackParamList = {
 // Screens in the auth stack.
 export type AuthStackParamList = {
   Login: undefined;
+  CreateOrganization: undefined;
   ForgotPasswordFlow: NavigatorScreenParams<ForgotPasswordStackParamList>;
 };

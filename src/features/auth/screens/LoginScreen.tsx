@@ -3,6 +3,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useN1Breakpoint } from '../../../shared/components';
 import AuthLayout from '../components/AuthLayout';
 import AuthMobileShell from '../components/AuthMobileShell';
+import AuthPrompt from '../components/AuthPrompt';
 import LoginForm from '../components/LoginForm';
 import { ApiError } from '../../../services/api';
 import { authApi } from '../api/authApi';
@@ -37,6 +38,9 @@ function LoginScreen() {
     }
   };
 
+  const goToCreateOrganization = () =>
+    navigation.navigate('Auth', { screen: 'CreateOrganization' });
+
   const goToForgotPassword = () =>
     navigation.navigate('Auth', {
       screen: 'ForgotPasswordFlow',
@@ -48,6 +52,13 @@ function LoginScreen() {
       <AuthMobileShell
         title="Welcome back"
         subtitle="Log in to manage your organization and team."
+        footer={
+          <AuthPrompt
+            question="No account yet?"
+            action="Create organization"
+            onPress={goToCreateOrganization}
+          />
+        }
       >
         <LoginForm
           errorText={error}
@@ -60,9 +71,15 @@ function LoginScreen() {
   }
 
   return (
-    // No "Create organization" footer: shops are onboarded by the N1 team
-    // (guide section 6, Rule), so the app offers sign-in only.
-    <AuthLayout>
+    <AuthLayout
+      footer={
+        <AuthPrompt
+          question="Setting up for your company?"
+          action="Create organization"
+          onPress={goToCreateOrganization}
+        />
+      }
+    >
       <LoginForm
         title="Get Started"
         subtitle="Log in as a user or admin to view your dashboard."

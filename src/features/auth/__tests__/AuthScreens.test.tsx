@@ -61,11 +61,10 @@ describe('LoginScreen', () => {
     expect(text).not.toContain('Welcome back');
   });
 
-  // Shops are onboarded by the N1 team: no sign-up from the app.
   test.each([WIDE, PHONE])(
-    'no Create organization entry point (width %i)',
+    'shows the Create organization entry point (width %i)',
     async width => {
-      expect(allText(await render(<LoginScreen />, width))).not.toContain(
+      expect(allText(await render(<LoginScreen />, width))).toContain(
         'Create organization',
       );
     },
