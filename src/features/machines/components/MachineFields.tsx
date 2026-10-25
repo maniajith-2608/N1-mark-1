@@ -1,6 +1,7 @@
 import { FormRow, N1DropDown, N1TextInput } from '../../../shared/components';
 import type { FormErrors } from '../../../shared/hooks';
 import {
+  MACHINE_OPERATION_OPTIONS,
   MACHINE_SETTABLE_STATUS_OPTIONS,
   MACHINE_STATUS_OPTIONS,
   MACHINE_STRINGS,
@@ -36,16 +37,6 @@ export function MachineFields({
   return (
     <>
       <FormRow>
-        <N1TextInput
-          label={F.name}
-          required={!locked}
-          placeholder={hint(F.namePlaceholder)}
-          value={values.name}
-          onChangeText={bind('name')}
-          errorText={errors.name}
-          readOnly={locked}
-          testID="machine-form-name"
-        />
         <N1DropDown
           label={F.type}
           required={!locked}
@@ -54,6 +45,15 @@ export function MachineFields({
           onChange={bind('type')}
           disabled={locked}
           testID="machine-form-type"
+        />
+        <N1DropDown
+          label={F.operation}
+          placeholder={hint(F.operationPlaceholder)}
+          options={MACHINE_OPERATION_OPTIONS}
+          value={values.operation || null}
+          onChange={bind('operation')}
+          disabled={locked}
+          testID="machine-form-operation"
         />
       </FormRow>
       <FormRow>

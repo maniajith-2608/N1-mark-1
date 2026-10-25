@@ -1,4 +1,4 @@
-import { memo, useCallback, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { View } from 'react-native';
 import {
   N1DropDown,
@@ -82,6 +82,19 @@ export const FlowEditor = memo(function FlowEditorComponent({
 }) {
   const styles = useN1Styles(makeStyles);
   const { steps, submitted, rename, remove, add } = editor;
+  // Saved steps can carry names outside the app's list (the server's default
+  // route is Turning / Milling / Finishing): offer them too, so the picker
+  // shows the step's name instead of a blank placeholder.
+  const options = useMemo(() => {
+    const known = new Set(OPERATION_OPTIONS.map(o => o.value));
+    const extra = [
+      ...new Set(steps.map(s => s.name).filter(n => n && !known.has(n))),
+    ];
+    return [
+      ...OPERATION_OPTIONS,
+      ...extra.map(value => ({ value, label: value })),
+    ];
+  }, [steps]);
   return (
     <View style={styles.section} testID="flow-editor">
       <N1Text variant="small" color="secondary">
@@ -101,7 +114,7 @@ export const FlowEditor = memo(function FlowEditorComponent({
               testID={`flow-step-${i + 1}`}
             >
               <N1DropDown
-                options={OPERATION_OPTIONS}
+                options={options}
                 value={step.name || null}
                 onChange={name => rename(step.key, name)}
                 placeholder={F.stepPlaceholder}

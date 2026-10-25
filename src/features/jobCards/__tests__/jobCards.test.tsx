@@ -1039,6 +1039,24 @@ describe('Create / Edit flow, in place on the job card', () => {
     expect(h.store.getState().jobCards.entities['1036'].operations).toEqual([]);
   });
 
+  test('Edit flow shows saved step names that are not in the operation list', async () => {
+    const h = await renderAdmin('JobCards');
+    await h.navigate('JobCardDetails', { jobCardId: '1042' });
+    // The server's default route names steps like "Finishing".
+    const card = h.store.getState().jobCards.entities['1042'];
+    const operations = card.operations.map((o, i, all) =>
+      i === all.length - 1 ? { ...o, name: 'Finishing' } : o,
+    );
+    await act(async () => {
+      h.store.dispatch(jobCardActions.saveSuccess({ ...card, operations }));
+    });
+    const screen = () => byTestId(h.root, 'job-card-details-screen');
+    await press(byTestId(screen(), 'open-flow'));
+    const last = byTestId(screen(), `flow-step-${operations.length}`);
+    expect(allText(last)).toContain('Finishing');
+    expect(allText(last)).not.toContain('Select operation');
+  });
+
   test('Edit flow on the Machining tab locks completed steps and saves the rest', async () => {
     const h = await renderAdmin('JobCards');
     await h.navigate('JobCardDetails', { jobCardId: '1042' });

@@ -12,12 +12,8 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import {
-  SafeAreaProvider,
-  SafeAreaView,
-  initialWindowMetrics,
-  type Metrics,
-} from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { ModalSafeAreaProvider } from '../ModalSafeAreaProvider/ModalSafeAreaProvider';
 import { createN1Styles, useN1Styles } from '../../../theme/N1ThemeProvider';
 import { N1IconButton } from '../N1IconButton/N1IconButton';
 import { N1Text } from '../N1Text/N1Text';
@@ -37,12 +33,6 @@ export type N1BottomSheetProps = {
   showClose?: boolean;
   children: ReactNode;
   testID?: string;
-};
-
-/** Before the native window reports (and in tests): no insets yet. */
-const NO_INSETS: Metrics = {
-  frame: { x: 0, y: 0, width: 0, height: 0 },
-  insets: { top: 0, left: 0, right: 0, bottom: 0 },
 };
 
 /** The sheet grows with its content up to this share of the screen, then scrolls. */
@@ -171,7 +161,7 @@ export const N1BottomSheet = React.memo(function N1BottomSheetComponent({
     >
       {/* A modal is its own native window: it needs its own provider for the
           SafeAreaView below to clear the home indicator. */}
-      <SafeAreaProvider initialMetrics={initialWindowMetrics ?? NO_INSETS}>
+      <ModalSafeAreaProvider>
         {/* A search field in the sheet keeps the sheet above the keyboard. */}
         <KeyboardAvoidingView
           style={styles.root}
@@ -228,7 +218,7 @@ export const N1BottomSheet = React.memo(function N1BottomSheetComponent({
             </ScrollView>
           </Animated.View>
         </KeyboardAvoidingView>
-      </SafeAreaProvider>
+      </ModalSafeAreaProvider>
     </Modal>
   );
 });

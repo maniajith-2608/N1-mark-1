@@ -4,9 +4,11 @@ import {
   graphqlRequest,
   toWireEnum,
 } from '../../../services/api';
+import { MACHINE_OPERATION_LABELS } from '../constants';
 import type {
   Machine,
   MachineInput,
+  MachineOperation,
   MachineStatus,
   MachineType,
 } from '../types';
@@ -17,14 +19,41 @@ import type {
 
 const MACHINE_FIELDS = `
   fragment MachineFields on Machine {
-    id name code model type location notes status
+    id name kind code model type location notes status
     currentWork { workOrderId title operator }
     currentAssignment { jobCardId }
   }
 `;
 
-type MachineNode = Omit<Machine, 'type' | 'status' | 'currentWork'> & {
-  type: Uppercase<MachineType>;
+type WireMachineType =
+  | 'CNC_LATHE'
+  | 'CNC_MILL'
+  | 'LATHE'
+  | 'WELDING'
+  | 'INSPECTION'
+  | 'PACKING';
+
+// The API has no CNC or VMC type yet: CNC is stored as its CNC lathe and a VMC
+// (a vertical mill) as its CNC mill. Its other kinds read as CNC.
+const TYPE_TO_WIRE: Record<MachineType, WireMachineType> = {
+  cnc: 'CNC_LATHE',
+  lathe: 'LATHE',
+  vmc: 'CNC_MILL',
+};
+const typeFromWire = (type: WireMachineType): MachineType =>
+  type === 'LATHE' ? 'lathe' : type === 'CNC_MILL' ? 'vmc' : 'cnc';
+
+// The API has no operation field yet: it goes in `kind`, the machine's free
+// text "what sort of machine it is". Anything else there reads as none.
+const operationFromKind = (kind: string | null): MachineOperation | '' =>
+  kind && kind in MACHINE_OPERATION_LABELS ? (kind as MachineOperation) : '';
+
+type MachineNode = Omit<
+  Machine,
+  'type' | 'operation' | 'status' | 'currentWork'
+> & {
+  type: WireMachineType;
+  kind: string | null;
   status: Uppercase<MachineStatus>;
   currentWork: { workOrderId: string; title: string; operator: string } | null;
   currentAssignment: { jobCardId: string } | null;
@@ -72,10 +101,11 @@ async function workOrderNumbers(
 }
 
 function toMachine(node: MachineNode, numbers: Map<string, string>): Machine {
-  const { currentAssignment, currentWork, ...rest } = node;
+  const { currentAssignment, currentWork, kind, ...rest } = node;
   return {
     ...rest,
-    type: fromWireEnum<MachineType>(node.type),
+    type: typeFromWire(node.type),
+    operation: operationFromKind(kind),
     status: fromWireEnum<MachineStatus>(node.status),
     currentWork: currentWork && {
       ...currentWork,
@@ -108,13 +138,18 @@ function toWireInput(
     }
   });
   if (input.type !== undefined) {
-    fields.type = toWireEnum(input.type);
+    fields.type = TYPE_TO_WIRE[input.type];
+  }
+  if (input.operation !== undefined) {
+    // Blank keeps what's there: the API can't clear `kind`.
+    fields.kind = input.operation || null;
   }
   return fields;
 }
 
 // Each machine's last-known name and status: the API needs the name on every
-// update, and status is only sent when it changed.
+// update, and status is only sent when it changed. The form has no name, so
+// the code (unique in the shop, like the name) is sent as the name.
 const known = new Map<string, Pick<Machine, 'name' | 'status'>>();
 const remember = (machine: Machine) => {
   known.set(machine.id, { name: machine.name, status: machine.status });
@@ -146,7 +181,7 @@ async function create(input: MachineInput): Promise<Machine> {
       createMachine(input: $input) { ...MachineFields }
     }
     ${MACHINE_FIELDS}`,
-    { input: toWireInput(input, input.name.trim()) },
+    { input: toWireInput(input, input.code.trim()) },
   );
   return remember((await toMachines([data.createMachine]))[0]);
 }
@@ -163,7 +198,7 @@ async function update(
   const current = known.get(id);
   const input = toWireInput(
     changes,
-    changes.name?.trim() ?? current?.name ?? '',
+    changes.code?.trim() || current?.name || '',
   );
   if (
     changes.status !== undefined &&
