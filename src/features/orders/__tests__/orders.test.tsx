@@ -7,6 +7,7 @@ import {
   byTestId,
   byText,
   choose,
+  flush,
   hasTestId,
   press,
   renderAdmin,
@@ -41,8 +42,17 @@ jest.mock('../../../services/print/printHtml', () => ({
   printHtml: (html: string, jobName: string) => mockPrintHtml(html, jobName),
 }));
 
+// Native builds can't stamp drawings; tests set what the preview returns.
+const mockStampedPreview = jest.fn();
+jest.mock('../drawingStamp/stampDrawing', () => ({
+  ...jest.requireActual('../drawingStamp/stampDrawing'),
+  stampedPreview: (...args: unknown[]) => mockStampedPreview(...args),
+}));
+
 beforeEach(() => {
   mockWidth = 1280;
+  mockStampedPreview.mockReset();
+  mockStampedPreview.mockResolvedValue(null);
   mockPrintHtml.mockClear();
   mockPrintHtml.mockImplementation(() => Promise.resolve(true));
 });
@@ -465,9 +475,10 @@ test('documents and the drawing open in a viewer with Print', async () => {
   );
   expect(alert).not.toHaveBeenCalled();
 
-  // Each row also has its own View and Print buttons.
+  // Each row also has its own View and Print buttons; the design file is a
+  // drawing, so it prints with the order QR (natively, as a sheet).
   expect(byLabel(screen, 'View drawing.pdf')).toBeTruthy();
-  await press(byLabel(screen, 'Print drawing.pdf'));
+  await press(byLabel(screen, 'Print drawing.pdf with QR'));
   expect(mockPrintHtml).toHaveBeenLastCalledWith(
     expect.stringContaining('Design file · 480 KB'),
     'drawing.pdf',
@@ -494,8 +505,9 @@ test('documents and the drawing open in a viewer with Print', async () => {
     expect.any(String),
     'WO-1042-QR.png',
   );
+  // The drawing row prints the design file, with the QR on it.
   await press(byLabel(screen, 'Print Drawing DRW-1187'));
-  expect(mockPrintHtml.mock.lastCall?.[1]).toMatch(/^Drawing · WO #1042/);
+  expect(mockPrintHtml.mock.lastCall?.[1]).toBe('drawing.pdf');
 
   // The drawing is listed with the documents and opens in the viewer.
   await press(byTestId(screen, 'document-order-drawing'));
@@ -512,6 +524,50 @@ test('documents and the drawing open in a viewer with Print', async () => {
   viewer = byTestId(h.root, 'document-viewer');
   expect(allText(viewer)).toContain('Drawing DRW-1187');
   Platform.OS = os;
+});
+
+test('Preview with QR shows the drawing as it prints, QR on every page', async () => {
+  const h = await renderAdmin('Orders');
+  await h.navigate('OrderDetails', { orderId: '1042' });
+  const screen = byTestId(h.root, 'order-details-screen');
+  mockStampedPreview.mockResolvedValue({
+    pages: [
+      { uri: 'data:image/png;base64,p1', aspectRatio: 1.41 },
+      { uri: 'data:image/png;base64,p2', aspectRatio: 1.41 },
+    ],
+    crowdedPages: [2],
+  });
+
+  await press(byTestId(screen, 'order-preview-qr'));
+  await flush();
+  let viewer = byTestId(h.root, 'document-viewer');
+  // The customer's details are blanked on the preview, as when printing.
+  expect(mockStampedPreview).toHaveBeenCalledWith(
+    expect.objectContaining({ name: 'drawing.pdf' }),
+    expect.stringContaining('1042'),
+    MOCK_ORDERS.find(o => o.id === '1042')?.customerName,
+  );
+  expect(allText(viewer)).toContain('Drawing DRW-1187 with QR');
+  expect(byLabel(viewer, 'Page 1 with the order QR')).toBeTruthy();
+  expect(byLabel(viewer, 'Page 2 with the order QR')).toBeTruthy();
+  // A page with no blank area big enough is called out.
+  expect(allText(viewer)).toContain('No blank area fits the QR on page 2');
+  // Print prints that drawing with its QR.
+  await press(byTestId(viewer, 'document-viewer-print'));
+  expect(mockPrintHtml.mock.lastCall?.[1]).toBe('drawing.pdf');
+});
+
+test('Preview with QR on a file that can’t be stamped says how it prints', async () => {
+  const h = await renderAdmin('Orders');
+  await h.navigate('OrderDetails', { orderId: '1042' });
+  const screen = byTestId(h.root, 'order-details-screen');
+  mockStampedPreview.mockRejectedValue(new Error('download failed'));
+
+  await press(byTestId(screen, 'order-preview-qr'));
+  await flush();
+  const viewer = byTestId(h.root, 'document-viewer');
+  expect(allText(viewer)).toContain('can’t be previewed with the QR');
+  expect(hasTestId(viewer, 'document-viewer-stamped')).toBe(false);
 });
 
 test('an order with a job card lists it; pressing it opens the job card', async () => {
@@ -587,11 +643,12 @@ test('documents: the drawing prints with its QR; download is not wired yet', asy
   const h = await renderAdmin('Orders');
   await h.navigate('OrderDetails', { orderId: '1042' });
   const screen = byTestId(h.root, 'order-details-screen');
-  // Print drawing sits with the drawing on the Order details tab.
+  // Print drawing sits with the drawing on the Order details tab. It prints
+  // the design file with the QR (natively, as a sheet naming it).
   await press(byText(screen, 'Print drawing with QR'));
   const [html, jobName] = mockPrintHtml.mock.calls[0];
-  expect(jobName).toMatch(/^Drawing · WO #1042/);
-  expect(html).toContain('DRW-1187');
+  expect(jobName).toBe('drawing.pdf');
+  expect(html).toContain('drawing.pdf');
   expect(html).toContain('aria-label="QR code for WO #1042"');
 
   // A build without a printer module says so; a failed dialog says that.
@@ -1084,8 +1141,8 @@ test('order helpers', () => {
     compareOrders(undated, { ...undated, createdAt: '2099-01-01' }),
   ).toBeGreaterThan(0);
   const values = orderToFormValues(first);
-  expect(validateOrderForm({ ...values, designFile: null })).toEqual({
-    designFile: 'This field is required',
+  expect(validateOrderForm({ ...values, designFiles: [] })).toEqual({
+    designFiles: 'This field is required',
   });
   const bad = { ...values, customerEmail: 'x', dcDate: '99/99/9999' };
   expect(validateOrderForm(bad)).toEqual({

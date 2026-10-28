@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -41,6 +42,7 @@ import {
 import { useOnSettled, useToggle } from '../../../shared/hooks';
 import { pickDocument } from '../../../services/files/pickDocument';
 import { openStoredFile } from '../../../services/files/fileStorage';
+import type { Attachment } from '../../../shared/types';
 import {
   formatLongDate,
   notify,
@@ -65,7 +67,8 @@ import {
 import { DrawingQrSection } from '../../orders/components/DrawingQrSection';
 import { printOrNotify } from '../../../services/print';
 import { ORDER_STRINGS } from '../../orders/constants';
-import { drawingPrintHtml } from '../../orders/printing';
+import { orderDrawings } from '../../orders/drawings';
+import { drawingPrintHtml, printDrawingWithQr } from '../../orders/printing';
 import { orderHeading, orderQrValue } from '../../orders/utils';
 import { COMMON_STRINGS } from '../../../shared/constants';
 import { QcHistory } from '../components/QcHistory';
@@ -383,28 +386,56 @@ export function JobCardDetailsScreen({
   // downloading files isn't available yet.
   const [viewing, setViewing] = useState<ViewerTarget | null>(null);
   const closeViewer = useCallback(() => setViewing(null), []);
-  const printDrawing = useCallback(() => {
-    if (!order) {
-      notifyUnavailable(ORDER_STRINGS.details.printDrawing);
-      return;
-    }
-    printOrNotify(
-      drawingPrintHtml(order, order.drawingNumber || D.noDrawing),
-      ORDER_STRINGS.print.drawingJob(orderHeading(order)),
-      ORDER_STRINGS.details.printDrawing,
-    );
-  }, [order]);
-  // The stored design file opens (or downloads) in its own tab.
+  const printDrawing = useCallback(
+    (doc?: Attachment) => {
+      if (!order) {
+        notifyUnavailable(ORDER_STRINGS.details.printDrawing);
+        return;
+      }
+      // A drawing file prints with the QR on it; else the placeholder sheet.
+      if (doc) {
+        printDrawingWithQr(order, doc);
+        return;
+      }
+      printOrNotify(
+        drawingPrintHtml(order, order.drawingNumber || D.noDrawing),
+        ORDER_STRINGS.print.drawingJob(orderHeading(order)),
+        ORDER_STRINGS.details.printDrawing,
+      );
+    },
+    [order],
+  );
+  // The order's drawing files, or the card's own before the order loads.
+  const drawings = useMemo(
+    () =>
+      order
+        ? orderDrawings(order)
+        : jobCard?.designFile
+        ? [jobCard.designFile]
+        : [],
+    [order, jobCard?.designFile],
+  );
+  const printTarget = useCallback(
+    (target: ViewerTarget) =>
+      printDrawing(target.type === 'qr' ? undefined : target.doc),
+    [printDrawing],
+  );
+  // The stored drawing (the one in the viewer, else the design file) opens
+  // (or downloads) in its own tab.
   const designFile = jobCard?.designFile;
-  const download = useCallback(() => {
-    if (!designFile) {
-      notifyUnavailable(ORDER_STRINGS.details.downloadAction);
-      return;
-    }
-    openStoredFile(designFile).catch(() =>
-      notifyUnavailable(ORDER_STRINGS.details.downloadAction),
-    );
-  }, [designFile]);
+  const download = useCallback(
+    (doc?: Attachment) => {
+      const file = doc ?? designFile;
+      if (!file) {
+        notifyUnavailable(ORDER_STRINGS.details.downloadAction);
+        return;
+      }
+      openStoredFile(file).catch(() =>
+        notifyUnavailable(ORDER_STRINGS.details.downloadAction),
+      );
+    },
+    [designFile],
+  );
   // Admin: the order slides in on this stack (Job Cards, Orders, Customers)
   // and its Back returns here; opened from that order already, it goes back
   // to it. A stack without Order details (Dashboard, Users) opens it in
@@ -659,9 +690,24 @@ export function JobCardDetailsScreen({
       <DrawingQrSection
         drawingNumber={drawingNumber}
         hasDrawing={Boolean(jobCard.designFile)}
+        drawings={drawings}
         qrValue={order ? orderQrValue(order) : jobCard.number}
-        onViewDrawing={() => setViewing({ type: 'drawing', drawingNumber })}
+        onViewDrawing={doc =>
+          setViewing({ type: 'drawing', drawingNumber, doc })
+        }
         onPrintDrawing={printDrawing}
+        onPreviewDrawing={
+          order
+            ? doc =>
+                setViewing({
+                  type: 'drawingQr',
+                  drawingNumber,
+                  doc,
+                  qrValue: orderQrValue(order),
+                  company: order.customerName,
+                })
+            : undefined
+        }
         columns={OVERVIEW_COLUMNS}
         testID="job-card"
       />
@@ -877,7 +923,7 @@ export function JobCardDetailsScreen({
     <DocumentViewer
       target={viewing}
       onClose={closeViewer}
-      onPrint={printDrawing}
+      onPrint={printTarget}
       onDownload={download}
       onOpen={null}
     />

@@ -2,9 +2,16 @@ import { lightTheme } from '../../theme';
 import type { Attachment } from '../../shared/types';
 import { ORDER_QR_SIZE } from '../../shared/constants';
 import { formatFileSize, formatLongDate } from '../../shared/utils';
-import { detailList, escapeHtml, printPage } from '../../services/print';
+import {
+  detailList,
+  escapeHtml,
+  printOrNotify,
+  printPage,
+  printPdf,
+} from '../../services/print';
 import { DIM_FONT, DIM_LABELS, PART, VIEW } from './components/DrawingPreview';
 import { qrPath } from './components/QrCode';
+import { stampDrawing } from './drawingStamp';
 import { ORDER_STRINGS } from './constants';
 import type { OrderSummary } from './types';
 import { orderHeading, orderQrValue, orderTitle } from './utils';
@@ -125,5 +132,30 @@ export function qrPrintHtml(order: OrderSummary) {
     `<h1>${escapeHtml(heading)}</h1>` +
       `<div class="figure">${qrSvg(order, PRINT_QR_SCALE * 2)}</div>` +
       `<div class="row">${orderDetails(order)}</div>`,
+  );
+}
+
+/**
+ * Prints a drawing file with the order QR in a blank area of every page,
+ * the customer's name, address and logo blanked out for the shop floor.
+ * Where it can't be stamped (a DWG, a native build, a failed download) it
+ * prints as a sheet naming the file, with the details and QR, as before.
+ */
+export async function printDrawingWithQr(
+  order: OrderSummary,
+  doc: Attachment,
+): Promise<void> {
+  const stamped = await stampDrawing(
+    doc,
+    orderQrValue(order),
+    order.customerName,
+  ).catch(() => null);
+  if (stamped && (await printPdf(stamped.url))) {
+    return;
+  }
+  await printOrNotify(
+    documentPrintHtml(order, doc),
+    doc.name,
+    ORDER_STRINGS.details.printDrawing,
   );
 }

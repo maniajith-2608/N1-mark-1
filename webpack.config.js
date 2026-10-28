@@ -30,6 +30,12 @@ const esmResolutionConfiguration = {
   resolve: { fullySpecified: false },
 };
 
+// pdf.js runs its parser in a worker; it is served as a file of its own.
+const pdfWorkerConfiguration = {
+  test: /pdf\.worker\.min\.mjs$/,
+  type: 'asset/resource',
+};
+
 const assetLoaderConfiguration = {
   test: /\.(gif|jpe?g|png|svg|webp|ttf)$/,
   type: 'asset/resource',
@@ -52,6 +58,7 @@ module.exports = (env, argv) => {
         esmResolutionConfiguration,
         babelLoaderConfiguration,
         assetLoaderConfiguration,
+        pdfWorkerConfiguration,
       ],
     },
     resolve: {
@@ -97,7 +104,11 @@ module.exports = (env, argv) => {
       proxy: [
         {
           context: ['/api'],
-          target: process.env.N1_API_URL || 'http://127.0.0.1:3000',
+          target:
+            process.env.N1_API_PROXY_TARGET ||
+            process.env.N1_API_URL ||
+            'http://127.0.0.1:3000',
+          changeOrigin: true,
           pathRewrite: { '^/api': '' },
         },
       ],

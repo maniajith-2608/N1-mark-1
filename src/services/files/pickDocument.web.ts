@@ -14,3 +14,12 @@ export async function pickDocument(
   const [file] = await chooseFiles(kind, { accept });
   return file ?? null;
 }
+
+/** The chooser for several files at once; empty when closed without any. */
+export function pickDocuments(
+  kind: string,
+  _sampleName?: string,
+  accept?: string,
+): Promise<Attachment[]> {
+  return chooseFiles(kind, { accept, multiple: true });
+}

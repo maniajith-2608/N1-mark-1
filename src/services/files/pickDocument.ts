@@ -21,3 +21,13 @@ export async function pickDocument(
     sizeBytes: Platform.OS === 'web' ? 640 * 1024 : 512 * 1024,
   };
 }
+
+/** Stand-in for picking several files: one sample file, as above. */
+export async function pickDocuments(
+  kind: string,
+  sampleName: string,
+  accept?: string,
+): Promise<Attachment[]> {
+  const file = await pickDocument(kind, sampleName, accept);
+  return file ? [file] : [];
+}

@@ -12,11 +12,15 @@ import {
   DRAWING_THUMB,
   ORDER_QR_SIZE,
 } from '../../../shared/constants';
+import type { Attachment } from '../../../shared/types';
 import { ORDER_STRINGS } from '../constants';
+import { useDrawingThumbnail } from '../hooks/useDrawingThumbnail';
+import { DocumentList } from './DocumentList';
 import { DrawingPreview } from './DrawingPreview';
 import { QrCode } from './QrCode';
 
 const D = ORDER_STRINGS.details;
+const NO_DRAWINGS: readonly Attachment[] = [];
 
 const makeStyles = createN1Styles(t => ({
   // Drawing (thumbnail, number, buttons), then Order QR; on phones they stack.
@@ -25,6 +29,8 @@ const makeStyles = createN1Styles(t => ({
   // inline), so it starts in line with that column below.
   wideRow: { flexWrap: 'nowrap', gap: 0 },
   section: { gap: t.spacing.md },
+  // Wide screens: the file list keeps clear of the QR column beside it.
+  wideSection: { paddingRight: t.spacing.xl },
   // Heading and code start on the column's left edge; the code sits level
   // with the middle of the drawing thumbnail.
   qrColumn: { alignItems: 'flex-start' },
@@ -53,10 +59,18 @@ type Props = {
   drawingNumber: string;
   /** False: a note stands in for the drawing; the QR still shows. */
   hasDrawing?: boolean;
+  /**
+   * The uploaded drawing files. The thumbnail and buttons show the first;
+   * with more than one, each is listed under them too.
+   */
+  drawings?: readonly Attachment[];
   /** What the order QR holds; the app's scanner imports the order from it. */
   qrValue: string;
-  onViewDrawing: () => void;
-  onPrintDrawing: () => void;
+  /** `doc` is the drawing file; none when no file is uploaded. */
+  onViewDrawing: (doc?: Attachment) => void;
+  onPrintDrawing: (doc?: Attachment) => void;
+  /** Shows the drawing file as it prints, the order QR on every page. */
+  onPreviewDrawing?: (doc: Attachment) => void;
   /** Columns of the detail grid below, so the QR lines up with the last. */
   columns?: number;
   /** Prefix for test IDs: `order` → order-drawing, order-qr… */
@@ -70,9 +84,11 @@ type Props = {
 export const DrawingQrSection = memo(function DrawingQrSectionComponent({
   drawingNumber,
   hasDrawing = true,
+  drawings = NO_DRAWINGS,
   qrValue,
   onViewDrawing,
   onPrintDrawing,
+  onPreviewDrawing,
   columns = DETAIL_COLUMNS,
   testID,
 }: Props) {
@@ -85,10 +101,19 @@ export const DrawingQrSection = memo(function DrawingQrSectionComponent({
       {text}
     </N1Text>
   );
+  // The thumbnail and buttons are for the first file.
+  const [first] = drawings;
+  const thumbnail = useDrawingThumbnail(first);
+  const viewFirst = () => onViewDrawing(first);
+  const printFirst = () => onPrintDrawing(first);
   return (
     <View style={[styles.row, !isCompact && styles.wideRow]}>
       <View
-        style={[styles.section, !isCompact && { width: percent(columns - 1) }]}
+        style={[
+          styles.section,
+          !isCompact && styles.wideSection,
+          !isCompact && { width: percent(columns - 1) },
+        ]}
       >
         {heading(D.drawing)}
         {hasDrawing ? (
@@ -96,7 +121,7 @@ export const DrawingQrSection = memo(function DrawingQrSectionComponent({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={D.viewDrawingOf(drawingNumber)}
-              onPress={onViewDrawing}
+              onPress={viewFirst}
               style={({ pressed }) => [
                 isCompact && styles.compactThumbButton,
                 pressed && styles.pressed,
@@ -105,6 +130,7 @@ export const DrawingQrSection = memo(function DrawingQrSectionComponent({
             >
               <DrawingPreview
                 drawingNumber={drawingNumber}
+                uri={thumbnail}
                 style={isCompact ? styles.compactThumb : styles.thumb}
               />
             </Pressable>
@@ -121,21 +147,41 @@ export const DrawingQrSection = memo(function DrawingQrSectionComponent({
                   leftIcon="eye"
                   variant="secondary"
                   size="sm"
-                  onPress={onViewDrawing}
+                  onPress={viewFirst}
                   testID={`${testID}-view-drawing`}
                 />
+                {first && onPreviewDrawing && (
+                  <N1Button
+                    title={D.previewQr}
+                    leftIcon="scan"
+                    variant="secondary"
+                    size="sm"
+                    onPress={() => onPreviewDrawing(first)}
+                    testID={`${testID}-preview-qr`}
+                  />
+                )}
                 <N1Button
                   title={D.printDrawing}
                   leftIcon="printer"
                   variant="secondary"
                   size="sm"
-                  onPress={onPrintDrawing}
+                  onPress={printFirst}
                 />
               </View>
             </View>
           </View>
         ) : (
           <N1Text color="secondary">{D.noDrawing}</N1Text>
+        )}
+        {drawings.length > 1 && (
+          <View testID={`${testID}-drawing-files`}>
+            <DocumentList
+              documents={drawings}
+              onView={onViewDrawing}
+              onPrint={onPrintDrawing}
+              printLabel={doc => D.printDrawingOf(doc.name)}
+            />
+          </View>
         )}
       </View>
       <View

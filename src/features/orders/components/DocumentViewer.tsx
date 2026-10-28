@@ -1,5 +1,6 @@
-import { Image, View } from 'react-native';
+import { Image, ScrollView, View } from 'react-native';
 import {
+  AsyncContent,
   N1Button,
   N1Icon,
   N1Modal,
@@ -15,6 +16,8 @@ import { useHeldWhileVisible } from '../../../shared/hooks';
 import type { Attachment } from '../../../shared/types';
 import { formatFileSize } from '../../../shared/utils';
 import { ORDER_STRINGS } from '../constants';
+import { useDrawingThumbnail } from '../hooks/useDrawingThumbnail';
+import { useStampedPreview } from '../hooks/useStampedPreview';
 import { DrawingPreview } from './DrawingPreview';
 import { QrCode } from './QrCode';
 
@@ -24,6 +27,8 @@ const D = ORDER_STRINGS.details;
 const VIEWER_HEIGHT = DRAWING_PREVIEW_HEIGHT * 2;
 
 const makeStyles = createN1Styles(t => ({
+  // An uploaded drawing's page shows as large as an image.
+  drawing: { height: VIEWER_HEIGHT },
   image: {
     width: '100%',
     height: VIEWER_HEIGHT,
@@ -47,6 +52,15 @@ const makeStyles = createN1Styles(t => ({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // The stamped pages scroll one under another, each at its own shape.
+  stampedPages: { maxHeight: VIEWER_HEIGHT },
+  stampedPagesContent: { gap: t.spacing.md },
+  stampedPage: {
+    width: '100%',
+    borderRadius: t.radius.md,
+    borderWidth: t.borderWidth.hairline,
+    borderColor: t.colors.border,
+  },
   footer: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
@@ -57,8 +71,21 @@ const makeStyles = createN1Styles(t => ({
 /** What the viewer shows: a document, the order's drawing, or its QR. */
 export type ViewerTarget =
   | { type: 'document'; doc: Attachment }
-  | { type: 'drawing'; drawingNumber: string }
+  /** `doc`: the uploaded drawing file, shown by its first page. */
+  | { type: 'drawing'; drawingNumber: string; doc?: Attachment }
+  /** The drawing file as it prints: the order QR on every page. */
+  | {
+      type: 'drawingQr';
+      drawingNumber: string;
+      doc: Attachment;
+      qrValue: string;
+      /** The customer, whose details are blanked as when printing. */
+      company: string;
+    }
   | { type: 'qr'; doc: Attachment; value: string };
+
+const isDrawing = (target: ViewerTarget | null) =>
+  target?.type === 'drawing' || target?.type === 'drawingQr';
 
 type Props = {
   target: ViewerTarget | null;
@@ -85,14 +112,59 @@ export function DocumentViewer({
   const visible = targetProp !== null;
   // Kept while the dialog fades out.
   const target = useHeldWhileVisible(visible, targetProp);
-  const doc = target && target.type !== 'drawing' ? target.doc : null;
+  const doc = target?.doc ?? null;
+  const thumbnail = useDrawingThumbnail(
+    target?.type === 'drawing' ? target.doc : undefined,
+  );
+  const stamped = useStampedPreview(
+    target?.type === 'drawingQr' ? target.doc : undefined,
+    target?.type === 'drawingQr' ? target.qrValue : '',
+    target?.type === 'drawingQr' ? target.company : '',
+  );
 
   const body = () => {
     if (!target) {
       return null;
     }
+    if (target.type === 'drawingQr') {
+      const crowded = stamped.preview?.crowdedPages ?? [];
+      return (
+        <AsyncContent
+          status={stamped.status}
+          error={D.previewQrUnavailable}
+          testID="document-viewer-stamped-status"
+        >
+          <ScrollView
+            style={styles.stampedPages}
+            contentContainerStyle={styles.stampedPagesContent}
+            testID="document-viewer-stamped"
+          >
+            {crowded.length > 0 && (
+              <N1Text variant="small" color="secondary">
+                {D.previewQrCrowded(crowded.join(', '))}
+              </N1Text>
+            )}
+            {stamped.preview?.pages.map((page, i) => (
+              <Image
+                key={page.uri}
+                source={{ uri: page.uri }}
+                resizeMode="contain"
+                style={[styles.stampedPage, { aspectRatio: page.aspectRatio }]}
+                accessibilityLabel={D.previewQrPage(i + 1)}
+              />
+            ))}
+          </ScrollView>
+        </AsyncContent>
+      );
+    }
     if (target.type === 'drawing') {
-      return <DrawingPreview drawingNumber={target.drawingNumber} />;
+      return (
+        <DrawingPreview
+          drawingNumber={target.drawingNumber}
+          uri={thumbnail}
+          style={thumbnail ? styles.drawing : undefined}
+        />
+      );
     }
     if (target.type === 'qr') {
       return (
@@ -146,6 +218,8 @@ export function DocumentViewer({
       title={
         target?.type === 'drawing'
           ? D.drawingTitle(target.drawingNumber)
+          : target?.type === 'drawingQr'
+          ? D.previewQrTitle(target.drawingNumber)
           : doc?.name
       }
       subtitle={
@@ -167,7 +241,7 @@ export function DocumentViewer({
             />
           )}
           <N1Button
-            title={target?.type === 'drawing' ? D.printDrawing : D.print}
+            title={isDrawing(target) ? D.printDrawing : D.print}
             leftIcon="printer"
             onPress={() => target && onPrint(target)}
             testID="document-viewer-print"

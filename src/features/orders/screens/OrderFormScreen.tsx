@@ -21,7 +21,10 @@ import {
   type N1DropDownOption,
 } from '../../../shared/components';
 import type { OrdersScreenProps } from '../types';
-import { pickDocument } from '../../../services/files/pickDocument';
+import {
+  pickDocument,
+  pickDocuments,
+} from '../../../services/files/pickDocument';
 import {
   AdminScreen,
   AdminScreenBackground,
@@ -51,6 +54,7 @@ import {
   type OrderFormValues,
 } from '../components/orderForm';
 import {
+  DRAWING_KIND,
   MATERIAL_SOURCE_OPTIONS,
   ORDER_STRINGS,
   PRIORITY_OPTIONS,
@@ -67,7 +71,7 @@ const isRawMaterialField = (key: keyof OrderFormValues) =>
 /** Plain text fields (not files, the customer or priority). */
 type OrderTextField = Exclude<
   keyof OrderFormValues,
-  | 'designFile'
+  | 'designFiles'
   | 'purchaseOrder'
   | 'customerId'
   | 'priority'
@@ -89,6 +93,7 @@ const makeStyles = createN1Styles(t => ({
   },
   pressed: { opacity: t.opacity.pressed },
   section: { gap: t.spacing.lg },
+  designFiles: { gap: t.spacing.sm },
   createCustomer: { alignSelf: 'flex-start' },
   arrived: {
     gap: t.spacing.xs,
@@ -222,17 +227,31 @@ export function OrderFormScreen({
   const canCreateCustomer =
     !isEdit && !values.customerId && !isBlank(values.customerName);
 
-  const attach = useCallback(
-    async (field: 'designFile' | 'purchaseOrder') => {
-      const file =
-        field === 'designFile'
-          ? await pickDocument(F.designFile, F.designSample, F.designAccept)
-          : await pickDocument(F.poKind, F.poSample, F.poAccept);
-      if (file) {
-        setField(field, file);
-      }
-    },
-    [setField],
+  const attachPurchaseOrder = useCallback(async () => {
+    const file = await pickDocument(F.poKind, F.poSample, F.poAccept);
+    if (file) {
+      setField('purchaseOrder', file);
+    }
+  }, [setField]);
+  // Any number of drawings; each prints with the order QR.
+  const { designFiles } = values;
+  const addDesignFiles = useCallback(async () => {
+    const files = await pickDocuments(
+      DRAWING_KIND,
+      F.designSample,
+      F.designAccept,
+    );
+    if (files.length) {
+      setField('designFiles', [...designFiles, ...files]);
+    }
+  }, [designFiles, setField]);
+  const removeDesignFile = useCallback(
+    (id: string) =>
+      setField(
+        'designFiles',
+        designFiles.filter(doc => doc.id !== id),
+      ),
+    [designFiles, setField],
   );
 
   const show = useCallback((n: number) => {
@@ -309,25 +328,39 @@ export function OrderFormScreen({
     <View style={styles.section} testID="order-form-step-1">
       {heading(F.customerSection)}
       <FormRow>
-        <N1UploadBox
-          label={F.designFile}
-          required
-          hint={isCompact ? F.designHintCompact : F.designHint}
-          onPress={() => attach('designFile')}
-          fileName={values.designFile?.name}
-          fileSize={
-            values.designFile
-              ? formatFileSize(values.designFile.sizeBytes)
-              : undefined
-          }
-          onRemove={() => setField('designFile', null)}
-          errorText={errors.designFile}
-          testID="order-form-design"
-        />
+        <View style={styles.designFiles}>
+          {designFiles.map((doc, i) => (
+            <N1UploadBox
+              key={doc.id}
+              label={i === 0 ? F.designFile : undefined}
+              required
+              hint={F.designHint}
+              onPress={addDesignFiles}
+              fileName={doc.name}
+              fileSize={formatFileSize(doc.sizeBytes)}
+              onRemove={() => removeDesignFile(doc.id)}
+              testID={`order-form-design-${i}`}
+            />
+          ))}
+          <N1UploadBox
+            label={designFiles.length ? undefined : F.designFile}
+            required
+            hint={
+              designFiles.length
+                ? F.addDesignFile
+                : isCompact
+                ? F.designHintCompact
+                : F.designHint
+            }
+            onPress={addDesignFiles}
+            errorText={errors.designFiles}
+            testID="order-form-design"
+          />
+        </View>
         <N1UploadBox
           label={F.purchaseOrder}
           hint={isCompact ? F.poHintCompact : F.poHint}
-          onPress={() => attach('purchaseOrder')}
+          onPress={attachPurchaseOrder}
           fileName={values.purchaseOrder?.name}
           fileSize={
             values.purchaseOrder

@@ -65,6 +65,7 @@ export const ORDER_STRINGS = {
     drawing: 'Drawing',
     drawingNo: 'Drawing no',
     printDrawing: 'Print drawing with QR',
+    printDrawingOf: (name: string) => `Print ${name} with QR`,
     qrA11y: (number: string) => `QR code for ${workOrderLabel(number)}`,
     documents: 'Documents',
     noDocuments: 'No documents attached.',
@@ -75,6 +76,13 @@ export const ORDER_STRINGS = {
     viewDrawingOf: (no: string) => `View drawing ${no}`,
     noDrawing: 'No drawing attached',
     drawingTitle: (no: string) => `Drawing ${no}`,
+    previewQr: 'Preview with QR',
+    previewQrTitle: (no: string) => `Drawing ${no} with QR`,
+    previewQrPage: (page: number) => `Page ${page} with the order QR`,
+    previewQrUnavailable:
+      'This file can’t be previewed with the QR. It prints as a sheet with the drawing details and QR.',
+    previewQrCrowded: (pages: string) =>
+      `No blank area fits the QR on page ${pages}, so it covers a little of the drawing there.`,
     orderQr: 'Order QR',
     orderQrA11y: (workOrder: string) => `QR code for ${workOrder}`,
     orderQrFile: (number: string) =>
@@ -161,9 +169,10 @@ export const ORDER_STRINGS = {
     back: 'Back',
     submitCreate: 'Create order',
     submitEdit: 'Save changes',
-    designFile: 'Design file',
-    designHint: 'Click or drop design file (PDF, DWG, STEP)',
-    designHintCompact: 'Upload design file',
+    designFile: 'Design files',
+    designHint: 'Click or drop design files (PDF, DWG, STEP)',
+    designHintCompact: 'Upload design files',
+    addDesignFile: 'Add another design file',
     designSample: 'bracket-drawing.pdf',
     /** File types the design file chooser offers. */
     designAccept: '.pdf,.dwg,.dxf,.step,.stp,image/*',
@@ -252,3 +261,31 @@ export const MATERIAL_SOURCE_OPTIONS: N1RadioOption<MaterialSource>[] = [
   { value: 'bought_out', label: 'Bought out' },
   { value: 'in_house', label: 'In-house' },
 ];
+
+/**
+ * The order QR stamped onto each page of a printed drawing, in mm on paper.
+ * It goes in the page's largest blank area, kept clear of ink by `gapMm`.
+ */
+export const DRAWING_QR = {
+  /** Scans comfortably from an A3 sheet at arm's length. */
+  preferredMm: 28,
+  /** Below this, phone cameras struggle with a printed code. */
+  minMm: 18,
+  gapMm: 3,
+  /** Printer margins and the sheet's own frame. */
+  marginMm: 10,
+  /** Pages are drawn this many pixels on their longer side to find room. */
+  mapPixels: 1000,
+  /** The drawing thumbnail's longer side: sharp at twice its on-screen size. */
+  thumbnailPixels: 600,
+  /** The QR preview's longer side: the code's modules stay distinct. */
+  previewPixels: 1400,
+  /** A picture drawing is treated as a sheet this long (A3). */
+  imageSheetMm: 420,
+} as const;
+
+/**
+ * The kind marking an order's extra drawings among its documents: the order
+ * holds one design file, so further drawings are stored as documents.
+ */
+export const DRAWING_KIND = 'Design file';

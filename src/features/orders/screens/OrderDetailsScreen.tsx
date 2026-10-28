@@ -61,7 +61,13 @@ import { OrderStatusBadge, PriorityBadge } from '../components/OrderBadges';
 import { RAW_MATERIAL_FIELDS } from '../components/orderForm';
 import { MATERIAL_SOURCE_OPTIONS, ORDER_STRINGS } from '../constants';
 import { useOrder } from '../hooks/useOrders';
-import { documentPrintHtml, drawingPrintHtml, qrPrintHtml } from '../printing';
+import { orderDrawings } from '../drawings';
+import {
+  documentPrintHtml,
+  drawingPrintHtml,
+  printDrawingWithQr,
+  qrPrintHtml,
+} from '../printing';
 import { orderHeading, orderQrValue } from '../utils';
 
 const D = ORDER_STRINGS.details;
@@ -245,12 +251,27 @@ export function OrderDetailsScreen({
   const [askRawMaterial, setAskRawMaterial] = useState(false);
   const openRawMaterial = useCallback(() => setAskRawMaterial(true), []);
   const closeRawMaterial = useCallback(() => setAskRawMaterial(false), []);
-  const printDrawing = useCallback(() => {
-    if (order) {
+  // A drawing file prints with the order QR in a blank area of every page;
+  // with no file uploaded, the placeholder sheet prints as before.
+  const drawings = useMemo(() => (order ? orderDrawings(order) : []), [order]);
+  const printDrawing = useCallback(
+    (doc?: Attachment) => {
+      if (!order) {
+        return;
+      }
+      if (doc) {
+        printDrawingWithQr(order, doc);
+        return;
+      }
       const html = drawingPrintHtml(order, orDash(order.drawingNumber));
       printOrNotify(html, P.drawingJob(orderHeading(order)), D.printDrawing);
-    }
-  }, [order]);
+    },
+    [order],
+  );
+  const isDrawing = useCallback(
+    (doc: Attachment) => drawings.some(d => d.id === doc.id),
+    [drawings],
+  );
   // Stored files open (or download) from a short-lived link.
   const download = useCallback((doc?: Attachment) => {
     if (!doc) {
@@ -293,12 +314,14 @@ export function OrderDetailsScreen({
   }, [order]);
   const printTarget = useCallback(
     (target: ViewerTarget) =>
-      target.type === 'drawing'
-        ? printDrawing()
+      target.type === 'drawing' || target.type === 'drawingQr'
+        ? printDrawing(target.doc)
         : target.type === 'qr'
         ? printQr()
+        : isDrawing(target.doc)
+        ? printDrawing(target.doc)
         : printFile(target.doc),
-    [printDrawing, printQr, printFile],
+    [printDrawing, printQr, printFile, isDrawing],
   );
   const openFile = download;
 
@@ -456,14 +479,24 @@ export function OrderDetailsScreen({
   const drawingNo = orDash(order.drawingNumber);
   // What the order QR holds; the app's scanner imports the order from it.
   const qrValue = orderQrValue(order);
-  const viewDrawing = () =>
-    setViewing({ type: 'drawing', drawingNumber: drawingNo });
+  const viewDrawing = (doc?: Attachment) =>
+    setViewing({ type: 'drawing', drawingNumber: drawingNo, doc });
+  const previewDrawing = (doc: Attachment) =>
+    setViewing({
+      type: 'drawingQr',
+      drawingNumber: drawingNo,
+      doc,
+      qrValue,
+      company: order.customerName,
+    });
   const drawingSection = (
     <DrawingQrSection
       drawingNumber={drawingNo}
+      drawings={drawings}
       qrValue={qrValue}
       onViewDrawing={viewDrawing}
       onPrintDrawing={printDrawing}
+      onPreviewDrawing={previewDrawing}
       testID="order"
     />
   );
@@ -629,17 +662,24 @@ export function OrderDetailsScreen({
         onDownload={downloadDoc}
         onView={doc =>
           doc.id === DRAWING_DOC_ID
-            ? viewDrawing()
+            ? viewDrawing(drawings[0])
+            : isDrawing(doc)
+            ? viewDrawing(doc)
             : doc.id === ORDER_QR_DOC_ID
             ? setViewing({ type: 'qr', doc, value: qrValue })
             : viewDocument(doc)
         }
         onPrint={doc =>
           doc.id === DRAWING_DOC_ID
-            ? printDrawing()
+            ? printDrawing(drawings[0])
             : doc.id === ORDER_QR_DOC_ID
             ? printQr()
+            : isDrawing(doc)
+            ? printDrawing(doc)
             : printFile(doc)
+        }
+        printLabel={doc =>
+          isDrawing(doc) ? D.printDrawingOf(doc.name) : D.printFile(doc.name)
         }
       />
     </View>

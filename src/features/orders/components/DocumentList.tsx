@@ -13,10 +13,13 @@ import { ORDER_STRINGS } from '../constants';
 
 type Props = {
   documents: readonly Attachment[];
-  onDownload: (doc: Attachment) => void;
+  /** Without it, rows have no Download button. */
+  onDownload?: (doc: Attachment) => void;
   /** Pressing a row views it too. */
   onView?: (doc: Attachment) => void;
   onPrint?: (doc: Attachment) => void;
+  /** The print button's label for a file; by default "Print <name>". */
+  printLabel?: (doc: Attachment) => string;
 };
 
 const makeStyles = createN1Styles(t => ({
@@ -46,6 +49,7 @@ export const DocumentList = memo(function DocumentListComponent({
   onDownload,
   onView,
   onPrint,
+  printLabel = doc => ORDER_STRINGS.details.printFile(doc.name),
 }: Props) {
   const styles = useN1Styles(makeStyles);
   const [hovered, setHovered] = useState<string | null>(null);
@@ -97,17 +101,19 @@ export const DocumentList = memo(function DocumentListComponent({
                 icon="printer"
                 size="sm"
                 variant="soft"
-                accessibilityLabel={ORDER_STRINGS.details.printFile(doc.name)}
+                accessibilityLabel={printLabel(doc)}
                 onPress={() => onPrint(doc)}
               />
             )}
-            <N1IconButton
-              icon="download"
-              size="sm"
-              variant="soft"
-              accessibilityLabel={ORDER_STRINGS.details.download(doc.name)}
-              onPress={() => onDownload(doc)}
-            />
+            {onDownload && (
+              <N1IconButton
+                icon="download"
+                size="sm"
+                variant="soft"
+                accessibilityLabel={ORDER_STRINGS.details.download(doc.name)}
+                onPress={() => onDownload(doc)}
+              />
+            )}
           </View>
         </Pressable>
       ))}

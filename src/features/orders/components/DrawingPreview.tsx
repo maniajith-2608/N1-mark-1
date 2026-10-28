@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { View, type StyleProp, type ViewStyle } from 'react-native';
+import { Image, View, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Circle, Line, Rect, Text as SvgText } from 'react-native-svg';
 import {
   createN1Styles,
@@ -29,15 +29,23 @@ const makeStyles = createN1Styles(t => ({
     backgroundColor: t.colors.background,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
+  image: { width: '100%', height: '100%' },
 }));
 
-/** Simple technical-drawing thumbnail for the order screen. */
+/**
+ * Technical-drawing thumbnail for the order screen: the drawing's first page
+ * when `uri` has it, else a simple placeholder part.
+ */
 export const DrawingPreview = memo(function DrawingPreviewComponent({
   drawingNumber,
+  uri,
   style,
 }: {
   drawingNumber: string;
+  /** The first page as an image; null or absent shows the placeholder. */
+  uri?: string | null;
   /** e.g. a smaller box for a thumbnail. */
   style?: StyleProp<ViewStyle>;
 }) {
@@ -49,12 +57,26 @@ export const DrawingPreview = memo(function DrawingPreviewComponent({
   const cy = PART.y + PART.h / 2;
   const dimY = PART.y + PART.h + 14;
   const dimX = PART.x + PART.w + 12;
+  const label = ORDER_STRINGS.details.drawingA11y(drawingNumber);
+  if (uri) {
+    return (
+      <View style={[styles.box, style]}>
+        <Image
+          source={{ uri }}
+          resizeMode="contain"
+          style={styles.image}
+          accessibilityLabel={label}
+          testID="drawing-preview-image"
+        />
+      </View>
+    );
+  }
   return (
     <View
       style={[styles.box, style]}
       accessible
       accessibilityRole="image"
-      accessibilityLabel={ORDER_STRINGS.details.drawingA11y(drawingNumber)}
+      accessibilityLabel={label}
     >
       <Svg width="100%" height="100%" viewBox={`0 0 ${VIEW.w} ${VIEW.h}`}>
         <Rect
