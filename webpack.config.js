@@ -78,6 +78,7 @@ module.exports = (env, argv) => {
       }),
       new webpack.DefinePlugin({
         __DEV__: JSON.stringify(isDev),
+        'process.env.N1_API_URL': JSON.stringify(process.env.N1_API_URL || '/api'),
         __REACT_NATIVE_VERSION__: JSON.stringify(
           require(path.resolve(
             appDirectory,
