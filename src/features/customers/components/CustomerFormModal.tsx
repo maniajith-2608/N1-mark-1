@@ -71,9 +71,7 @@ export function validateCustomer(v: CustomerInput): FormErrors<CustomerInput> {
   if (isBlank(v.contactPerson)) {
     errors.contactPerson = COMMON_STRINGS.required;
   }
-  if (isBlank(v.mobile)) {
-    errors.mobile = COMMON_STRINGS.required;
-  } else if (!isPhone(v.mobile)) {
+  if (!isBlank(v.mobile) && !isPhone(v.mobile)) {
     errors.mobile = COMMON_STRINGS.invalidPhone;
   }
   if (!isBlank(v.alternateMobile) && !isPhone(v.alternateMobile)) {
@@ -88,16 +86,8 @@ export function validateCustomer(v: CustomerInput): FormErrors<CustomerInput> {
   ) {
     errors.gstNumber = F.gstInvalid;
   }
-  // The billing address is required by the API (street, city, PIN code).
-  if (isBlank(v.address)) {
-    errors.address = COMMON_STRINGS.required;
-  }
-  if (isBlank(v.city)) {
-    errors.city = COMMON_STRINGS.required;
-  }
-  if (isBlank(v.pinCode)) {
-    errors.pinCode = COMMON_STRINGS.required;
-  } else if (!isPinCode(v.pinCode)) {
+  // Only the name and contact person are required; the address is optional.
+  if (!isBlank(v.pinCode) && !isPinCode(v.pinCode)) {
     errors.pinCode = F.pinCodeInvalid;
   }
   return errors;
@@ -213,7 +203,6 @@ export function CustomerFormModal({
       <FormRow>
         <N1TextInput
           label={F.mobile}
-          required
           placeholder={F.mobilePlaceholder}
           value={values.mobile}
           onChangeText={bind('mobile')}
@@ -256,7 +245,6 @@ export function CustomerFormModal({
       </FormRow>
       <N1TextInput
         label={F.address}
-        required
         placeholder={F.addressPlaceholder}
         value={values.address}
         onChangeText={bind('address')}
@@ -266,7 +254,6 @@ export function CustomerFormModal({
       <FormRow>
         <N1TextInput
           label={F.city}
-          required
           placeholder={F.cityPlaceholder}
           value={values.city}
           onChangeText={bind('city')}
@@ -283,7 +270,6 @@ export function CustomerFormModal({
       <FormRow>
         <N1TextInput
           label={F.pinCode}
-          required
           placeholder={F.pinCodePlaceholder}
           value={values.pinCode}
           onChangeText={bind('pinCode')}

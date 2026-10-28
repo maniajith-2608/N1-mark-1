@@ -25,7 +25,7 @@ export const MOCK_SESSION: Session = {
     email: 'admin@abcengineering.com',
     website: 'www.abcengineering.com',
     businessType: 'private-limited',
-    industry: 'metal-manufacturing',
+    industry: 'manufacturing',
     registrationDetails: 'CIN U28910TN2018PTC123456',
     address: 'Plot 14, SIDCO Industrial Estate, Ambattur',
     city: 'Chennai',

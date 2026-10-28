@@ -23,14 +23,18 @@ function newIdempotencyKey(): string {
 export async function graphqlRequest<T>(
   query: string,
   variables?: Record<string, unknown>,
+  headers?: Record<string, string>,
 ): Promise<T> {
   const isMutation = /^\s*mutation\b/.test(query);
   const { status, data } = await apiClient.post<GraphQLResponse<T>>(
     '/graphql',
     { query, variables },
-    isMutation
-      ? { headers: { 'Idempotency-Key': newIdempotencyKey() } }
-      : undefined,
+    {
+      headers: {
+        ...(isMutation ? { 'Idempotency-Key': newIdempotencyKey() } : {}),
+        ...headers,
+      },
+    },
   );
   if (data.errors?.length || !data.data) {
     throw toApiError(status, data);

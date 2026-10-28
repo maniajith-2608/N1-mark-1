@@ -63,7 +63,9 @@ export function* lookupJob(action: PayloadAction<LookupJobPayload>) {
     yield put(
       myJobsActions.importFailure(
         isNotFound(error)
-          ? JOBS_STRINGS.code.notFound(code.trim())
+          ? ROLE_JOBS[role].importTo === 'job'
+            ? JOBS_STRINGS.code.notAssigned(code.trim())
+            : JOBS_STRINGS.code.notFound(code.trim())
           : errorMessage(error, 'Failed to find the job'),
       ),
     );

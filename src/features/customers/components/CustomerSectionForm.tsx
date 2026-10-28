@@ -165,7 +165,6 @@ export function CustomerSectionForm({
             </FormRow>
             <FormRow>
               {text('mobile', F.mobile, F.mobilePlaceholder, {
-                required: editing,
                 keyboardType: 'phone-pad',
               })}
               {text(
@@ -193,10 +192,9 @@ export function CustomerSectionForm({
           <>
             {text('address', F.address, F.addressPlaceholder, {
               multiline: true,
-              required: editing,
             })}
             <FormRow>
-              {text('city', F.city, F.cityPlaceholder, { required: editing })}
+              {text('city', F.city, F.cityPlaceholder)}
               <N1DropDown
                 label={F.state}
                 options={STATE_OPTIONS}
@@ -210,7 +208,6 @@ export function CustomerSectionForm({
               {text('pinCode', F.pinCode, F.pinCodePlaceholder, {
                 keyboardType: 'number-pad',
                 maxLength: 6,
-                required: editing,
               })}
               <N1DropDown
                 label={F.country}

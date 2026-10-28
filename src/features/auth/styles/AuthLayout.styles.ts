@@ -32,6 +32,17 @@ export const makeAuthLayoutStyles = createN1Styles(t => ({
   wideFormWidth: {
     maxWidth: t.modalWidth.lg,
   },
+  // A pane that doesn't scroll: the form inside fills its height instead.
+  fixedPaneContent: {
+    alignItems: 'center',
+    paddingVertical: t.spacing.xxl,
+    paddingHorizontal: t.spacing.xxl,
+    backgroundColor: t.colors.surface,
+  },
+  fixedFormWidth: {
+    flex: 1,
+    minHeight: 0,
+  },
 
   // Phone: single column with the footer pushed to the bottom.
   compactSafeArea: {

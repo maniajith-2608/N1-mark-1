@@ -9,7 +9,7 @@ import {
   BACKEND_ROLE_TO_APP,
   type BackendRole,
 } from '../../auth/constants';
-import type { AdminUser, UserInput, UserStatus } from '../types';
+import type { AdminUser, UserInput } from '../types';
 
 // N1 Core API: users / createUser / updateUser / resetUserPassword /
 // setUserStatus on POST /graphql (schema: packages/schema/app.graphql).
@@ -33,7 +33,8 @@ type UserNode = Omit<
   email: string | null;
   phone: string | null;
   role: BackendRole;
-  status: Uppercase<UserStatus>;
+  // The backend may still report INVITED or SUSPENDED; anything not ACTIVE shows as inactive.
+  status: string;
   documents: {
     id: string;
     name: string;
@@ -54,7 +55,7 @@ function toAdminUser(node: UserNode): AdminUser {
     email: node.email ?? '',
     phone: node.phone ?? '',
     role: BACKEND_ROLE_TO_APP[node.role],
-    status: node.status.toLowerCase() as UserStatus,
+    status: node.status === 'ACTIVE' ? 'active' : 'inactive',
     attachments: node.documents.map(fromFileReference),
     activity: [],
   };

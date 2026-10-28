@@ -34,7 +34,7 @@ describe('Users list (desktop)', () => {
       'Divya Rao',
       'Karthik Iyer',
     ].forEach(name => expect(text).toContain(name));
-    expect(text).toContain('Suspended');
+    expect(text).toContain('Inactive');
     expect(text).toContain('Sep 18, 2026');
     expect(text).toContain('Showing 10 of 22 employees');
   });
@@ -65,17 +65,16 @@ describe('Users list (desktop)', () => {
           allText(n).startsWith(label),
       );
 
-    // Invited + Suspended, picked together.
+    // Inactive only.
     await press(byTestId(root, 'users-filter'));
     await press(tab('Status'));
-    await press(byLabel(panel(), 'Invited'));
-    await press(byLabel(panel(), 'Suspended'));
+    await press(byLabel(panel(), 'Inactive'));
     await press(byTestId(root, 'users-filter-apply'));
     let text = allText(root);
     expect(text).toContain('Arjun Mehta');
     expect(text).toContain('Karthik Iyer');
     expect(text).not.toContain('Divya Rao');
-    expect(byLabel(root, 'Filter (2)')).toBeTruthy();
+    expect(byLabel(root, 'Filter (1)')).toBeTruthy();
 
     // Picks without Apply change nothing.
     await press(byTestId(root, 'users-filter'));
@@ -194,12 +193,6 @@ describe('Users list (desktop)', () => {
     expect(spy.mock.calls[0][1]).not.toHaveProperty('confirmPassword');
     expect(store.getState().userManagement.entities['USR-2']).toBeTruthy();
     spy.mockRestore();
-  });
-
-  test('an invited user has no current password yet', async () => {
-    const { root } = await renderAdmin('Users');
-    await press(byLabel(root, 'Edit Arjun Mehta'));
-    expect(byTestId(root, 'user-form-current-password').props.value).toBe('');
   });
 
   test('deletes a user after confirming', async () => {

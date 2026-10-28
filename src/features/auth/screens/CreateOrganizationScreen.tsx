@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useN1Breakpoint, useN1Styles } from '../../../shared/components';
@@ -8,11 +8,16 @@ import CreateOrganizationForm, {
   type CreateOrganizationValues,
 } from '../components/CreateOrganizationForm';
 import { makeAuthLayoutStyles } from '../styles';
+import { authApi } from '../api/authApi';
+import { useAuthSession } from '../hooks';
 
 function CreateOrganizationScreen() {
   const styles = useN1Styles(makeAuthLayoutStyles);
   const { isCompact } = useN1Breakpoint();
   const navigation = useNavigation();
+  const { signIn } = useAuthSession();
+  const [error, setError] = useState<string>();
+  const [submitting, setSubmitting] = useState(false);
 
   // Opened straight from a link there is no Login behind this screen to go back to.
   const goToLogin = () => {
@@ -23,10 +28,19 @@ function CreateOrganizationScreen() {
     }
   };
 
-  // TODO: call the create-organization API once its details are available.
-  // Until then the form only validates and returns to Login.
-  const handleSubmit = (_values: CreateOrganizationValues) => {
-    goToLogin();
+  const handleSubmit = async (values: CreateOrganizationValues) => {
+    setSubmitting(true);
+    setError(undefined);
+    try {
+      const { role } = await authApi.createOrganization(values);
+      // Signed in as the new owner: the root navigator swaps in their area.
+      signIn(role);
+    } catch (e) {
+      // The backend's own message: already registered, invalid GSTIN,
+      // too many attempts, signup off.
+      setError(e instanceof Error ? e.message : String(e));
+      setSubmitting(false);
+    }
   };
 
   const loginPrompt = (
@@ -45,6 +59,8 @@ function CreateOrganizationScreen() {
         <CreateOrganizationForm
           compact
           footer={loginPrompt}
+          errorText={error}
+          submitting={submitting}
           onBack={goToLogin}
           onSubmit={handleSubmit}
         />
@@ -53,9 +69,12 @@ function CreateOrganizationScreen() {
   }
 
   return (
-    <AuthLayout wide footer={loginPrompt}>
+    <AuthLayout wide fixed>
       <CreateOrganizationForm
         compact={false}
+        footer={loginPrompt}
+        errorText={error}
+        submitting={submitting}
         onBack={goToLogin}
         onSubmit={handleSubmit}
       />

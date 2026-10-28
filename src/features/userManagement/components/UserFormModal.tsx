@@ -233,7 +233,7 @@ export function UserFormModal({
         <>
           <N1TextInput
             label={PASSWORD_STRINGS.current}
-            value={user?.status !== 'invited' ? PASSWORD_MASK : ''}
+            value={PASSWORD_MASK}
             placeholder={PASSWORD_STRINGS.noPassword}
             readOnly
             autoComplete="off"

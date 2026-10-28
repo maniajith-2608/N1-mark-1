@@ -12,26 +12,23 @@ import {
   useN1Styles,
 } from '../../../shared/components';
 import { COMMON_STRINGS } from '../../../shared/constants';
-import { isGstin, normalizeGstin } from '../../../shared/utils';
-import { INDUSTRY_OPTIONS } from '../constants';
+import { isGstin, isPinCode, normalizeGstin } from '../../../shared/utils';
+import {
+  DEFAULT_INDUSTRY,
+  INDUSTRY_OPTIONS,
+  STATE_OPTIONS,
+} from '../constants';
 import { makeCreateOrganizationFormStyles } from '../styles';
+import type { CreateOrganizationValues } from '../types';
 import {
   checkPassword,
   generateOrganizationCode,
   isValidEmail,
   passwordChecklist,
+  randomCodeSuffix,
 } from '../utils';
 
-export type CreateOrganizationValues = {
-  name: string;
-  code: string;
-  industry: string;
-  email: string;
-  phone: string;
-  /** GSTIN, upper-case; blank when the business isn't registered. */
-  gstNumber: string;
-  password: string;
-};
+export type { CreateOrganizationValues };
 
 type Props = {
   /**
@@ -39,50 +36,73 @@ type Props = {
    * submit button pinned while the fields scroll.
    */
   compact: boolean;
-  /** Line under the fields on phones, e.g. "Already have an account? Log in". */
+  /**
+   * "Already have an account? Log in": under the fields on phones, under the
+   * pinned button on wider screens.
+   */
   footer?: ReactNode;
+  /** Why the server refused the last submit, shown above the button. */
+  errorText?: string;
+  submitting?: boolean;
   onBack: () => void;
   onSubmit: (values: CreateOrganizationValues) => void;
 };
 
-function CreateOrganizationForm({ compact, footer, onBack, onSubmit }: Props) {
+function CreateOrganizationForm({
+  compact,
+  footer,
+  errorText,
+  submitting = false,
+  onBack,
+  onSubmit,
+}: Props) {
   const styles = useN1Styles(makeCreateOrganizationFormStyles);
+  const [yourName, setYourName] = useState('');
   const [name, setName] = useState('');
-  const [industry, setIndustry] = useState<string | null>(null);
+  const [industry, setIndustry] = useState<string | null>(DEFAULT_INDUSTRY);
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [gstNumber, setGstNumber] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [addressLine1, setAddressLine1] = useState('');
+  const [addressLine2, setAddressLine2] = useState('');
+  const [city, setCity] = useState('');
+  const [state, setState] = useState<string | null>(null);
+  const [pinCode, setPinCode] = useState('');
   // Errors only show once the user has tried to submit.
   const [submitted, setSubmitted] = useState(false);
 
-  const code = generateOrganizationCode(name);
+  // Picked once, so the code doesn't change with every letter typed.
+  const [codeSuffix] = useState(randomCodeSuffix);
+  const code = generateOrganizationCode(name, codeSuffix);
   const rules = checkPassword(password, confirmPassword);
   const errors = {
+    yourName: yourName.trim() ? undefined : 'Enter your name',
     name: name.trim() ? undefined : 'Enter the organization name',
     industry: industry ? undefined : 'Select an industry',
     email: isValidEmail(email) ? undefined : 'Enter a valid email',
     phone: phone.trim() ? undefined : 'Enter a phone number',
-    // Optional: not every business is GST-registered.
-    gstNumber:
-      !gstNumber.trim() || isGstin(gstNumber)
-        ? undefined
-        : COMMON_STRINGS.invalidGstin,
+    gstNumber: isGstin(gstNumber) ? undefined : COMMON_STRINGS.invalidGstin,
     password:
       rules.minLength && rules.lettersAndNumbers
         ? undefined
         : 'Password does not meet the rules below',
     confirmPassword: rules.matches ? undefined : 'Passwords do not match',
+    addressLine1: addressLine1.trim() ? undefined : 'Enter the address',
+    city: city.trim() ? undefined : 'Enter the city',
+    state: state ? undefined : 'Select a state',
+    pinCode: isPinCode(pinCode) ? undefined : 'Enter a 6-digit PIN code',
   };
   const shown = (error?: string) => (submitted ? error : undefined);
 
   const handleSubmit = () => {
     setSubmitted(true);
-    if (Object.values(errors).some(Boolean) || !industry) {
+    if (Object.values(errors).some(Boolean) || !industry || !state) {
       return;
     }
     onSubmit({
+      yourName: yourName.trim(),
       name: name.trim(),
       code,
       industry,
@@ -90,6 +110,11 @@ function CreateOrganizationForm({ compact, footer, onBack, onSubmit }: Props) {
       phone: phone.trim(),
       gstNumber: normalizeGstin(gstNumber),
       password,
+      addressLine1: addressLine1.trim(),
+      addressLine2: addressLine2.trim(),
+      city: city.trim(),
+      state,
+      pinCode: pinCode.trim(),
     });
   };
 
@@ -122,6 +147,18 @@ function CreateOrganizationForm({ compact, footer, onBack, onSubmit }: Props) {
     <>
       <View style={rowStyle}>
         <N1TextInput
+          label="Your name"
+          required
+          value={yourName}
+          onChangeText={setYourName}
+          placeholder="Your full name"
+          autoCapitalize="words"
+          autoComplete="name"
+          textContentType="name"
+          errorText={shown(errors.yourName)}
+          containerStyle={itemStyle}
+        />
+        <N1TextInput
           label="Organization name"
           required
           value={name}
@@ -131,6 +168,8 @@ function CreateOrganizationForm({ compact, footer, onBack, onSubmit }: Props) {
           errorText={shown(errors.name)}
           containerStyle={itemStyle}
         />
+      </View>
+      <View style={rowStyle}>
         <N1TextInput
           label="Organization code"
           readOnly
@@ -139,8 +178,6 @@ function CreateOrganizationForm({ compact, footer, onBack, onSubmit }: Props) {
           rightElement={<N1Badge label="Auto" tone="info" />}
           containerStyle={itemStyle}
         />
-      </View>
-      <View style={rowStyle}>
         <N1DropDown
           label="Industry"
           required
@@ -151,6 +188,8 @@ function CreateOrganizationForm({ compact, footer, onBack, onSubmit }: Props) {
           errorText={shown(errors.industry)}
           containerStyle={itemStyle}
         />
+      </View>
+      <View style={rowStyle}>
         <N1TextInput
           label="Business email"
           required
@@ -164,8 +203,6 @@ function CreateOrganizationForm({ compact, footer, onBack, onSubmit }: Props) {
           errorText={shown(errors.email)}
           containerStyle={itemStyle}
         />
-      </View>
-      <View style={rowStyle}>
         <N1TextInput
           label="Phone number"
           required
@@ -178,8 +215,11 @@ function CreateOrganizationForm({ compact, footer, onBack, onSubmit }: Props) {
           errorText={shown(errors.phone)}
           containerStyle={itemStyle}
         />
+      </View>
+      <View style={rowStyle}>
         <N1TextInput
           label="GST number"
+          required
           value={gstNumber}
           onChangeText={setGstNumber}
           placeholder="e.g. 33ABCDE1234F1Z5"
@@ -187,6 +227,64 @@ function CreateOrganizationForm({ compact, footer, onBack, onSubmit }: Props) {
           autoCorrect={false}
           maxLength={15}
           errorText={shown(errors.gstNumber)}
+          containerStyle={itemStyle}
+        />
+        <N1TextInput
+          label="Address line 1"
+          required
+          value={addressLine1}
+          onChangeText={setAddressLine1}
+          placeholder="Building, street"
+          autoComplete="address-line1"
+          textContentType="streetAddressLine1"
+          errorText={shown(errors.addressLine1)}
+          containerStyle={itemStyle}
+        />
+      </View>
+      <View style={rowStyle}>
+        <N1TextInput
+          label="Address line 2"
+          value={addressLine2}
+          onChangeText={setAddressLine2}
+          placeholder="Area, landmark"
+          autoComplete="address-line2"
+          textContentType="streetAddressLine2"
+          containerStyle={itemStyle}
+        />
+        <N1TextInput
+          label="City"
+          required
+          value={city}
+          onChangeText={setCity}
+          placeholder="e.g. Chennai"
+          autoCapitalize="words"
+          textContentType="addressCity"
+          errorText={shown(errors.city)}
+          containerStyle={itemStyle}
+        />
+      </View>
+      <View style={rowStyle}>
+        <N1DropDown
+          label="State"
+          required
+          options={STATE_OPTIONS}
+          value={state}
+          onChange={setState}
+          placeholder="Select state"
+          errorText={shown(errors.state)}
+          containerStyle={itemStyle}
+        />
+        <N1TextInput
+          label="PIN code"
+          required
+          value={pinCode}
+          onChangeText={setPinCode}
+          placeholder="e.g. 600001"
+          keyboardType="number-pad"
+          maxLength={6}
+          autoComplete="postal-code"
+          textContentType="postalCode"
+          errorText={shown(errors.pinCode)}
           containerStyle={itemStyle}
         />
       </View>
@@ -217,6 +315,11 @@ function CreateOrganizationForm({ compact, footer, onBack, onSubmit }: Props) {
         />
       </View>
       <N1Checklist items={passwordChecklist(rules)} />
+      {errorText ? (
+        <N1Text variant="small" color="danger">
+          {errorText}
+        </N1Text>
+      ) : null}
     </>
   );
 
@@ -225,6 +328,7 @@ function CreateOrganizationForm({ compact, footer, onBack, onSubmit }: Props) {
       title="Create organization"
       size="lg"
       fullWidth
+      loading={submitting}
       onPress={handleSubmit}
     />
   );
@@ -247,11 +351,18 @@ function CreateOrganizationForm({ compact, footer, onBack, onSubmit }: Props) {
     );
   }
 
+  // Tablet / desktop: header and button stay put while the fields scroll.
   return (
-    <View style={styles.form}>
+    <View style={styles.wideScreen}>
       {header}
-      {fields}
+      <KeyboardScrollView
+        style={styles.wideScroll}
+        contentContainerStyle={styles.wideScrollContent}
+      >
+        {fields}
+      </KeyboardScrollView>
       {submitButton}
+      {footer}
     </View>
   );
 }

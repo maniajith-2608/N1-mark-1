@@ -21,6 +21,24 @@ export const makeCreateOrganizationFormStyles = createN1Styles(t => ({
     flex: 1,
   },
 
+  // Tablet / desktop: fills the pane; only the fields between scroll.
+  wideScreen: {
+    flex: 1,
+    minHeight: 0,
+    gap: t.spacing.lg,
+  },
+  // The scroll area reaches into the pane's padding, so its scrollbar sits
+  // beside the fields instead of over their right edge.
+  wideScroll: {
+    flex: 1,
+    marginRight: -t.spacing.lg,
+  },
+  wideScrollContent: {
+    gap: t.spacing.lg,
+    paddingVertical: t.spacing.xs,
+    paddingRight: t.spacing.lg,
+  },
+
   // Phones: header and submit button stay put while the fields scroll.
   screen: {
     flex: 1,

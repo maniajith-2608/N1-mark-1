@@ -100,14 +100,17 @@ const withOperations = (operations: JobOperation[]): JobCardInput => ({
 /**
  * A typed or scanned code as the server knows it: "WO-12", the card code
  * ("JOB12") or its QR value ("JC-00012"). People type "wo 12", "WO #12" or
- * just "12" for the work order; those read as "WO-12". Only the first line
- * counts: the order's QR lists its details under the number.
+ * just "12" for the work order; those read as "WO-12". The card code may be
+ * typed as shown on screen ("#JOB12") or "JOB#12"; the "#" is dropped. Only
+ * the first line counts: the order's QR lists its details under the number.
  */
 export function normaliseJobCode(code: string): string {
   const [first = ''] = code.trim().split('\n');
   const value = first.trim().toUpperCase();
   const workOrder = /^(?:WO\s*[#-]?\s*)?0*(\d+)$/.exec(value);
-  return workOrder ? `WO-${workOrder[1]}` : value.replace(/\s+/g, '');
+  return workOrder
+    ? `WO-${workOrder[1]}`
+    : value.replace(/\s+/g, '').replace(/^#|#(?=\d)/g, '');
 }
 
 // ---- Stage: where the job is ----

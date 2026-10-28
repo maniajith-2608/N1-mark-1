@@ -125,7 +125,7 @@ function QcTabPage({
 /**
  * QC's home: its jobs as Raw Material QC or Machine QC checks, under the
  * black header with the search, the filter (by QC status) and the QR
- * scanner (Import Job). The two kinds are swipeable tabs with an underline,
+ * scanner (Import Order). The two kinds are swipeable tabs with an underline,
  * like Billing on phones.
  */
 export function QcListScreen() {

@@ -57,7 +57,7 @@ test('list pages through every user and maps them to app shapes', async () => {
   expect(request.mock.calls[0][0]).toContain('users(first: 50,');
   expect(users.map(u => [u.role, u.status])).toEqual([
     ['admin', 'active'],
-    ['qc', 'invited'],
+    ['qc', 'inactive'],
   ]);
   expect(users[0]).toMatchObject({
     email: '',
