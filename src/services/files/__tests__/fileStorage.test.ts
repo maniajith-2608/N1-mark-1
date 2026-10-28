@@ -3,6 +3,8 @@ import {
   fileDownloadUrl,
   toFileReference,
   uploadAttachment,
+  uploadIdempotencyKey,
+  uploadTarget,
 } from '../fileStorage';
 import { pickedFile, rememberPickedFile } from '../pickedFiles';
 
@@ -135,4 +137,23 @@ test('fileDownloadUrl passes other errors straight through', async () => {
 
   await expect(fileDownloadUrl('f1')).rejects.toThrow('gone');
   expect(post).toHaveBeenCalledTimes(1);
+});
+
+test('the upload idempotency key keeps to the characters the backend allows', () => {
+  const entityId = '01a18444-dc54-74e7-8fbc-5c0e6a26e97d';
+  expect(uploadIdempotencyKey(entityId, 'Design file-1793220400789-0')).toBe(
+    `upload-${entityId}-Design_file-1793220400789-0`,
+  );
+  const long = uploadIdempotencyKey(entityId, `${'x'.repeat(200)}-42`);
+  expect(long).toHaveLength(128);
+  expect(long.endsWith('-42')).toBe(true);
+  expect(long).toMatch(/^[A-Za-z0-9._:-]+$/);
+});
+
+test('in web dev the upload goes through the S3 proxy; otherwise straight to S3', () => {
+  const url = 'https://bucket.s3.ap-south-1.amazonaws.com/';
+  expect(uploadTarget(url, '/s3')).toBe(
+    '/s3/bucket.s3.ap-south-1.amazonaws.com/',
+  );
+  expect(uploadTarget(url, '')).toBe(url);
 });
