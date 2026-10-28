@@ -1,4 +1,4 @@
-import { openDocument, printDocument } from '../viewDocument.web';
+import { openDocument, printDocument, reserveTab } from '../viewDocument.web';
 
 type FakePopup = {
   html: string;
@@ -8,6 +8,8 @@ type FakePopup = {
   focus: () => void;
   print: () => void;
   addEventListener: (event: string, cb: () => void) => void;
+  location: { href: string };
+  close: jest.Mock;
 };
 
 const g = globalThis as unknown as { open?: jest.Mock };
@@ -31,6 +33,8 @@ beforeEach(() => {
     addEventListener: (_event, cb) => {
       popup.onLoad = cb;
     },
+    location: { href: '' },
+    close: jest.fn(),
   };
   g.open = jest.fn(() => popup);
 });
@@ -74,4 +78,18 @@ test('an image prints from a page of its own', () => {
   expect(popup.html).toContain('<title>part &lt;1&gt;.png</title>');
   expect(popup.html).toContain(`<img src="${image.uri}"`);
   expect(popup.html).toContain('window.print()');
+});
+
+test('a reserved tab opens on the tap and takes the link later', () => {
+  const tab = reserveTab();
+  expect(g.open).toHaveBeenCalledWith('', '_blank');
+  expect(tab?.open('https://files.example/a.pdf')).toBe(true);
+  expect(popup.location.href).toBe('https://files.example/a.pdf');
+  tab?.close();
+  expect(popup.close).toHaveBeenCalled();
+});
+
+test('no reserved tab when pop-ups are blocked', () => {
+  g.open = jest.fn(() => null);
+  expect(reserveTab()).toBeNull();
 });
