@@ -105,7 +105,15 @@ export async function uploadAttachment(
       contentType: contentTypeOf(file),
       sizeBytes: file.size,
     },
-    { headers: { 'Idempotency-Key': `upload-${entityId}-${doc.id}` } },
+    // Picked ids carry the kind ("Design file-…"); the backend refuses spaces.
+    {
+      headers: {
+        'Idempotency-Key': `upload-${entityId}-${doc.id}`.replace(
+          /[^A-Za-z0-9_-]/g,
+          '_',
+        ),
+      },
+    },
   );
   const form = new browser.FormData();
   Object.entries(data.upload.fields).forEach(([name, value]) =>

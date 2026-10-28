@@ -88,6 +88,27 @@ test('a picked file is uploaded with the form fields first and the file last', a
   expect(pickedFile(doc.id)).toBeUndefined();
 });
 
+test('the upload key keeps only characters the backend accepts', async () => {
+  const id = 'Design file-17:30-0';
+  rememberPickedFile(id, {
+    name: 'Bracket.pdf',
+    size: 3,
+    type: 'application/pdf',
+  });
+  post.mockResolvedValueOnce({
+    data: {
+      file: { id: 'f2', name: 'Bracket.pdf', sizeBytes: 3 },
+      upload: { url: 'http://minio/bucket', fields: {} },
+    },
+  });
+
+  await uploadAttachment('sales_order', 'o1', { ...doc, id });
+
+  expect(post.mock.calls[0][2].headers['Idempotency-Key']).toBe(
+    'upload-o1-Design_file-17_30-0',
+  );
+});
+
 test('a failed storage upload rejects and keeps the file for a retry', async () => {
   rememberPickedFile('retry-1', {
     name: 'a.pdf',
