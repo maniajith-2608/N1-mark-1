@@ -7,7 +7,7 @@ import AuthPrompt from '../components/AuthPrompt';
 import LoginForm from '../components/LoginForm';
 import { ApiError } from '../../../services/api';
 import { authApi } from '../api/authApi';
-import { INVALID_CREDENTIALS_MESSAGE } from '../constants';
+import { AUTH_ENTRY_POINTS, INVALID_CREDENTIALS_MESSAGE } from '../constants';
 import { useAuthSession } from '../hooks';
 
 function LoginScreen() {
@@ -47,24 +47,29 @@ function LoginScreen() {
       params: { screen: 'ForgotPassword' },
     });
 
+  const { createOrganization, forgotPassword } = AUTH_ENTRY_POINTS;
+  const onForgotPassword = forgotPassword ? goToForgotPassword : undefined;
+
   if (isCompact) {
     return (
       <AuthMobileShell
         title="Welcome back"
         subtitle="Log in to manage your organization and team."
         footer={
-          <AuthPrompt
-            question="No account yet?"
-            action="Create organization"
-            onPress={goToCreateOrganization}
-          />
+          createOrganization ? (
+            <AuthPrompt
+              question="No account yet?"
+              action="Create organization"
+              onPress={goToCreateOrganization}
+            />
+          ) : undefined
         }
       >
         <LoginForm
           errorText={error}
           submitting={submitting}
           onSubmit={handleSubmit}
-          onForgotPassword={goToForgotPassword}
+          onForgotPassword={onForgotPassword}
         />
       </AuthMobileShell>
     );
@@ -73,11 +78,13 @@ function LoginScreen() {
   return (
     <AuthLayout
       footer={
-        <AuthPrompt
-          question="Setting up for your company?"
-          action="Create organization"
-          onPress={goToCreateOrganization}
-        />
+        createOrganization ? (
+          <AuthPrompt
+            question="Setting up for your company?"
+            action="Create organization"
+            onPress={goToCreateOrganization}
+          />
+        ) : undefined
       }
     >
       <LoginForm
@@ -88,7 +95,7 @@ function LoginScreen() {
         errorText={error}
         submitting={submitting}
         onSubmit={handleSubmit}
-        onForgotPassword={goToForgotPassword}
+        onForgotPassword={onForgotPassword}
       />
     </AuthLayout>
   );

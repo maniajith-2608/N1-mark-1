@@ -1,0 +1,6 @@
+<resources>
+    <color name="ic_launcher_background">#FFFFFF</color>
+    <color name="splash_gradient_start">#020206</color>
+    <color name="splash_gradient_center">#161640</color>
+    <color name="splash_gradient_end">#3939A2</color>
+</resources>

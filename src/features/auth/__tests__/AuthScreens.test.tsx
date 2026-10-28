@@ -5,6 +5,7 @@
 import { type ReactTestInstance } from 'react-test-renderer';
 import LoginScreen from '../screens/LoginScreen';
 import CreateOrganizationScreen from '../screens/CreateOrganizationScreen';
+import { AUTH_ENTRY_POINTS } from '../constants';
 import { createStore } from '../../../app/store';
 import {
   PHONE,
@@ -59,16 +60,15 @@ describe('LoginScreen', () => {
       'N1 brings your organization, your team, and your data together in one simple workspace. Stay on top of daily operations, keep your team aligned, and get a clear view of your business from one dashboard.',
     );
     expect(text).toContain('Remember me');
-    expect(text).toContain('Forgot password?');
     expect(text).not.toContain('Welcome back');
   });
 
   test.each([WIDE, PHONE])(
-    'shows the Create organization entry point (width %i)',
+    'hides Create organization and Forgot password for now (width %i)',
     async width => {
-      expect(allText(await render(<LoginScreen />, width))).toContain(
-        'Create organization',
-      );
+      const text = allText(await render(<LoginScreen />, width));
+      expect(text).not.toContain('Create organization');
+      expect(text).not.toContain('Forgot password?');
     },
   );
 
@@ -144,14 +144,38 @@ describe('LoginScreen', () => {
     });
   });
 
-  test('"Forgot password?" opens the forgot password flow', async () => {
-    const root = await render(<LoginScreen />, WIDE);
+  describe('with the hidden links switched back on', () => {
+    beforeEach(() => {
+      AUTH_ENTRY_POINTS.createOrganization = true;
+      AUTH_ENTRY_POINTS.forgotPassword = true;
+    });
+    afterEach(() => {
+      AUTH_ENTRY_POINTS.createOrganization = false;
+      AUTH_ENTRY_POINTS.forgotPassword = false;
+    });
 
-    await press(findText(root, 'Forgot password?'));
+    test.each([WIDE, PHONE])(
+      'shows the Create organization entry point (width %i)',
+      async width => {
+        const root = await render(<LoginScreen />, width);
+        expect(allText(root)).toContain('Forgot password?');
 
-    expect(mockNavigation.navigate).toHaveBeenCalledWith('Auth', {
-      screen: 'ForgotPasswordFlow',
-      params: { screen: 'ForgotPassword' },
+        await press(findText(root, 'Create organization'));
+        expect(mockNavigation.navigate).toHaveBeenCalledWith('Auth', {
+          screen: 'CreateOrganization',
+        });
+      },
+    );
+
+    test('"Forgot password?" opens the forgot password flow', async () => {
+      const root = await render(<LoginScreen />, WIDE);
+
+      await press(findText(root, 'Forgot password?'));
+
+      expect(mockNavigation.navigate).toHaveBeenCalledWith('Auth', {
+        screen: 'ForgotPasswordFlow',
+        params: { screen: 'ForgotPassword' },
+      });
     });
   });
 });

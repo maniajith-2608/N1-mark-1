@@ -1,5 +1,6 @@
 package com.n1mark1
 
+import android.os.Bundle
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
@@ -12,6 +13,12 @@ class MainActivity : ReactActivity() {
    * rendering of the component.
    */
   override fun getMainComponentName(): String = "N1Mark1"
+
+  /** Swap the launch (splash) theme for the regular app theme before any view is created. */
+  override fun onCreate(savedInstanceState: Bundle?) {
+    setTheme(R.style.AppTheme)
+    super.onCreate(savedInstanceState)
+  }
 
   /**
    * Returns the instance of the [ReactActivityDelegate]. We use [DefaultReactActivityDelegate]

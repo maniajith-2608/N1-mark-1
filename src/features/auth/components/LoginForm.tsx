@@ -47,6 +47,7 @@ type Props = {
   /** Sign-in in flight: the button spins and can't be pressed again. */
   submitting?: boolean;
   onSubmit: (email: string, password: string) => void;
+  /** Left out to hide the "Forgot password?" link. */
   onForgotPassword?: () => void;
 };
 
@@ -121,23 +122,27 @@ function LoginForm({
         autoComplete="password"
         textContentType="password"
       />
-      <View
-        style={[styles.optionsRow, !showRememberMe && styles.optionsRowEnd]}
-      >
-        {showRememberMe ? (
-          <N1Checkbox
-            label="Remember me"
-            checked={rememberMe}
-            onChange={setRememberMe}
-          />
-        ) : null}
-        <N1Button
-          title="Forgot password?"
-          variant="ghost"
-          size="sm"
-          onPress={onForgotPassword}
-        />
-      </View>
+      {showRememberMe || onForgotPassword ? (
+        <View
+          style={[styles.optionsRow, !showRememberMe && styles.optionsRowEnd]}
+        >
+          {showRememberMe ? (
+            <N1Checkbox
+              label="Remember me"
+              checked={rememberMe}
+              onChange={setRememberMe}
+            />
+          ) : null}
+          {onForgotPassword ? (
+            <N1Button
+              title="Forgot password?"
+              variant="ghost"
+              size="sm"
+              onPress={onForgotPassword}
+            />
+          ) : null}
+        </View>
+      ) : null}
       <N1Button
         title="Log in"
         size="lg"

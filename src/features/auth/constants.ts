@@ -7,6 +7,15 @@ export const AUTH_TAGLINE =
 
 export { PASSWORD_MIN_LENGTH } from '../../config/constants';
 
+/**
+ * Login screen links, temporarily hidden on web and mobile. Set one back to
+ * true to show its link again; the screens and routes are untouched.
+ */
+export const AUTH_ENTRY_POINTS = {
+  createOrganization: false,
+  forgotPassword: false,
+};
+
 /** Digits in the emailed verification code. */
 export const VERIFICATION_CODE_LENGTH = 6;
 
