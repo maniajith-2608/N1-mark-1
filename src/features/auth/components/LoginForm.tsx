@@ -8,6 +8,7 @@ import {
   useN1Styles,
 } from '../../../shared/components';
 import { isPhone } from '../../../shared/utils';
+import { DEV_LOGIN } from '../constants';
 import { makeLoginFormStyles } from '../styles';
 import { isValidEmail } from '../utils';
 
@@ -62,8 +63,8 @@ function LoginForm({
   onForgotPassword,
 }: Props) {
   const styles = useN1Styles(makeLoginFormStyles);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState(DEV_LOGIN.email);
+  const [password, setPassword] = useState(DEV_LOGIN.password);
   const [rememberMe, setRememberMe] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 

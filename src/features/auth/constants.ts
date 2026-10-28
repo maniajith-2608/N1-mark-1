@@ -133,3 +133,12 @@ export const MOCK_USERS: MockUser[] = [
 
 export const INVALID_CREDENTIALS_MESSAGE =
   'Invalid email, phone number or password.';
+
+/**
+ * Prefilled on the login form in dev builds only, to skip typing while
+ * testing locally. Release builds and Jest start with empty fields.
+ */
+export const DEV_LOGIN =
+  __DEV__ && process.env.NODE_ENV !== 'test'
+    ? { email: 'main@gmail.com', password: 'kou123PD&@' }
+    : { email: '', password: '' };

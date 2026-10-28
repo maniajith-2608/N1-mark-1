@@ -9,7 +9,7 @@ import { Platform } from 'react-native';
  */
 export const API_BASE_URL = Platform.select({
   web: process.env.N1_API_URL || '/api',
-  android: 'http://10.0.2.2:3000',
+  android: 'https://api.staging.app.none1.in',
   default: 'http://127.0.0.1:3000',
 });
 /**
