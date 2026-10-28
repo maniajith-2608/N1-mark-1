@@ -111,10 +111,14 @@ export const ORDER_STRINGS = {
     rawMaterialHelp: (workOrder: string) =>
       `${workOrder} is missing some raw material details. Fill them in so RM QC can inspect the material.`,
     rawMaterialSubmit: 'Save raw material',
+    /** An order without a job card: its raw material opens the card. */
+    createJobCard: 'Create job card',
+    createJobCardHelp: (workOrder: string) =>
+      `Enter the raw material details for ${workOrder}. Its job card is created once they are saved.`,
     jobCards: 'Job cards',
     noJobCard: 'No job card',
     noJobCardHelp:
-      'Every order opens its job card when it is created. This one was cancelled before work started.',
+      'An order gets its job card once its raw material details are entered. Use Create job card to enter them.',
     jobCardNow: (where: string) => `Now: ${where}`,
     jobCardNoFlow: 'No process steps yet — open it to plan the flow.',
     openJobCard: (number: string) => `Open job card ${workOrderLabel(number)}`,
@@ -141,7 +145,7 @@ export const ORDER_STRINGS = {
     editSubtitle: (number: string) =>
       `Update ${workOrderLabel(number)}'s details.`,
     /** The stepper, in order. */
-    steps: ['Customer', 'Order details', 'Raw material'],
+    steps: ['Customer', 'Order details'],
     stepOf: (n: number, total: number, label: string) =>
       `Step ${n} of ${total} · ${label}`,
     stepA11y: (n: number, label: string) => `Step ${n}: ${label}`,
@@ -150,13 +154,7 @@ export const ORDER_STRINGS = {
     scrollForMore: 'Scroll for more fields',
     customerSection: 'Customer & requirement',
     orderSection: 'Order details',
-    rawMaterialSection: 'Raw material details',
     materialSource: 'Material source',
-    rawMaterialArrived: 'Mark raw material arrived',
-    rawMaterialArrivedHelp: 'All raw material details are required.',
-    rawMaterialArrivedEditHelp: 'All raw material details are required.',
-    rawMaterialPendingHelp:
-      'Not arrived yet — fill in what you know; the details are optional.',
     next: 'Next and Continue',
     back: 'Back',
     submitCreate: 'Create order',

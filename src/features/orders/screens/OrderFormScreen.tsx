@@ -9,8 +9,6 @@ import {
   N1DropDown,
   N1Divider,
   N1Icon,
-  N1RadioGroup,
-  N1Switch,
   N1Text,
   N1TextInput,
   N1UploadBox,
@@ -43,36 +41,23 @@ import { OrderStepper } from '../components/OrderStepper';
 import {
   formValuesToOrderInput,
   orderToFormValues,
-  RAW_MATERIAL_FIELDS,
   REQUIRED_ORDER_FIELDS,
   firstStepWithErrors,
   hasStepErrors,
   validateOrderForm,
   type OrderFormValues,
 } from '../components/orderForm';
-import {
-  MATERIAL_SOURCE_OPTIONS,
-  ORDER_STRINGS,
-  PRIORITY_OPTIONS,
-} from '../constants';
+import { ORDER_STRINGS, PRIORITY_OPTIONS } from '../constants';
 import { useOrder } from '../hooks/useOrders';
 
 const F = ORDER_STRINGS.form;
 
 const STEP_COUNT = F.steps.length;
 
-const isRawMaterialField = (key: keyof OrderFormValues) =>
-  (RAW_MATERIAL_FIELDS as readonly string[]).includes(key);
-
 /** Plain text fields (not files, the customer or priority). */
 type OrderTextField = Exclude<
   keyof OrderFormValues,
-  | 'designFile'
-  | 'purchaseOrder'
-  | 'customerId'
-  | 'priority'
-  | 'materialSource'
-  | 'rawMaterialArrived'
+  'designFile' | 'purchaseOrder' | 'customerId' | 'priority'
 >;
 
 const makeStyles = createN1Styles(t => ({
@@ -90,12 +75,6 @@ const makeStyles = createN1Styles(t => ({
   pressed: { opacity: t.opacity.pressed },
   section: { gap: t.spacing.lg },
   createCustomer: { alignSelf: 'flex-start' },
-  arrived: {
-    gap: t.spacing.xs,
-    padding: t.spacing.md,
-    borderRadius: t.radius.md,
-    backgroundColor: t.colors.background,
-  },
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -387,15 +366,8 @@ export function OrderFormScreen({
     </View>
   );
 
-  // Raw material is required only once it has arrived; switching that off
-  // drops its errors too.
   const isRequired = (key: keyof OrderFormValues) =>
-    (REQUIRED_ORDER_FIELDS as readonly string[]).includes(key) ||
-    (values.rawMaterialArrived && isRawMaterialField(key));
-  const errorFor = (key: keyof OrderFormValues) =>
-    isRawMaterialField(key) && !values.rawMaterialArrived
-      ? undefined
-      : errors[key];
+    (REQUIRED_ORDER_FIELDS as readonly string[]).includes(key);
 
   const text = (
     key: OrderTextField,
@@ -409,7 +381,7 @@ export function OrderFormScreen({
       placeholder={placeholder}
       value={values[key]}
       onChangeText={bind(key)}
-      errorText={errorFor(key)}
+      errorText={errors[key]}
       {...extra}
     />
   );
@@ -424,7 +396,7 @@ export function OrderFormScreen({
       placeholder={F.datePlaceholder}
       value={values[key]}
       onChange={bind(key)}
-      errorText={errorFor(key)}
+      errorText={errors[key]}
       testID={testID}
     />
   );
@@ -486,54 +458,7 @@ export function OrderFormScreen({
     </View>
   );
 
-  const rawMaterialStep = (
-    <View style={styles.section} testID="order-form-step-3">
-      {heading(F.rawMaterialSection)}
-      <View style={styles.arrived}>
-        <N1Switch
-          label={F.rawMaterialArrived}
-          value={values.rawMaterialArrived}
-          onValueChange={bind('rawMaterialArrived')}
-          testID="order-form-rm-arrived"
-        />
-        <N1Text variant="small" color="secondary">
-          {values.rawMaterialArrived
-            ? isEdit
-              ? F.rawMaterialArrivedEditHelp
-              : F.rawMaterialArrivedHelp
-            : F.rawMaterialPendingHelp}
-        </N1Text>
-      </View>
-      <N1RadioGroup
-        label={F.materialSource}
-        required={isRequired('materialSource')}
-        options={MATERIAL_SOURCE_OPTIONS}
-        value={values.materialSource || null}
-        onChange={bind('materialSource')}
-        errorText={errorFor('materialSource')}
-      />
-      <FormRow>
-        {text('rmPartNumber', F.rmPartNumber, F.rmPartNumberPlaceholder, {
-          testID: 'order-form-rm-part-number',
-        })}
-        {text(
-          'rawMaterialSize',
-          F.rawMaterialSize,
-          F.rawMaterialSizePlaceholder,
-        )}
-      </FormRow>
-      <FormRow>
-        {text('heatNumber', F.heatNumber, F.heatNumberPlaceholder)}
-        {text(
-          'rawMaterialGrade',
-          F.rawMaterialGrade,
-          F.rawMaterialGradePlaceholder,
-        )}
-      </FormRow>
-    </View>
-  );
-
-  const stepContent = [customerStep, orderStep, rawMaterialStep][step - 1];
+  const stepContent = [customerStep, orderStep][step - 1];
 
   const footer = (
     <View style={styles.footer}>

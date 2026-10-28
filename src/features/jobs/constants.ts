@@ -182,6 +182,9 @@ export const JOBS_STRINGS = {
     retestHelp: (workOrder: string) =>
       `Enter the new material for ${workOrder}. RM QC will inspect it again.`,
     retestSubmit: 'Re-initiate RM QC',
+    /** The order took the material but the server opened no job card. */
+    noJobCard: (workOrder: string) =>
+      `${workOrder} has no job card yet. Check its raw material grade and size, then try again.`,
   },
 } as const;
 

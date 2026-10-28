@@ -5,6 +5,7 @@ import { selectJobCardsState } from '../../jobCards/store/selectors';
 import { useEmployeeRole } from '../../profile/context/EmployeeRoleContext';
 import { qcQueueKey, type QcQueueEntry } from '../qc';
 import { myJobsActions } from '../store/myJobsSlice';
+import type { WorkOrder } from '../../orders/types';
 import type { RawMaterialInput } from '../types';
 
 const selectMyJobs = (state: RootState) => state.myJobs;
@@ -61,8 +62,18 @@ export function useMyJobs() {
     [dispatch, role],
   );
   const importJob = useCallback(
-    (jobCardId: string, rawMaterial?: RawMaterialInput) =>
-      dispatch(myJobsActions.importRequest({ role, jobCardId, rawMaterial })),
+    (
+      order: Pick<WorkOrder, 'id' | 'jobCardId'>,
+      rawMaterial?: RawMaterialInput,
+    ) =>
+      dispatch(
+        myJobsActions.importRequest({
+          role,
+          orderId: order.id,
+          jobCardId: order.jobCardId,
+          rawMaterial,
+        }),
+      ),
     [dispatch, role],
   );
 

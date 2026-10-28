@@ -1,5 +1,5 @@
 import { useNavigation } from '@react-navigation/native';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { View } from 'react-native';
 import {
   HeaderSearchBar,
@@ -29,6 +29,7 @@ import { selectJobCardsState } from '../../jobCards/store/selectors';
 import { formatDayMonth } from '../../../shared/utils';
 import { OrderCard } from '../components/OrderCard';
 import { OrderStatusBadge, PriorityBadge } from '../components/OrderBadges';
+import { RawMaterialDialog } from '../components/RawMaterialDialog';
 import {
   ORDER_STATUS_OPTIONS,
   ORDER_STRINGS as S,
@@ -165,7 +166,7 @@ export function OrdersListScreen() {
   );
 
   // Opens the order's job card (Back returns to Orders), with Create flow
-  // open when it has no route yet. createOrder opens every order's card.
+  // open when it has no route yet.
   const openJobCard = useCallback(
     (jobCardId: string, createFlow: boolean) =>
       // Pushed on the Orders stack: Back returns to this list.
@@ -175,11 +176,30 @@ export function OrdersListScreen() {
       }),
     [navigation],
   );
-  // Only orders whose job card is open get the clipboard: Open, or Create
-  // flow when it has no route yet.
+  // An order without a job card yet (FE-007): Create job card asks for its
+  // raw material, which opens the card, then its Create flow.
+  const [cardFor, setCardFor] = useState<WorkOrder | null>(null);
+  const closeCreateCard = useCallback(() => setCardFor(null), []);
+  const createdCard = useCallback(
+    (jobCardId: string) => {
+      setCardFor(null);
+      if (jobCardId) {
+        openJobCard(jobCardId, true);
+      }
+    },
+    [openJobCard],
+  );
+  // The clipboard: Create job card for an order without one; Open, or
+  // Create flow when it has no route yet, for one whose card is loaded.
   const jobCardAction = useCallback(
     (o: WorkOrder) => {
-      const card = o.jobCardId ? jobCardEntities[o.jobCardId] : undefined;
+      if (!o.jobCardId) {
+        return {
+          label: S.a11y.createJobCard(o.number),
+          onPress: () => setCardFor(o),
+        };
+      }
+      const card = jobCardEntities[o.jobCardId];
       if (!card) {
         return undefined;
       }
@@ -355,6 +375,13 @@ export function OrdersListScreen() {
           testID="orders-table"
         />
       </AsyncContent>
+      <RawMaterialDialog
+        visible={Boolean(cardFor)}
+        order={cardFor}
+        jobCardId=""
+        onClose={closeCreateCard}
+        onSaved={createdCard}
+      />
     </AdminScreen>
   );
 }

@@ -1,4 +1,5 @@
 import {
+  ApiError,
   definedOnly,
   fetchAllNodes,
   fromPaise,
@@ -23,9 +24,11 @@ import type {
   OrderStatus,
   WorkOrder,
 } from '../types';
+import { isWorkOrder } from '../utils';
 
 // N1 Core API: orders / order / createOrder / updateOrder on POST /graphql.
-// createOrder opens the order's job card (with its steps) itself. Design and
+// createOrder or updateOrder opens the order's job card itself, once the
+// order's raw material grade and size are both set (FE-007). Design and
 // PO files go up to file storage against the order, then onto it with
 // updateOrder.
 
@@ -215,6 +218,35 @@ async function get(id: string): Promise<WorkOrder> {
   return toOrder(data.order);
 }
 
+/**
+ * The order with work order number `code` ("WO-12"), card or not: an order
+ * gets its job card only once its raw material grade and size are set
+ * (FE-007), so jobCardByQr can't find it before then. The search also matches
+ * other fields and longer numbers ("WO-120"), so only an exact number counts.
+ */
+async function findByNumber(code: string): Promise<WorkOrder> {
+  const data = await graphqlRequest<{
+    orders: { edges: { node: OrderNode }[] };
+  }>(
+    `query OrderByNumber($search: String!) {
+      orders(first: ${PAGE_SIZE}, search: $search) {
+        edges { node { ...OrderFields } }
+      }
+    }
+    ${ORDER_FIELDS}`,
+    { search: code },
+  );
+  const order = data.orders.edges
+    .map(({ node }) => toOrder(node))
+    .find(o => isWorkOrder(o, code));
+  if (!order) {
+    throw new ApiError('That order does not exist.', 404, undefined, {
+      code: 'ORDER_NOT_FOUND',
+    });
+  }
+  return order;
+}
+
 /** Uploads newly picked files, then puts their references on the order. */
 async function update(
   id: string,
@@ -243,8 +275,9 @@ async function update(
 }
 
 /**
- * createOrder, which opens the order's job card too (no second call). It
- * needs an existing customer. Files go up against the new order afterwards.
+ * createOrder, which opens the order's job card too when its raw material
+ * grade and size are given (FE-007; no second call). It needs an existing
+ * customer. Files go up against the new order afterwards.
  */
 async function create({
   customerId,
@@ -270,4 +303,4 @@ function remove(): Promise<string> {
   return Promise.reject(new Error('Orders cannot be deleted'));
 }
 
-export const ordersApi = { list, get, create, update, remove };
+export const ordersApi = { list, get, findByNumber, create, update, remove };

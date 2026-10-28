@@ -10,14 +10,13 @@ import {
 } from '../../../shared/utils';
 import { COMMON_STRINGS } from '../../../shared/constants';
 import { ORDER_STRINGS } from '../constants';
-import type {
-  MaterialSource,
-  OrderInput,
-  OrderPriority,
-  WorkOrder,
-} from '../types';
+import type { OrderInput, OrderPriority, WorkOrder } from '../types';
 
-/** Form state: every field is text so partial input (e.g. "12/0") survives. */
+/**
+ * Form state: every field is text so partial input (e.g. "12/0") survives.
+ * No raw material: it goes in with Create job card, which opens the order's
+ * job card (FE-007).
+ */
 export type OrderFormValues = {
   designFile: Attachment | null;
   purchaseOrder: Attachment | null;
@@ -38,15 +37,8 @@ export type OrderFormValues = {
   partName: string;
   partNumber: string;
   drawingNumber: string;
-  rmPartNumber: string;
   shopOrderNumber: string;
-  rawMaterialSize: string;
-  heatNumber: string;
   projectId: string;
-  rawMaterialGrade: string;
-  materialSource: MaterialSource | '';
-  /** Form only: the material is in, so its details are required. */
-  rawMaterialArrived: boolean;
 };
 
 export const EMPTY_ORDER_FORM: OrderFormValues = {
@@ -66,24 +58,18 @@ export const EMPTY_ORDER_FORM: OrderFormValues = {
   partName: '',
   partNumber: '',
   drawingNumber: '',
-  rmPartNumber: '',
   shopOrderNumber: '',
-  rawMaterialSize: '',
-  heatNumber: '',
   projectId: '',
-  rawMaterialGrade: '',
-  materialSource: '',
-  rawMaterialArrived: false,
 };
 
-/** Required once the raw material is marked as arrived. */
+/** The raw material details Create job card asks for, all required. */
 export const RAW_MATERIAL_FIELDS = [
   'materialSource',
   'rmPartNumber',
   'rawMaterialSize',
   'heatNumber',
   'rawMaterialGrade',
-] as const satisfies (keyof OrderFormValues & keyof WorkOrder)[];
+] as const satisfies (keyof WorkOrder)[];
 
 export function orderToFormValues(order?: WorkOrder): OrderFormValues {
   if (!order) {
@@ -106,14 +92,8 @@ export function orderToFormValues(order?: WorkOrder): OrderFormValues {
     partName: order.partName,
     partNumber: order.partNumber,
     drawingNumber: order.drawingNumber,
-    rmPartNumber: order.rmPartNumber,
     shopOrderNumber: order.shopOrderNumber,
-    rawMaterialSize: order.rawMaterialSize,
-    heatNumber: order.heatNumber,
     projectId: order.projectId,
-    rawMaterialGrade: order.rawMaterialGrade,
-    materialSource: order.materialSource,
-    rawMaterialArrived: RAW_MATERIAL_FIELDS.every(key => !isBlank(order[key])),
   };
 }
 
@@ -141,7 +121,6 @@ export const ORDER_FORM_STEPS: (keyof OrderFormValues)[][] = [
     'deliveryDate',
     'description',
   ],
-  ['rawMaterialArrived', ...RAW_MATERIAL_FIELDS],
 ];
 
 /**
@@ -166,10 +145,7 @@ export function validateOrderForm(
   if (!v.designFile) {
     errors.designFile = COMMON_STRINGS.required;
   }
-  [
-    ...REQUIRED_ORDER_FIELDS,
-    ...(v.rawMaterialArrived ? RAW_MATERIAL_FIELDS : []),
-  ].forEach(key => {
+  REQUIRED_ORDER_FIELDS.forEach(key => {
     if (isBlank(v[key])) {
       errors[key] = COMMON_STRINGS.required;
     }
@@ -251,13 +227,14 @@ export function formValuesToOrderInput(
     dcDate: parseDisplayDate(v.dcDate) ?? '',
     partNumber: v.partNumber.trim(),
     drawingNumber: v.drawingNumber.trim(),
-    rmPartNumber: v.rmPartNumber.trim(),
     shopOrderNumber: v.shopOrderNumber.trim(),
-    rawMaterialSize: v.rawMaterialSize.trim(),
-    heatNumber: v.heatNumber.trim(),
     projectId: v.projectId.trim(),
-    rawMaterialGrade: v.rawMaterialGrade.trim(),
-    materialSource: v.materialSource,
+    // Not on the form: entered with Create job card, then kept as they are.
+    rmPartNumber: existing?.rmPartNumber ?? '',
+    rawMaterialSize: existing?.rawMaterialSize ?? '',
+    heatNumber: existing?.heatNumber ?? '',
+    rawMaterialGrade: existing?.rawMaterialGrade ?? '',
+    materialSource: existing?.materialSource ?? '',
     quoteId: existing?.quoteId ?? '',
     notes: existing?.notes ?? '',
     designFile: v.designFile,

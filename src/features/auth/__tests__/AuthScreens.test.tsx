@@ -185,7 +185,7 @@ describe('CreateOrganizationScreen', () => {
     await type(root, 'Re-enter password', 'Kaveri2026');
   };
 
-  test('every field but address line 2 is required', async () => {
+  test('every field but GST number and address line 2 is required', async () => {
     const store = createStore();
     const root = await render(<CreateOrganizationScreen />, WIDE, store);
     await press(findText(root, 'Create organization'));
@@ -194,7 +194,7 @@ describe('CreateOrganizationScreen', () => {
     expect(text).toContain('Enter the organization name');
     expect(text).toContain('Enter a valid email');
     expect(text).toContain('Enter a phone number');
-    expect(text).toContain('Enter a valid 15-character GST number');
+    expect(text).not.toContain('Enter a valid 15-character GST number');
     expect(text).toContain('Enter the address');
     expect(text).toContain('Enter the city');
     expect(text).toContain('Select a state');
@@ -202,6 +202,10 @@ describe('CreateOrganizationScreen', () => {
     expect(text).toContain('Password does not meet the rules below');
     expect(text).not.toContain('Select an industry');
     expect(store.getState().session.role).toBeNull();
+
+    // Optional, but a GST number that is given must be valid.
+    await type(root, 'e.g. 33ABCDE1234F1Z5', '33ABC');
+    expect(allText(root)).toContain('Enter a valid 15-character GST number');
   });
 
   test('creating the organization signs the new owner in as admin', async () => {

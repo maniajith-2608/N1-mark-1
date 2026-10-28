@@ -33,13 +33,14 @@ type CustomerNode = {
   email: string | null;
   gstin: string | null;
   notes: string;
+  /** Null when no billing address is saved; a saved one may be partial. */
   address: {
-    address: string;
-    city: string;
-    state: string;
-    pinCode: string;
+    address: string | null;
+    city: string | null;
+    state: string | null;
+    pinCode: string | null;
     country: string;
-  };
+  } | null;
   currentProjects: number;
   previousProjects: number;
   totalRevenue: number;
@@ -60,6 +61,7 @@ type CustomerNode = {
 const known = new Map<string, Customer>();
 
 function toCustomer(node: CustomerNode): Customer {
+  const address = node.address;
   const customer: Customer = {
     id: node.id,
     type: fromWireEnum<CustomerType>(node.type),
@@ -69,11 +71,11 @@ function toCustomer(node: CustomerNode): Customer {
     alternateMobile: node.alternateMobile,
     email: node.email ?? '',
     gstNumber: node.gstin ?? '',
-    address: node.address.address,
-    city: node.address.city,
-    state: node.address.state,
-    pinCode: node.address.pinCode,
-    country: node.address.country,
+    address: address?.address ?? '',
+    city: address?.city ?? '',
+    state: address?.state ?? '',
+    pinCode: address?.pinCode ?? '',
+    country: address?.country ?? '',
     notes: node.notes,
     currentProjects: node.currentProjects,
     previousProjects: node.previousProjects,

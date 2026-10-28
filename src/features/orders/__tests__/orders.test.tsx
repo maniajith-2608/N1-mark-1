@@ -24,6 +24,7 @@ import { MOCK_JOB_CARDS } from '../../jobCards/api/mockData';
 import type { JobCard, JobOperation } from '../../jobCards/types';
 import { statusFor } from '../../jobCards/utils';
 import { selectOrderById } from '../store/selectors';
+import { orderActions } from '../store/ordersSlice';
 import type { WorkOrder } from '../types';
 import { compareOrders, orderQrValue, orderStatus, orderTitle } from '../utils';
 import { normaliseJobCode } from '../../jobCards/utils';
@@ -419,7 +420,7 @@ test('Back on an order returns to the customer or the list it came from', async 
   // Saving an edit keeps where the order came from.
   await press(byTestId(screen, 'edit-order'));
   const form = byTestId(h.root, 'order-form-screen');
-  await press(byTestId(form, 'order-step-3'));
+  await press(byTestId(form, 'order-step-2'));
   await press(byTestId(form, 'order-form-submit'));
   expect(h.currentRoute()).toBe('OrderDetails');
   screen = byTestId(h.root, 'order-details-screen');
@@ -616,18 +617,18 @@ test('documents: the drawing prints with its QR; download is not wired yet', asy
   expect(hasTestId(screen, 'view-route-card')).toBe(false);
 });
 
-test('creates an order over three steps', async () => {
+test('creates an order over two steps, without raw material', async () => {
   const h = await renderAdmin('Orders');
   await press(byTestId(h.root, 'create-order'));
   let form = byTestId(h.root, 'order-form-screen');
   const onStep = (n: number) => hasTestId(form, `order-form-step-${n}`);
   expect(allText(form)).toContain('Create order');
   expect(allText(byTestId(form, 'order-stepper'))).toBe(
-    '1|Customer|2|Order details|3|Raw material',
+    '1|Customer|2|Order details',
   );
   expect(onStep(1)).toBe(true);
   // Steps ahead can't be opened from the stepper yet.
-  expect(byTestId(form, 'order-step-3').props.accessibilityState).toMatchObject(
+  expect(byTestId(form, 'order-step-2').props.accessibilityState).toMatchObject(
     { disabled: true },
   );
 
@@ -658,7 +659,8 @@ test('creates an order over three steps', async () => {
 
   await typeInto(byTestId(form, 'order-form-quantity'), 'ten');
   await typeInto(byTestId(form, 'order-form-po-amount'), '-5');
-  await press(byTestId(form, 'order-form-next'));
+  // The last step: Create order checks it and stays.
+  await press(byTestId(form, 'order-form-submit'));
   expect(allText(form).split('Enter a number').length - 1).toBe(2);
 
   // Required fields come first; DC no sits at the bottom.
@@ -667,8 +669,8 @@ test('creates an order over three steps', async () => {
   );
   // Priority starts at Low.
   expect(allText(byTestId(form, 'order-form-priority'))).toBe('Low');
-  // The required fields stop Next until they're filled (the server needs a
-  // PO number; DC no is optional).
+  // The required fields stop Create until they're filled (the server needs
+  // a PO number; DC no is optional).
   expect(allText(form).split('This field is required').length - 1).toBe(5);
 
   await typeInto(byTestId(form, 'order-form-quantity'), '25');
@@ -677,25 +679,20 @@ test('creates an order over three steps', async () => {
   await typeInto(byTestId(form, 'order-form-description'), 'Spacer ring');
   await typeInto(byTestId(form, 'order-form-part-number'), 'PN-40001');
   await choose(form, 'order-form-priority', 'High');
-  await press(byTestId(form, 'order-form-next'));
-  expect(onStep(3)).toBe(true);
-  expect(allText(form)).toContain('Raw material details');
-  // Done steps fill in; the current one is a ring.
+  // Done steps fill in; the current one is a ring. No raw material step: it
+  // goes in with Create job card.
   expect(hasTestId(form, 'order-step-1-completed')).toBe(true);
-  expect(hasTestId(form, 'order-step-3-current')).toBe(true);
-  expect(allText(byTestId(form, 'order-form-step-3'))).toMatch(
-    /Material source.*Bought out.*In-house.*RM part number.*Raw material size.*Heat number.*Raw material grade/,
-  );
+  expect(hasTestId(form, 'order-step-2-current')).toBe(true);
+  expect(hasTestId(form, 'order-step-3')).toBe(false);
+  expect(allText(form)).not.toContain('Raw material grade');
 
   // The stepper goes back to a finished step and forward again.
   await press(byTestId(form, 'order-step-1'));
   expect(onStep(1)).toBe(true);
-  await press(byTestId(form, 'order-step-3'));
-  expect(onStep(3)).toBe(true);
+  await press(byTestId(form, 'order-step-2'));
+  expect(onStep(2)).toBe(true);
 
   form = byTestId(h.root, 'order-form-screen');
-  await typeInto(byTestId(form, 'order-form-rm-part-number'), 'RM-77');
-  await press(byLabel(form, 'In-house'));
   await press(byTestId(form, 'order-form-submit'));
 
   expect(h.currentRoute()).toBe('Orders');
@@ -710,8 +707,9 @@ test('creates an order over three steps', async () => {
     partName: 'Spacer ring',
     partNumber: 'PN-40001',
     dcDate: '2026-10-15',
-    rmPartNumber: 'RM-77',
-    materialSource: 'in_house',
+    rmPartNumber: '',
+    rawMaterialGrade: '',
+    materialSource: '',
     poAmount: 125000,
   });
   expect(created.designFile?.name).toBe('bracket-drawing.pdf');
@@ -732,18 +730,20 @@ test('edits an existing order and keeps its names', async () => {
   await press(byTestId(form, 'order-step-2'));
   expect(byTestId(form, 'order-form-quantity').props.value).toBe('120');
   await typeInto(byTestId(form, 'order-form-quantity'), '150');
-  await press(byTestId(form, 'order-form-next'));
   await press(byText(form, 'Back'));
-  expect(hasTestId(form, 'order-form-step-2')).toBe(true);
-  await press(byTestId(form, 'order-step-3'));
+  expect(hasTestId(form, 'order-form-step-1')).toBe(true);
+  await press(byTestId(form, 'order-step-2'));
   await press(byTestId(form, 'order-form-submit'));
   // Opened from the order's details, so saving returns there.
   expect(h.currentRoute()).toBe('OrderDetails');
   expect(hasTestId(h.root, 'order-form-screen')).toBe(false);
+  // The raw material isn't on the form, so it stays as it was.
   expect(h.store.getState().orders.entities['1040']).toMatchObject({
     quantity: 150,
     partName: 'Bracket',
     jobName: 'Job B',
+    rawMaterialGrade: 'MS',
+    heatNumber: 'HT-99211',
   });
 });
 
@@ -770,7 +770,6 @@ test('an order is made for a saved customer: a new name must be added first', as
   expect(byTestId(form, 'order-form-email').props.value).not.toBe('');
   await press(byTestId(form, 'order-form-next'));
   await fillOrderDetails(form);
-  await press(byTestId(form, 'order-form-next'));
   await press(byTestId(form, 'order-form-submit'));
   const created = Object.values(h.store.getState().orders.entities).find(
     o => o?.poNumber === 'PO-9001',
@@ -837,48 +836,38 @@ test('the form keeps its buttons pinned and links back', async () => {
   expect(h.currentRoute()).toBe('OrderDetails');
 });
 
-test('marking raw material arrived requires it; the job card comes with the order', async () => {
+test('an order without a job card: Create job card takes its raw material, then opens the new card', async () => {
   const h = await renderAdmin('Orders');
-  await press(byTestId(h.root, 'create-order'));
-  const form = byTestId(h.root, 'order-form-screen');
-  await typeInto(byTestId(form, 'order-form-customer'), 'Nova Fabrication');
-  await press(byTestId(form, 'order-form-design'));
-  await press(byTestId(form, 'order-form-next'));
-  await fillOrderDetails(form);
-  await press(byTestId(form, 'order-form-next'));
-  const required = () =>
-    allText(form).split('This field is required').length - 1;
-  const toggle = () => press(byTestId(form, 'order-form-rm-arrived'));
-
-  // Off: optional. Either way it's plain Create order.
-  expect(allText(byTestId(form, 'order-form-submit'))).toBe('Create order');
-  await toggle();
-  expect(allText(byTestId(form, 'order-form-submit'))).toBe('Create order');
-  await press(byTestId(form, 'order-form-submit'));
-  expect(required()).toBe(5);
-  // Switching off drops the errors again.
-  await toggle();
-  expect(required()).toBe(0);
-  await toggle();
-
-  await press(byLabel(form, 'Bought out'));
-  await typeInto(byTestId(form, 'order-form-rm-part-number'), 'RM-77');
-  await typeInto(byLabel(form, 'Raw material size'), '25mm dia');
-  await typeInto(byLabel(form, 'Heat number'), 'HT-1');
-  await typeInto(byLabel(form, 'Raw material grade'), 'EN8');
-  await press(byTestId(form, 'order-form-submit'));
-
-  const created = Object.values(h.store.getState().orders.entities).find(
-    o => o?.poNumber === 'PO-9001',
-  );
-  expect(created).toMatchObject({
-    materialSource: 'bought_out',
-    rawMaterialGrade: 'EN8',
+  await h.navigate('OrderDetails', { orderId: '1036' });
+  // The mock opens every order's card; this stands for one the server left
+  // without a card, as it has no raw material yet (FE-007).
+  const order = h.store.getState().orders.entities['1036']!;
+  await ReactTestRenderer.act(async () => {
+    h.store.dispatch(orderActions.saveSuccess({ ...order, jobCardId: '' }));
   });
-  // createOrder opened its job card; it's in the store already.
-  expect(h.store.getState().jobCards.entities[created!.jobCardId]).toBeTruthy();
-  expect(h.currentRoute()).toBe('Orders');
-  expect(hasTestId(h.root, 'order-form-screen')).toBe(false);
+  const screen = byTestId(h.root, 'order-details-screen');
+  expect(hasTestId(screen, 'order-add-raw-material')).toBe(false);
+  await press(byTestId(screen, 'order-create-job-card'));
+
+  const dialog = () => byTestId(h.root, 'rm-dialog');
+  expect(allText(dialog())).toContain(
+    'Enter the raw material details for WO #1036. Its job card is created once they are saved.',
+  );
+  // Every detail is required: the material source is still blank.
+  await press(byTestId(dialog(), 'rm-dialog-submit'));
+  expect(allText(dialog())).toContain('This field is required');
+  await press(byLabel(dialog(), 'In-house'));
+  await press(byTestId(dialog(), 'rm-dialog-submit'));
+
+  // Saved on the order, which opened its card: straight to its Create flow.
+  expect(h.store.getState().orders.entities['1036']).toMatchObject({
+    materialSource: 'in_house',
+    jobCardId: '1036',
+  });
+  expect(h.currentRoute()).toBe('JobCardDetails');
+  expect(allText(byTestId(h.root, 'job-card-machining'))).toMatch(
+    /^Create flow/,
+  );
 });
 
 test('a pill says there are more fields below until the end', async () => {
@@ -916,7 +905,7 @@ test('edit from the list returns to the list; from details, to details', async (
   expect(allText(byTestId(form, 'order-form-back-to-list'))).toBe(
     'Back to orders',
   );
-  await press(byTestId(form, 'order-step-3'));
+  await press(byTestId(form, 'order-step-2'));
   await press(byTestId(form, 'order-form-submit'));
   expect(h.currentRoute()).toBe('Orders');
 
@@ -936,23 +925,26 @@ test('edit from the list returns to the list; from details, to details', async (
   await press(byTestId(form, 'order-form-back-to-list'));
   expect(h.currentRoute()).toBe('OrderDetails');
   form = await editFromDetails();
-  await press(byTestId(form, 'order-step-3'));
+  await press(byTestId(form, 'order-step-2'));
   await press(byTestId(form, 'order-form-submit'));
   expect(h.currentRoute()).toBe('OrderDetails');
 });
 
-test('saving an edit with a bad earlier step opens that step', async () => {
+test('saving an edit with a bad field keeps the form open on that step', async () => {
   const h = await renderAdmin('Orders');
   await h.navigate('OrderForm', { orderId: '1040' });
   const form = byTestId(h.root, 'order-form-screen');
+  // A bad step 1 stops the stepper moving on.
+  await typeInto(byTestId(form, 'order-form-email'), 'not-an-email');
   await press(byTestId(form, 'order-step-2'));
-  // Clear the delivery date from its picker.
+  expect(hasTestId(form, 'order-form-step-1')).toBe(true);
+  expect(allText(form)).toContain('Enter a valid email address');
+  await typeInto(byTestId(form, 'order-form-email'), 'orders@brightsteel.in');
+  await press(byTestId(form, 'order-step-2'));
+  // Clear the delivery date from its picker, then try to save.
   await press(byTestId(form, 'order-form-delivery'));
   await press(byTestId(form, 'order-form-delivery-clear'));
   expect(allText(byTestId(form, 'order-form-delivery'))).toBe('DD/MM/YYYY');
-  // Going back never checks; jumping straight to the end skips step 2.
-  await press(byTestId(form, 'order-step-1'));
-  await press(byTestId(form, 'order-step-3'));
   await press(byTestId(form, 'order-form-submit'));
   expect(hasTestId(form, 'order-form-step-2')).toBe(true);
   expect(allText(form)).toContain('This field is required');
@@ -1003,7 +995,7 @@ test('phone: cards with the table details, actions and step footer', async () =>
   );
   await h.navigate('OrderForm');
   const form = byTestId(h.root, 'order-form-screen');
-  expect(allText(form)).toContain('Step 1 of 3 · Customer');
+  expect(allText(form)).toContain('Step 1 of 2 · Customer');
   // Phones: Customer opens a sheet with a search box.
   await press(byTestId(form, 'order-form-customer'));
   const sheet = () => byTestId(form, 'order-form-customer-sheet');
@@ -1032,13 +1024,13 @@ test('phone: cards with the table details, actions and step footer', async () =>
   await typeInto(byTestId(sheet(), 'order-form-customer-search'), 'Acme');
   await press(byText(sheet(), 'Acme Metalworks'));
   await press(byTestId(form, 'order-form-next'));
-  expect(allText(form)).toContain('Step 2 of 3 · Order details');
+  expect(allText(form)).toContain('Step 2 of 2 · Order details');
   // The header's back leaves the form; the footer's Back (last) steps back.
   const backs = form.findAll(
     n => typeof n.type === 'string' && n.props.accessibilityLabel === 'Back',
   );
   await press(backs[backs.length - 1]);
-  expect(allText(form)).toContain('Step 1 of 3 · Customer');
+  expect(allText(form)).toContain('Step 1 of 2 · Customer');
 });
 
 test('order helpers', () => {
@@ -1101,10 +1093,11 @@ test('order helpers', () => {
     poNumber: 'This field is required',
   });
   expect(hasStepErrors(1, bad)).toBe(true);
-  expect(hasStepErrors(3, bad)).toBe(false);
+  expect(hasStepErrors(2, { ...bad, dcDate: '' })).toBe(true);
+  expect(hasStepErrors(2, values)).toBe(false);
   expect(firstStepWithErrors(bad)).toBe(1);
   expect(firstStepWithErrors({ ...bad, customerEmail: '' })).toBe(2);
-  expect(firstStepWithErrors(values)).toBe(3);
+  expect(firstStepWithErrors(values)).toBe(2);
   const input = formValuesToOrderInput({
     ...orderToFormValues(),
     description: 'New part',
@@ -1144,15 +1137,34 @@ describe('Orders list actions', () => {
     );
   });
 
-  test('a new order comes with its job card, so it gets the button', async () => {
+  test('an order without a job card gets Create job card, which asks for its raw material', async () => {
     const h = await renderAdmin('Orders');
-    // createOrder opens the job card too (no second call).
+    // Stands for an order the server left without a card (FE-007).
+    const order = h.store.getState().orders.entities['1036']!;
+    await ReactTestRenderer.act(async () => {
+      h.store.dispatch(orderActions.saveSuccess({ ...order, jobCardId: '' }));
+    });
+    await press(byLabel(h.root, 'Create job card for WO #1036'));
+    const dialog = byTestId(h.root, 'rm-dialog');
+    expect(allText(dialog)).toContain('Create job card');
+    await press(byLabel(dialog, 'Bought out'));
+    await press(byTestId(dialog, 'rm-dialog-submit'));
+    expect(h.store.getState().orders.entities['1036']?.materialSource).toBe(
+      'bought_out',
+    );
+    expect(h.currentRoute()).toBe('JobCardDetails');
+    expect(allText(byTestId(h.root, 'job-card-machining'))).toMatch(
+      /^Create flow/,
+    );
+  });
+
+  test('a new order is listed with its job card button', async () => {
+    const h = await renderAdmin('Orders');
     await press(byTestId(h.root, 'create-order'));
     await typeInto(byTestId(h.root, 'order-form-customer'), 'Nova Fabrication');
     await press(byTestId(h.root, 'order-form-design'));
     await press(byTestId(h.root, 'order-form-next'));
     await fillOrderDetails(h.root);
-    await press(byTestId(h.root, 'order-form-next'));
     await press(byTestId(h.root, 'order-form-submit'));
     await typeInto(
       byLabel(h.root, 'Search by WO #, part or customer'),

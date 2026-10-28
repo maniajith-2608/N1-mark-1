@@ -78,7 +78,12 @@ module.exports = (env, argv) => {
       }),
       new webpack.DefinePlugin({
         __DEV__: JSON.stringify(isDev),
-        'process.env.N1_API_URL': JSON.stringify(process.env.N1_API_URL || '/api'),
+        // The dev server always calls its /api proxy (which forwards to
+        // N1_API_URL), since the backend refuses browser calls from
+        // localhost; production builds call N1_API_URL directly.
+        'process.env.N1_API_URL': JSON.stringify(
+          (!isDev && process.env.N1_API_URL) || '/api',
+        ),
         __REACT_NATIVE_VERSION__: JSON.stringify(
           require(path.resolve(
             appDirectory,
@@ -98,6 +103,9 @@ module.exports = (env, argv) => {
         {
           context: ['/api'],
           target: process.env.N1_API_URL || 'http://127.0.0.1:3000',
+          // Send the target's own Host header; a remote HTTPS backend
+          // (staging behind CloudFront) refuses "localhost:8080".
+          changeOrigin: true,
           pathRewrite: { '^/api': '' },
         },
       ],
