@@ -71,16 +71,17 @@ function RawMaterialForm({ order, retest, header, onImported }: FormProps) {
 
   const save = useCallback(
     (v: RawMaterialInput) =>
-      // Saved on the job card (saveJobCardRawMaterial); RM QC inspects it
+      // Saved on the job card (saveJobCardRawMaterial), or on the order when
+      // it has no card yet, which opens one (FE-007); RM QC inspects it
       // (again, after a rejection).
-      importJob(order.jobCardId, {
+      importJob(order, {
         rawMaterialGrade: v.rawMaterialGrade.trim(),
         rawMaterialSize: v.rawMaterialSize.trim(),
         heatNumber: v.heatNumber.trim(),
         rmPartNumber: v.rmPartNumber.trim(),
         materialSource: v.materialSource,
       }),
-    [importJob, order.jobCardId],
+    [importJob, order],
   );
 
   const workOrder = ORDER_STRINGS.workOrder(order.number);
@@ -141,8 +142,9 @@ function RawMaterialForm({ order, retest, header, onImported }: FormProps) {
 
 /**
  * Mandatory raw material details, opened as a modal from the order. Continue
- * saves them on the job card (opened with the order), adds the job to My
- * Jobs (watchJob) and opens its job card (Back returns to My Jobs).
+ * saves them on the job card (or on the order, which then opens its card),
+ * adds the job to My Jobs (watchJob) and opens its job card (Back returns to
+ * My Jobs).
  */
 export function RawMaterialScreen({
   route,

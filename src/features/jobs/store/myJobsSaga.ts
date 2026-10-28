@@ -6,6 +6,11 @@ import { jobCardsApi } from '../../jobCards/api/jobCardsApi';
 import { isNotFound, refreshOrder } from '../../jobCards/store/jobCardsSaga';
 import { jobCardActions } from '../../jobCards/store/jobCardsSlice';
 import type { JobCard } from '../../jobCards/types';
+import { normaliseJobCode } from '../../jobCards/utils';
+import { ordersApi } from '../../orders/api/ordersApi';
+import { ORDER_STRINGS } from '../../orders/constants';
+import { orderActions } from '../../orders/store/ordersSlice';
+import type { WorkOrder } from '../../orders/types';
 import type { EmployeeRole } from '../../profile/types';
 import { myJobsApi } from '../api/myJobsApi';
 import { JOBS_STRINGS, ROLE_JOBS } from '../constants';
@@ -43,13 +48,53 @@ function* withJob(jobCardId: string) {
 }
 
 /**
+ * Supervisor: the order behind a work order number that has no job card yet
+ * (FE-007: the card opens once its raw material is in). Rethrows the lookup's
+ * not-found for anything else.
+ */
+function* orderWithoutCard(code: string, notFound: unknown) {
+  const value = normaliseJobCode(code);
+  if (!value.startsWith('WO-')) {
+    throw notFound;
+  }
+  let order: WorkOrder;
+  try {
+    order = yield call(ordersApi.findByNumber, value);
+  } catch {
+    // Best effort: the code lookup already found nothing.
+    throw notFound;
+  }
+  if (order.jobCardId) {
+    throw notFound;
+  }
+  yield put(orderActions.saveSuccess(order));
+  return order;
+}
+
+/**
  * A typed or scanned code → its job (jobCardByQr). Operators open only jobs
- * assigned to them (others aren't found); QC adds the job to their list.
+ * assigned to them (others aren't found); QC adds the job to their list. A
+ * supervisor also finds an order that has no job card yet, to import it with
+ * its raw material.
  */
 export function* lookupJob(action: PayloadAction<LookupJobPayload>) {
   const { role, code } = action.payload;
   try {
-    const card: JobCard = yield call(jobCardsApi.getByQr, code);
+    let card: JobCard;
+    try {
+      card = yield call(jobCardsApi.getByQr, code);
+    } catch (error) {
+      if (!isNotFound(error) || ROLE_JOBS[role].importTo !== 'order') {
+        throw error;
+      }
+      const order: WorkOrder = yield call(orderWithoutCard, code, error);
+      yield put(
+        myJobsActions.lookupSuccess({
+          found: { jobCardId: '', orderId: order.id },
+        }),
+      );
+      return;
+    }
     yield put(jobCardActions.received([card]));
     const found = { jobCardId: card.id, orderId: card.orderId };
     if (ROLE_JOBS[role].importTo === 'qc') {
@@ -72,11 +117,30 @@ export function* lookupJob(action: PayloadAction<LookupJobPayload>) {
   }
 }
 
-/** Supervisor: saves the raw material on the job card, then lists the job. */
+/**
+ * Supervisor: saves the raw material on the job card, then lists the job. An
+ * order without a card takes the material itself, which opens its card.
+ */
 export function* importJob(action: PayloadAction<ImportJobPayload>) {
   try {
-    const { role, jobCardId, rawMaterial } = action.payload;
-    if (rawMaterial) {
+    const { role, orderId, rawMaterial } = action.payload;
+    let { jobCardId } = action.payload;
+    if (!jobCardId) {
+      const order: WorkOrder = yield call(
+        ordersApi.update,
+        orderId,
+        rawMaterial ?? {},
+      );
+      yield put(orderActions.saveSuccess(order));
+      if (!order.jobCardId) {
+        throw new Error(
+          JOBS_STRINGS.rawMaterial.noJobCard(
+            ORDER_STRINGS.workOrder(order.number),
+          ),
+        );
+      }
+      jobCardId = order.jobCardId;
+    } else if (rawMaterial) {
       const card: JobCard = yield call(jobCardsApi.run, jobCardId, {
         type: 'rawMaterial',
         rawMaterial,

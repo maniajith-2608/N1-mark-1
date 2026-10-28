@@ -83,7 +83,11 @@ function CreateOrganizationForm({
     industry: industry ? undefined : 'Select an industry',
     email: isValidEmail(email) ? undefined : 'Enter a valid email',
     phone: phone.trim() ? undefined : 'Enter a phone number',
-    gstNumber: isGstin(gstNumber) ? undefined : COMMON_STRINGS.invalidGstin,
+    // Optional: not every business is GST-registered.
+    gstNumber:
+      !gstNumber.trim() || isGstin(gstNumber)
+        ? undefined
+        : COMMON_STRINGS.invalidGstin,
     password:
       rules.minLength && rules.lettersAndNumbers
         ? undefined
@@ -219,7 +223,6 @@ function CreateOrganizationForm({
       <View style={rowStyle}>
         <N1TextInput
           label="GST number"
-          required
           value={gstNumber}
           onChangeText={setGstNumber}
           placeholder="e.g. 33ABCDE1234F1Z5"

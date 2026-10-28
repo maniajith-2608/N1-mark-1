@@ -83,6 +83,13 @@ describe('createOrganization', () => {
     });
   });
 
+  test('leaves out a blank GST number', async () => {
+    request.mockResolvedValue(payload);
+    await authApi.createOrganization({ ...values, gstNumber: '' });
+    const { input } = request.mock.calls[0][1] as { input: any };
+    expect(input).not.toHaveProperty('gstin');
+  });
+
   test('sends address line 2 when given', async () => {
     request.mockResolvedValue(payload);
     await authApi.createOrganization({ ...values, addressLine2: 'Guindy' });
