@@ -85,7 +85,8 @@ export const authApi = {
             name: values.name,
             businessEmail: values.email,
             phone: toE164Phone(values.phone),
-            gstin: values.gstNumber,
+            // Left out when the business isn't GST-registered.
+            ...(values.gstNumber ? { gstin: values.gstNumber } : {}),
             password: values.password,
             address: {
               line1: values.addressLine1,

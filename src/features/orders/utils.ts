@@ -19,6 +19,14 @@ export function orderTitle(
   return title || o.description.split('\n')[0] || '';
 }
 
+/**
+ * Whether an order is work order `code` ("WO-12", as normaliseJobCode writes
+ * a typed or scanned one). The server numbers orders "WO-12"; mock seeds
+ * use a bare "12".
+ */
+export const isWorkOrder = (o: Pick<WorkOrder, 'number'>, code: string) =>
+  `WO-${o.number.replace(/^WO-?/i, '')}` === code;
+
 /** "WO #1042 · Bracket — Job A" */
 export const orderHeading = (
   o: Pick<WorkOrder, 'number' | 'partName' | 'jobName' | 'description'>,

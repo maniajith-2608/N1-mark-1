@@ -16,7 +16,10 @@ import {
 } from '../../../shared/hooks';
 import { isBlank } from '../../../shared/utils';
 import { MATERIAL_SOURCE_OPTIONS, ORDER_STRINGS } from '../constants';
+import { useAppSelector } from '../../../app/store/hooks';
 import { useJobCardCommands } from '../../jobCards/hooks/useJobCards';
+import { useOrders } from '../hooks/useOrders';
+import { selectOrderById } from '../store/selectors';
 import type { WorkOrder } from '../types';
 import { RAW_MATERIAL_FIELDS } from './orderForm';
 
@@ -52,16 +55,21 @@ type Props = {
   visible: boolean;
   order: WorkOrder | null;
   onClose: () => void;
-  /** The order's job card, which the details are saved on. */
+  /**
+   * The order's job card, which the details are saved on. Blank for an order
+   * without one: Create job card saves them on the order (updateOrder), and
+   * the server opens its card (FE-007).
+   */
   jobCardId: string;
-  /** The details are saved. */
-  onSaved: () => void;
+  /** The details are saved; with the order's job card, new or not. */
+  onSaved: (jobCardId: string) => void;
 };
 
 /**
- * Raw material for an order that's missing some: collect it (prefilled with
- * what the order has) and save it on the job card (saveJobCardRawMaterial),
- * which also fills it in on the order. RM QC then inspects it.
+ * Raw material for an order: collect it (prefilled with what the order has)
+ * and save it on the job card (saveJobCardRawMaterial), which also fills it
+ * in on the order, or on an order without a card, which opens one. RM QC
+ * then inspects it.
  */
 export function RawMaterialDialog({
   visible,
@@ -72,38 +80,56 @@ export function RawMaterialDialog({
 }: Props) {
   // Kept while the dialog fades out.
   const order = useHeldWhileVisible(visible, orderProp);
-  const { run, saving, saveError, clearErrors } = useJobCardCommands();
+  const creating = !jobCardId;
+  const commands = useJobCardCommands();
+  const orders = useOrders();
+  const { saving, saveError } = creating ? orders : commands;
+  // The order as saved: Create job card links its new card.
+  const savedJobCardId = useAppSelector(state =>
+    order ? selectOrderById(state, order.id)?.jobCardId ?? '' : '',
+  );
   const form = useForm<RawMaterial>(valuesOf(order), validate);
   const { reset, values, errors, bind } = form;
 
+  const clearCommandErrors = commands.clearErrors;
+  const clearOrderErrors = orders.clearErrors;
   useEffect(() => {
     if (visible) {
       reset(valuesOf(order));
-      clearErrors();
+      clearCommandErrors();
+      clearOrderErrors();
     }
-  }, [visible, order, reset, clearErrors]);
+  }, [visible, order, reset, clearCommandErrors, clearOrderErrors]);
 
   useOnSettled(saving, saveError, () => {
     if (visible) {
-      onSaved();
+      onSaved(creating ? savedJobCardId : jobCardId);
     }
   });
 
+  const { run } = commands;
+  const { update } = orders;
+  const orderId = order?.id;
   const save = useCallback(
     (v: RawMaterial) => {
-      run(jobCardId, {
-        type: 'rawMaterial',
-        rawMaterial: {
-          materialSource: v.materialSource,
-          rmPartNumber: v.rmPartNumber.trim(),
-          rawMaterialSize: v.rawMaterialSize.trim(),
-          heatNumber: v.heatNumber.trim(),
-          rawMaterialGrade: v.rawMaterialGrade.trim(),
-        },
-      });
+      const rawMaterial = {
+        materialSource: v.materialSource,
+        rmPartNumber: v.rmPartNumber.trim(),
+        rawMaterialSize: v.rawMaterialSize.trim(),
+        heatNumber: v.heatNumber.trim(),
+        rawMaterialGrade: v.rawMaterialGrade.trim(),
+      };
+      if (!jobCardId) {
+        if (orderId) {
+          update(orderId, rawMaterial);
+        }
+      } else {
+        run(jobCardId, { type: 'rawMaterial', rawMaterial });
+      }
     },
-    [jobCardId, run],
+    [jobCardId, orderId, run, update],
   );
+  const workOrder = ORDER_STRINGS.workOrder(order?.number ?? '');
 
   const text = (
     key: Exclude<keyof RawMaterial, 'materialSource'>,
@@ -125,12 +151,14 @@ export function RawMaterialDialog({
     <N1Modal
       visible={visible}
       onClose={onClose}
-      title={D.rawMaterialTitle}
-      subtitle={D.rawMaterialHelp(ORDER_STRINGS.workOrder(order?.number ?? ''))}
+      title={creating ? D.createJobCard : D.rawMaterialTitle}
+      subtitle={
+        creating ? D.createJobCardHelp(workOrder) : D.rawMaterialHelp(workOrder)
+      }
       footer={
         <FormFooter
           onCancel={onClose}
-          submitLabel={D.rawMaterialSubmit}
+          submitLabel={creating ? D.createJobCard : D.rawMaterialSubmit}
           onSubmit={form.submit(save)}
           loading={saving}
           submitTestID="rm-dialog-submit"

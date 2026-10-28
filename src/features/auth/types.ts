@@ -24,6 +24,7 @@ export type CreateOrganizationValues = {
   industry: string;
   email: string;
   phone: string;
+  /** Blank when the business isn't GST-registered. */
   gstNumber: string;
   password: string;
   addressLine1: string;

@@ -38,6 +38,11 @@ export type LookupJobPayload = { role: EmployeeRole; code: string };
 
 export type ImportJobPayload = {
   role: EmployeeRole;
+  orderId: string;
+  /**
+   * Blank for an order without a job card yet (FE-007): saving its raw
+   * material on the order opens the card.
+   */
   jobCardId: string;
   /**
    * Supervisor only: saved on the job card first (saveJobCardRawMaterial).

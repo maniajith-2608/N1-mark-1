@@ -247,10 +247,31 @@ export function OrderDetailsScreen({
     [navigation],
   );
   // Raw material still missing: a popup collects it and saves it on the job
-  // card (saveJobCardRawMaterial), which RM QC then inspects.
+  // card (saveJobCardRawMaterial), which RM QC then inspects. An order with
+  // no job card yet takes it itself (Create job card), which opens the card
+  // (FE-007); that card then opens on its Create flow.
   const [askRawMaterial, setAskRawMaterial] = useState(false);
-  const openRawMaterial = useCallback(() => setAskRawMaterial(true), []);
+  // The card as it was on open: once saved, the order has its new one.
+  const [dialogJobCardId, setDialogJobCardId] = useState('');
+  const orderJobCardId = order?.jobCardId ?? '';
+  const openRawMaterial = useCallback(() => {
+    setDialogJobCardId(orderJobCardId);
+    setAskRawMaterial(true);
+  }, [orderJobCardId]);
   const closeRawMaterial = useCallback(() => setAskRawMaterial(false), []);
+  const savedRawMaterial = useCallback(
+    (jobCardId: string) => {
+      setAskRawMaterial(false);
+      if (!dialogJobCardId && jobCardId) {
+        navigation.push('JobCardDetails', {
+          jobCardId,
+          from: 'order',
+          editFlow: true,
+        });
+      }
+    },
+    [dialogJobCardId, navigation],
+  );
   // A drawing file prints with the order QR in a blank area of every page;
   // with no file uploaded, the placeholder sheet prints as before.
   const drawings = useMemo(() => (order ? orderDrawings(order) : []), [order]);
@@ -391,16 +412,28 @@ export function OrderDetailsScreen({
     );
   }
 
-  const rawMaterialButton = jobCard && isRawMaterialMissing(order) && (
+  const createJobCardButton = !order.jobCardId && (
     <N1Button
-      title={D.addRawMaterial}
+      title={D.createJobCard}
       leftIcon="plus"
       variant="secondary"
       size="sm"
       onPress={openRawMaterial}
-      testID="order-add-raw-material"
+      testID="order-create-job-card"
     />
   );
+  const rawMaterialButton =
+    createJobCardButton ||
+    (jobCard && isRawMaterialMissing(order) && (
+      <N1Button
+        title={D.addRawMaterial}
+        leftIcon="plus"
+        variant="secondary"
+        size="sm"
+        onPress={openRawMaterial}
+        testID="order-add-raw-material"
+      />
+    ));
 
   const top = (
     <View style={styles.top}>
@@ -697,6 +730,7 @@ export function OrderDetailsScreen({
           <N1Text variant="small" color="secondary" align="center">
             {D.noJobCardHelp}
           </N1Text>
+          {createJobCardButton}
         </View>
       )}
     </View>
@@ -734,9 +768,9 @@ export function OrderDetailsScreen({
     <RawMaterialDialog
       visible={askRawMaterial}
       order={order}
-      jobCardId={order.jobCardId}
+      jobCardId={dialogJobCardId}
       onClose={closeRawMaterial}
-      onSaved={closeRawMaterial}
+      onSaved={savedRawMaterial}
     />
   );
 
