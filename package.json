@@ -70,6 +70,9 @@
     "webpack-cli": "7.2.3",
     "webpack-dev-server": "6.0.0"
   },
+  "overrides": {
+    "schema-utils": "4.6.0"
+  },
   "engines": {
     "node": ">= 22.11.0"
   }

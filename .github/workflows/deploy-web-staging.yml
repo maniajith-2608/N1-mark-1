@@ -1,0 +1,64 @@
+name: Deploy web staging
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: web-staging-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      AWS_REGION: ap-south-1
+      AWS_DEFAULT_REGION: ap-south-1
+      N1_API_URL: https://api.staging.app.none1.in
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+
+      # The repository does not track a JavaScript lockfile.
+      - name: Install dependencies
+        run: npm install --no-package-lock --no-audit --no-fund
+
+      - name: Build web app
+        run: |
+          npm run build:web
+          test -s dist/index.html
+
+      - name: Assume staging deployment role
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: arn:aws:iam::414437158264:role/n1-staging-webapp-deploy
+          aws-region: ap-south-1
+          allowed-account-ids: '414437158264'
+
+      - name: Sync staging assets and publish HTML
+        run: |
+          aws s3 sync dist/ s3://n1-staging-webapp-414437158264/ \
+            --delete \
+            --exclude 'index.html' \
+            --cache-control 'max-age=31536000,immutable' \
+            --only-show-errors
+          # Upload HTML last, always replacing its cache metadata.
+          aws s3 cp dist/index.html s3://n1-staging-webapp-414437158264/index.html \
+            --cache-control 'no-cache' \
+            --content-type 'text/html' \
+            --only-show-errors
+
+      - name: Invalidate staging CloudFront cache
+        run: aws cloudfront create-invalidation --distribution-id E3ENZSCP3ZHW0T --paths '/*'
