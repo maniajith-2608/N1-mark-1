@@ -4,12 +4,14 @@
 
 import { type ReactTestInstance } from 'react-test-renderer';
 import LoginScreen from '../screens/LoginScreen';
+import CreateOrganizationScreen from '../screens/CreateOrganizationScreen';
 import { createStore } from '../../../app/store';
 import {
   PHONE,
   WIDE,
   allText,
   findText,
+  input,
   press,
   render,
   type,
@@ -151,5 +153,79 @@ describe('LoginScreen', () => {
       screen: 'ForgotPasswordFlow',
       params: { screen: 'ForgotPassword' },
     });
+  });
+});
+
+describe('CreateOrganizationScreen', () => {
+  test('industry is Manufacturing only, picked from the start', async () => {
+    const root = await render(<CreateOrganizationScreen />, WIDE);
+    expect(allText(root)).toContain('Manufacturing');
+    await press(findText(root, 'Manufacturing'));
+    const options = root
+      .findAll(node => node.props.accessibilityRole === 'menuitem')
+      .filter(node => typeof node.type === 'string');
+    expect(options.map(node => allText(node).join(''))).toEqual([
+      'Manufacturing',
+    ]);
+  });
+
+  // Fills every required field with valid values.
+  const fillForm = async (root: ReactTestInstance, email: string) => {
+    await type(root, 'Your full name', 'Kaveri Owner');
+    await type(root, 'ABC Engineering Pvt Ltd', 'Kaveri Tools');
+    await type(root, 'owner@abcengineering.com', email);
+    await type(root, '+91 98765 43210', '+91 98400 12345');
+    await type(root, 'e.g. 33ABCDE1234F1Z5', '33abcde1234f1z5');
+    await type(root, 'Building, street', '1 Test Road');
+    await type(root, 'e.g. Chennai', 'Chennai');
+    await press(findText(root, 'Select state'));
+    await press(findText(root, 'Tamil Nadu'));
+    await type(root, 'e.g. 600001', '600001');
+    await type(root, 'Create a password', 'Kaveri2026');
+    await type(root, 'Re-enter password', 'Kaveri2026');
+  };
+
+  test('every field but address line 2 is required', async () => {
+    const store = createStore();
+    const root = await render(<CreateOrganizationScreen />, WIDE, store);
+    await press(findText(root, 'Create organization'));
+    const text = allText(root);
+    expect(text).toContain('Enter your name');
+    expect(text).toContain('Enter the organization name');
+    expect(text).toContain('Enter a valid email');
+    expect(text).toContain('Enter a phone number');
+    expect(text).toContain('Enter a valid 15-character GST number');
+    expect(text).toContain('Enter the address');
+    expect(text).toContain('Enter the city');
+    expect(text).toContain('Select a state');
+    expect(text).toContain('Enter a 6-digit PIN code');
+    expect(text).toContain('Password does not meet the rules below');
+    expect(text).not.toContain('Select an industry');
+    expect(store.getState().session.role).toBeNull();
+  });
+
+  test('creating the organization signs the new owner in as admin', async () => {
+    const store = createStore();
+    const root = await render(<CreateOrganizationScreen />, WIDE, store);
+    await fillForm(root, 'owner@kaveri.in');
+    // The code is the name's letters plus a random number.
+    expect(input(root, 'Generated from name').props.value).toMatch(
+      /^KAVERI-[1-9][0-9]{3}$/,
+    );
+    await press(findText(root, 'Create organization'));
+    expect(allText(root)).not.toContain('Enter the organization name');
+    expect(store.getState().session.role).toBe('admin');
+    expect(mockNavigation.goBack).not.toHaveBeenCalled();
+  });
+
+  test('an already registered email shows the reason and stays put', async () => {
+    const store = createStore();
+    const root = await render(<CreateOrganizationScreen />, PHONE, store);
+    await fillForm(root, 'admin@n1.com');
+    await press(findText(root, 'Create organization'));
+    expect(allText(root)).toContain(
+      'This business email is already registered.',
+    );
+    expect(store.getState().session.role).toBeNull();
   });
 });

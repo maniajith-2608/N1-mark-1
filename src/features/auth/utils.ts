@@ -3,16 +3,31 @@ import {
   MOCK_USERS,
   type MockUser,
   ORGANIZATION_CODE_LENGTH,
+  ORGANIZATION_CODE_SUFFIX_LENGTH,
   PASSWORD_MIN_LENGTH,
   VERIFICATION_CODE_LENGTH,
 } from './constants';
 
-/** "ABC Engineering Pvt Ltd" → "ABCENG". Empty when the name has no letters or digits. */
-export function generateOrganizationCode(name: string): string {
-  return name
+/** A random number for the organization code, e.g. "4821" (never starts with 0). */
+export function randomCodeSuffix(): string {
+  const min = 10 ** (ORGANIZATION_CODE_SUFFIX_LENGTH - 1);
+  return String(
+    min +
+      Math.floor(Math.random() * (10 ** ORGANIZATION_CODE_SUFFIX_LENGTH - min)),
+  );
+}
+
+/**
+ * "ABC Engineering Pvt Ltd" + "4821" → "ABCENG-4821": the name's first letters
+ * and digits, then a random number so shops with similar names get different
+ * codes. Empty when the name has no letters or digits.
+ */
+export function generateOrganizationCode(name: string, suffix: string): string {
+  const prefix = name
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, '')
     .slice(0, ORGANIZATION_CODE_LENGTH);
+  return prefix && `${prefix}-${suffix}`;
 }
 
 export function isValidEmail(email: string): boolean {

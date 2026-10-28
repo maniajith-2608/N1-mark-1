@@ -91,7 +91,7 @@ export const JOBS_STRINGS = {
       `${active} active · ${total} total`,
     inProgressSubtitle: (inProgress: number, total: number) =>
       `${inProgress} in progress · ${total} total`,
-    importJob: 'Import Job',
+    importJob: 'Import Order',
     search: 'Search jobs',
     empty: 'No jobs yet. Import one to get started.',
     stageFilter: 'Stage',
@@ -110,20 +110,23 @@ export const JOBS_STRINGS = {
   scan: {
     title: 'Scan QR Code',
     frameTitle: 'Align the QR code within the frame',
-    message: 'The job details will import automatically once scanned',
+    message: 'The order will import automatically once scanned',
     manual: 'Enter code manually',
     flash: 'Turn on flash',
     flashOff: 'Turn off flash',
   },
   code: {
-    title: 'Enter Job Code',
-    heading: 'Type in the job code',
-    help: "You'll find this printed on the job card or route card if the QR code can't be scanned.",
-    label: 'Job code',
+    title: 'Enter Order ID',
+    heading: 'Type in the order ID',
+    help: "You'll find this on the order or printed on its job card if the QR code can't be scanned.",
+    label: 'Order ID',
     placeholder: 'e.g. WO-1042',
-    importJob: 'Import Job',
+    importJob: 'Import Order',
     scanInstead: 'Scan QR code instead',
-    notFound: (code: string) => `No work order found for ${code}`,
+    notFound: (code: string) => `No order found for ${code}`,
+    /** Operators only find orders with a step assigned to them. */
+    notAssigned: (code: string) =>
+      `No order assigned to you matches ${code}. Ask your supervisor to assign you a step on it.`,
     noRoute: (workOrder: string) =>
       `${workOrder} has no route card yet. Ask an admin to create its flow.`,
   },

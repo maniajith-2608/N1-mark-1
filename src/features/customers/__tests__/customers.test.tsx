@@ -52,8 +52,8 @@ test('adds a customer with validation', async () => {
   const { root, store } = await renderAdmin('Customers');
   await press(byTestId(root, 'add-customer'));
   await press(byTestId(root, 'customer-form-submit'));
-  // Name, contact, mobile and the billing address (street, city, PIN code).
-  expect(allText(root).split('This field is required').length - 1).toBe(6);
+  // Only the name and contact person are required.
+  expect(allText(root).split('This field is required').length - 1).toBe(2);
   await typeInto(byTestId(root, 'customer-form-name'), 'Kaveri Tools');
   await typeInto(byTestId(root, 'customer-form-contact'), 'Lakshmi Raman');
   await typeInto(byTestId(root, 'customer-form-mobile'), '+91 98400 12345');
@@ -72,6 +72,22 @@ test('adds a customer with validation', async () => {
     gstNumber: '33ABCDE1234F1Z5',
     state: 'Tamil Nadu',
     currentProjects: 0,
+  });
+});
+
+test('adds a customer with only a name and contact person', async () => {
+  const { root, store } = await renderAdmin('Customers');
+  await press(byTestId(root, 'add-customer'));
+  await typeInto(byTestId(root, 'customer-form-name'), 'Nila Fasteners');
+  await typeInto(byTestId(root, 'customer-form-contact'), 'Ravi Kumar');
+  await press(byTestId(root, 'customer-form-submit'));
+  const created = Object.values(store.getState().customers.entities).find(
+    c => c.name === 'Nila Fasteners',
+  );
+  expect(created).toMatchObject({
+    contactPerson: 'Ravi Kumar',
+    mobile: '',
+    address: '',
   });
 });
 
@@ -256,19 +272,22 @@ test('validator and address helpers', () => {
   expect(validateCustomer(base)).toEqual({
     email: 'Enter a valid email address',
   });
-  // The API needs a billing address to create a customer.
+  // Mobile and the address are optional; name and contact are required.
   expect(
     validateCustomer({
       ...base,
       email: '',
+      mobile: '',
       address: '',
       city: '',
       pinCode: '',
     }),
+  ).toEqual({});
+  expect(
+    validateCustomer({ ...base, email: '', name: ' ', contactPerson: '' }),
   ).toEqual({
-    address: 'This field is required',
-    city: 'This field is required',
-    pinCode: 'This field is required',
+    name: 'This field is required',
+    contactPerson: 'This field is required',
   });
   expect(validateCustomer({ ...base, email: '', mobile: '12' })).toEqual({
     mobile: 'Enter a valid phone number',

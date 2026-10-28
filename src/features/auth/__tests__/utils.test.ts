@@ -2,6 +2,7 @@ import {
   checkPassword,
   findMockUser,
   generateOrganizationCode,
+  randomCodeSuffix,
   isCompleteCode,
   isPasswordValid,
   isValidEmail,
@@ -10,14 +11,24 @@ import {
 } from '../utils';
 
 describe('generateOrganizationCode', () => {
-  test('uses the first letters and digits, upper-cased', () => {
-    expect(generateOrganizationCode('ABC Engineering Pvt Ltd')).toBe('ABCENG');
-    expect(generateOrganizationCode('n1 labs')).toBe('N1LABS');
+  test('uses the first letters and digits, upper-cased, then the number', () => {
+    expect(generateOrganizationCode('ABC Engineering Pvt Ltd', '4821')).toBe(
+      'ABCENG-4821',
+    );
+    expect(generateOrganizationCode('n1 labs', '1007')).toBe('N1LABS-1007');
   });
 
   test('ignores punctuation and handles short or empty names', () => {
-    expect(generateOrganizationCode('A&B')).toBe('AB');
-    expect(generateOrganizationCode('  ')).toBe('');
+    expect(generateOrganizationCode('A&B', '4821')).toBe('AB-4821');
+    expect(generateOrganizationCode('  ', '4821')).toBe('');
+  });
+});
+
+describe('randomCodeSuffix', () => {
+  test('is four digits that never start with 0', () => {
+    for (let i = 0; i < 50; i += 1) {
+      expect(randomCodeSuffix()).toMatch(/^[1-9][0-9]{3}$/);
+    }
   });
 });
 

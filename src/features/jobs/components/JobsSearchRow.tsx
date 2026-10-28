@@ -22,7 +22,7 @@ type Props = {
 
 /**
  * The jobs home's search on the black header, with the filter and the QR
- * scanner (Import Job) beside it.
+ * scanner (Import Order) beside it.
  */
 export function JobsSearchRow({
   query,

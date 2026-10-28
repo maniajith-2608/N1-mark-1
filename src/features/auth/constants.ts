@@ -1,4 +1,5 @@
 import type { N1DropDownOption } from '../../shared/components';
+import { INDIAN_STATES } from '../../shared/constants';
 
 /** Shown on the hero panel of every auth screen (login, sign-up, reset). */
 export const AUTH_TAGLINE =
@@ -9,18 +10,24 @@ export { PASSWORD_MIN_LENGTH } from '../../config/constants';
 /** Digits in the emailed verification code. */
 export const VERIFICATION_CODE_LENGTH = 6;
 
-/** Length of the auto-generated organization code. */
+/** Letters and digits taken from the name for the organization code. */
 export const ORGANIZATION_CODE_LENGTH = 6;
 
+/** Digits in the random number after the name part ("ABCENG-4821"). */
+export const ORGANIZATION_CODE_SUFFIX_LENGTH = 4;
+
+/** N1 serves manufacturers only, so Manufacturing is the one industry. */
 export const INDUSTRY_OPTIONS: N1DropDownOption<string>[] = [
-  { label: 'Metal Manufacturing', value: 'metal-manufacturing' },
-  { label: 'Automotive', value: 'automotive' },
-  { label: 'Electronics', value: 'electronics' },
-  { label: 'Plastics & Rubber', value: 'plastics-rubber' },
-  { label: 'Textiles', value: 'textiles' },
-  { label: 'Food & Beverage', value: 'food-beverage' },
-  { label: 'Other', value: 'other' },
+  { label: 'Manufacturing', value: 'manufacturing' },
 ];
+
+/** The only industry, so Create organization starts with it picked. */
+export const DEFAULT_INDUSTRY = INDUSTRY_OPTIONS[0].value;
+
+/** The registered address's state; the backend takes the name. */
+export const STATE_OPTIONS: N1DropDownOption<string>[] = INDIAN_STATES.map(
+  s => ({ label: s.name, value: s.name }),
+);
 
 export const USER_ROLES = {
   ADMIN: 'admin',

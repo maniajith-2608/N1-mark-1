@@ -92,6 +92,15 @@ function toCustomer(node: CustomerNode): Customer {
   return customer;
 }
 
+/** The fields that make up the billing address. */
+const ADDRESS_KEYS: string[] = [
+  'address',
+  'city',
+  'state',
+  'pinCode',
+  'country',
+];
+
 /** A phone as the API stores it; blank clears it. */
 const phoneOrEmpty = (value: string) =>
   isBlank(value) ? '' : toE164Phone(value);
@@ -130,8 +139,7 @@ function toWireInput(
   if (input.notes !== undefined) {
     fields.notes = input.notes.trim();
   }
-  const addressKeys = ['address', 'city', 'state', 'pinCode', 'country'];
-  if (addressKeys.some(key => key in input)) {
+  if (ADDRESS_KEYS.some(key => key in input)) {
     const pick = (key: 'address' | 'city' | 'state' | 'pinCode' | 'country') =>
       (input[key] ?? current?.[key] ?? '').trim();
     fields.country = textOrNull(pick('country'));
@@ -182,7 +190,18 @@ async function get(id: string): Promise<Customer> {
 // Required to create; the app has no payment terms field yet.
 const DEFAULT_PAYMENT_TERMS_DAYS = 30;
 
+/** No street, city or PIN code typed: the customer has no address yet. */
+const hasAddress = (input: CustomerInput) =>
+  [input.address, input.city, input.pinCode].some(value => !isBlank(value));
+
 async function create(input: CustomerInput): Promise<Customer> {
+  // The address is optional on the form; a blank one isn't sent (see
+  // N1-Frontend-Integration-Issues.md, FE-005: the API still requires it).
+  const fields: Partial<CustomerInput> = hasAddress(input)
+    ? input
+    : Object.fromEntries(
+        Object.entries(input).filter(([key]) => !ADDRESS_KEYS.includes(key)),
+      );
   const data = await graphqlRequest<{ createCustomer: CustomerNode }>(
     `mutation CreateCustomer($input: CustomerInput!) {
       createCustomer(input: $input) { ...CustomerFields }
@@ -190,7 +209,7 @@ async function create(input: CustomerInput): Promise<Customer> {
     ${CUSTOMER_FIELDS}`,
     {
       input: {
-        ...toWireInput(input),
+        ...toWireInput(fields),
         paymentTermsDays: DEFAULT_PAYMENT_TERMS_DAYS,
       },
     },

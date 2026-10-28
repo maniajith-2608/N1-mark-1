@@ -73,6 +73,15 @@ test('a scanned or typed code opens the job (operators open their own)', async (
   expect(text).toContain('4 in progress · 5 total');
 });
 
+test('an unknown code tells the operator it may not be assigned to them', async () => {
+  const root = await operator();
+  await importCode(root, 'WO-9999');
+
+  expect(allText(root)).toContain(
+    'No order assigned to you matches WO-9999. Ask your supervisor to assign you a step on it.',
+  );
+});
+
 test('a job without a route card cannot be imported', async () => {
   const root = await operator();
   await importCode(root, '1036');

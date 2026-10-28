@@ -35,7 +35,7 @@ async function secondAdmin() {
   return app.root;
 }
 
-/** Import Job → Enter code manually → type the code → Import Job. */
+/** Import Order → Enter code manually → type the order ID → Import Order. */
 async function importCode(
   root: ReactTestRenderer.ReactTestInstance,
   code: string,
@@ -55,6 +55,9 @@ describe('utils', () => {
     // Card codes and QR values pass through.
     expect(normaliseJobCode('job12')).toBe('JOB12');
     expect(normaliseJobCode('JC-00012')).toBe('JC-00012');
+    // The card code as shown on screen ("#JOB12") or typed with a "#".
+    expect(normaliseJobCode('#JOB12')).toBe('JOB12');
+    expect(normaliseJobCode('job#12')).toBe('JOB12');
     // An order QR code: only the first line counts, not the details under it.
     expect(normaliseJobCode('WO #1042\nPart no: PN-33021\nQty: 200')).toBe(
       'WO-1042',
@@ -80,7 +83,7 @@ test("My Jobs lists the user's jobs with counts and search", async () => {
   expect(hasTestId(root, 'job-card-1036')).toBe(false);
 
   // The black header: the N1 logo, "My Jobs" in the middle and the initials,
-  // then the search, filter and QR scanner (Import Job).
+  // then the search, filter and QR scanner (Import Order).
   const header = byTestId(root, 'employee-home-header');
   expect(allText(header)).toMatch(/^My Jobs\|[A-Z]{1,2}$/);
   expect(hasTestId(header, 'employee-home-logo')).toBe(true);
@@ -133,7 +136,7 @@ test('job codes that are blank or unknown show an error', async () => {
 
   await typeInto(byTestId(root, 'job-code-input'), 'WO-9999');
   await press(byTestId(root, 'job-code-submit'));
-  expect(allText(root)).toContain('No work order found for WO-9999');
+  expect(allText(root)).toContain('No order found for WO-9999');
 });
 
 /** Fires the mocked camera's barcode callback with one QR value. */
@@ -167,12 +170,12 @@ describe('Scan QR code', () => {
     await press(byTestId(root, 'import-job'));
 
     await scan(root, 'WO-9999');
-    expect(allText(root)).toContain('No work order found for WO-9999');
+    expect(allText(root)).toContain('No order found for WO-9999');
     // The same code stays in view; it isn't reported again.
     await scan(root, 'WO-9999');
     await scan(root, 'https://example.com');
     expect(allText(root)).toContain(
-      'No work order found for https://example.com',
+      'No order found for https://example.com',
     );
 
     expect(byTestId(root, 'qr-camera').props.torchMode).toBe('off');

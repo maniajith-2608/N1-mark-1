@@ -62,7 +62,7 @@ test('the organization name opens the organization details', async () => {
   for (const value of [
     'ABC Engineering Pvt Ltd',
     'ABC001',
-    'Metal Manufacturing',
+    'Manufacturing',
     'admin@abcengineering.com',
     '+91 44 4000 1000',
     '33ABCDE1234F1Z5',

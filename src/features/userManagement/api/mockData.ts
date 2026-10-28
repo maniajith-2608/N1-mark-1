@@ -99,7 +99,7 @@ export const MOCK_USERS: AdminUser[] = [
     pinCode: '600058',
     country: 'India',
     role: 'operator',
-    status: 'invited',
+    status: 'inactive',
     joinedAt: '2026-09-20',
     permissions: { viewOrders: true, manageUsers: false, exportReports: false },
     attachments: [],
@@ -159,7 +159,7 @@ export const MOCK_USERS: AdminUser[] = [
     pinCode: '600042',
     country: 'India',
     role: 'operator',
-    status: 'suspended',
+    status: 'inactive',
     joinedAt: '2026-09-24',
     permissions: {
       viewOrders: false,
@@ -170,7 +170,7 @@ export const MOCK_USERS: AdminUser[] = [
     activity: [
       {
         id: 'a1',
-        label: 'Account suspended',
+        label: 'Account deactivated',
         at: isoAgo(3 * DAY_MS),
         tone: 'danger',
       },
@@ -345,7 +345,7 @@ export const MOCK_USERS: AdminUser[] = [
     pinCode: '600042',
     country: 'India',
     role: 'qc',
-    status: 'invited',
+    status: 'inactive',
     joinedAt: '2026-09-27',
     permissions: {
       viewOrders: true,
@@ -525,7 +525,7 @@ export const MOCK_USERS: AdminUser[] = [
     pinCode: '600042',
     country: 'India',
     role: 'supervisor',
-    status: 'invited',
+    status: 'inactive',
     joinedAt: '2026-09-30',
     permissions: {
       viewOrders: true,
@@ -555,7 +555,7 @@ export const MOCK_USERS: AdminUser[] = [
     pinCode: '560058',
     country: 'India',
     role: 'operator',
-    status: 'suspended',
+    status: 'inactive',
     joinedAt: '2026-10-01',
     permissions: {
       viewOrders: false,
@@ -675,7 +675,7 @@ export const MOCK_USERS: AdminUser[] = [
     pinCode: '641012',
     country: 'India',
     role: 'operator',
-    status: 'invited',
+    status: 'inactive',
     joinedAt: '2026-10-03',
     permissions: {
       viewOrders: false,

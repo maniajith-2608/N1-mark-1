@@ -133,8 +133,6 @@ export const ROLE_META: Record<UserRole, StatusMeta> = {
 
 export const STATUS_META: Record<UserStatus, StatusMeta> = {
   active: { label: 'Active', tone: 'success' },
-  invited: { label: 'Invited', tone: 'info' },
-  suspended: { label: 'Suspended', tone: 'danger' },
   inactive: { label: 'Inactive', tone: 'neutral' },
 };
 

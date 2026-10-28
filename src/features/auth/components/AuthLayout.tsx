@@ -16,13 +16,18 @@ type Props = {
   footer?: ReactNode;
   /** Allow a wider form, e.g. for two-column fields. */
   wide?: boolean;
+  /**
+   * Tablet / desktop: the pane doesn't scroll and the form fills its height,
+   * for forms that scroll their own fields between a pinned header and button.
+   */
+  fixed?: boolean;
 };
 
 /**
  * Shared shell for the auth screens: hero panel + form side by side on
  * tablet / desktop, a single scrolling column on phones.
  */
-function AuthLayout({ children, footer, wide = false }: Props) {
+function AuthLayout({ children, footer, wide = false, fixed = false }: Props) {
   const styles = useN1Styles(makeAuthLayoutStyles);
   const { isCompact } = useN1Breakpoint();
 
@@ -34,6 +39,26 @@ function AuthLayout({ children, footer, wide = false }: Props) {
           {footer}
         </KeyboardScrollView>
       </SafeAreaView>
+    );
+  }
+
+  if (fixed) {
+    return (
+      <View style={styles.split}>
+        <AuthHero />
+        <View style={[styles.formPane, styles.fixedPaneContent]}>
+          <View
+            style={[
+              styles.formWidth,
+              wide && styles.wideFormWidth,
+              styles.fixedFormWidth,
+            ]}
+          >
+            {children}
+            {footer}
+          </View>
+        </View>
+      </View>
     );
   }
 

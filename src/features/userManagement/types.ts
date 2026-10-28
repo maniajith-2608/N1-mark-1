@@ -16,7 +16,7 @@ import type { AdminDrawerParamList } from '../dashboard/types';
 
 /** Admin uses the dashboard; Supervisor, Operator and QC use the shop-floor app. */
 export type { UserRole };
-export type UserStatus = 'active' | 'invited' | 'suspended' | 'inactive';
+export type UserStatus = 'active' | 'inactive';
 
 export type UserPermissionKey = 'viewOrders' | 'manageUsers' | 'exportReports';
 export type UserPermissions = Record<UserPermissionKey, boolean>;

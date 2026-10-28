@@ -49,7 +49,7 @@ const matchesFilters = (c: JobCard, filters: FilterValues) =>
 
 /**
  * The role's home: their imported jobs under the black header, which holds
- * the search, the filter and the QR scanner (Import Job).
+ * the search, the filter and the QR scanner (Import Order).
  */
 export function MyJobsScreen() {
   const navigation = useNavigation<Navigation>();

@@ -31,7 +31,7 @@ export type Organization = {
   // Business details
   /** A BUSINESS_TYPE_OPTIONS value, e.g. "private-limited". */
   businessType: string;
-  /** An INDUSTRY_OPTIONS value, e.g. "metal-manufacturing". */
+  /** An INDUSTRY_OPTIONS value, e.g. "manufacturing". */
   industry: string;
   /** e.g. CIN or Udyam registration number. */
   registrationDetails: string;

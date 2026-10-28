@@ -276,8 +276,7 @@ export function UserDetailsScreen({
           <PasswordSetForm
             title={D.resetPassword}
             subtitle={D.resetPasswordHelp(user.name)}
-            // Invited people haven't set one yet.
-            hasPassword={user.status !== 'invited'}
+            hasPassword
             startLabel={D.resetPassword}
             saving={saving}
             error={saveError}
