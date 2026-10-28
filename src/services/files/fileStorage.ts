@@ -1,7 +1,8 @@
+import { UPLOAD_PROXY } from '../../config/env';
 import { apiClient, ApiError } from '../api';
 import type { Attachment } from '../../shared/types';
 import { forgetPickedFile, pickedFile, type PickedBlob } from './pickedFiles';
-import { openDocument } from './viewDocument';
+import { openDocument, reserveTab } from './viewDocument';
 
 // N1 Core files (guide section 5, rule 7): POST /files/upload-url returns a
 // presigned POST; send its form fields first and the file last, then put the
@@ -67,6 +68,25 @@ function contentTypeOf(file: PickedBlob): string {
   return CONTENT_TYPES[ext] ?? 'application/octet-stream';
 }
 
+// Idempotency keys allow 8–128 of `A-Z a-z 0-9 . _ : -` (guide section 5).
+const IDEMPOTENCY_KEY_MAX = 128;
+
+/**
+ * The upload's idempotency key. Picked ids carry their label ("Design
+ * file-…"), so other characters become `_`; a long id keeps its unique tail.
+ */
+export function uploadIdempotencyKey(entityId: string, docId: string): string {
+  const key = `upload-${entityId}-${docId}`.replace(/[^A-Za-z0-9._:-]/g, '_');
+  return key.length > IDEMPOTENCY_KEY_MAX
+    ? key.slice(key.length - IDEMPOTENCY_KEY_MAX)
+    : key;
+}
+
+/** The presigned upload URL, through the dev server's S3 proxy when it has one. */
+export function uploadTarget(url: string, proxy = UPLOAD_PROXY): string {
+  return proxy ? url.replace(/^https:\/\//, `${proxy}/`) : url;
+}
+
 /** An attachment that already lives on the backend, as its reference. */
 export const toFileReference = (doc: Attachment): FileReference => ({
   id: doc.id,
@@ -105,22 +125,14 @@ export async function uploadAttachment(
       contentType: contentTypeOf(file),
       sizeBytes: file.size,
     },
-    // Picked ids carry the kind ("Design file-…"); the backend refuses spaces.
-    {
-      headers: {
-        'Idempotency-Key': `upload-${entityId}-${doc.id}`.replace(
-          /[^A-Za-z0-9_-]/g,
-          '_',
-        ),
-      },
-    },
+    { headers: { 'Idempotency-Key': uploadIdempotencyKey(entityId, doc.id) } },
   );
   const form = new browser.FormData();
   Object.entries(data.upload.fields).forEach(([name, value]) =>
     form.append(name, value),
   );
   form.append('file', file);
-  const response = await browser.fetch(data.upload.url, {
+  const response = await browser.fetch(uploadTarget(data.upload.url), {
     method: 'POST',
     body: form,
   });
@@ -180,5 +192,13 @@ export async function openStoredFile(doc: Attachment): Promise<boolean> {
   if (doc.uri) {
     return openDocument(doc);
   }
-  return openDocument({ ...doc, uri: await fileDownloadUrl(doc.id) });
+  // Web: the tab opens on the tap and shows the file once its link is in.
+  const tab = reserveTab();
+  try {
+    const uri = await fileDownloadUrl(doc.id);
+    return tab ? tab.open(uri) : openDocument({ ...doc, uri });
+  } catch (error) {
+    tab?.close();
+    throw error;
+  }
 }

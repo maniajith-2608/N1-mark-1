@@ -91,6 +91,9 @@ module.exports = (env, argv) => {
         'process.env.N1_API_URL': JSON.stringify(
           (!isDev && process.env.N1_API_URL) || '/api',
         ),
+        // S3 only accepts browser uploads from the deployed app's origin, so
+        // the dev server forwards them through /s3 (see the proxy below).
+        'process.env.N1_UPLOAD_PROXY': JSON.stringify(isDev ? '/s3' : ''),
         __REACT_NATIVE_VERSION__: JSON.stringify(
           require(path.resolve(
             appDirectory,
@@ -117,6 +120,23 @@ module.exports = (env, argv) => {
           // (staging behind CloudFront) refuses "localhost:8080".
           changeOrigin: true,
           pathRewrite: { '^/api': '' },
+        },
+        {
+          // /s3/<bucket host>/… → https://<bucket host>/…, for presigned
+          // uploads (src/services/files/fileStorage.ts). S3 hosts only.
+          context: ['/s3'],
+          target: 'https://s3.amazonaws.com',
+          changeOrigin: true,
+          router: req => {
+            const host = req.url.split('/')[2] ?? '';
+            if (!/^[a-z0-9.-]+\.amazonaws\.com$/.test(host)) {
+              throw new Error(`Not an S3 host: ${host}`);
+            }
+            return `https://${host}`;
+          },
+          pathRewrite: url => url.replace(/^\/s3\/[^/]+/, '') || '/',
+          // Without the browser's Origin, S3 treats it as a plain POST.
+          on: { proxyReq: proxyReq => proxyReq.removeHeader('origin') },
         },
       ],
     },

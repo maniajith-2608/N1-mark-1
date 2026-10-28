@@ -7,6 +7,8 @@ type Popup = {
   focus: () => void;
   print: () => void;
   addEventListener: (event: 'load', cb: () => void) => void;
+  location: { href: string };
+  close: () => void;
 };
 type Browser = {
   open?: (url: string, target: string) => Popup | null;
@@ -21,6 +23,28 @@ export function openDocument(doc: Attachment): boolean {
     return false;
   }
   return browser.open(doc.uri, '_blank') !== null;
+}
+
+/** A tab opened now, while the tap still allows pop-ups, for a link that's on its way. */
+export type ReservedTab = { open: (uri: string) => boolean; close: () => void };
+
+/**
+ * Opens an empty tab straight away: browsers block a tab opened after an
+ * await (a stored file's download link), so it's filled in once the link
+ * arrives. Null when pop-ups are blocked.
+ */
+export function reserveTab(): ReservedTab | null {
+  const tab = browser.open?.('', '_blank');
+  if (!tab) {
+    return null;
+  }
+  return {
+    open: uri => {
+      tab.location.href = uri;
+      return true;
+    },
+    close: () => tab.close(),
+  };
 }
 
 /**

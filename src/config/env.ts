@@ -12,6 +12,12 @@ export const API_BASE_URL = Platform.select({
   android: 'http://10.0.2.2:3000',
   default: 'http://127.0.0.1:3000',
 });
+/**
+ * Web dev only: the dev server path that forwards presigned file uploads to
+ * S3, whose CORS allows only the deployed app (webpack.config.js).
+ */
+export const UPLOAD_PROXY =
+  Platform.OS === 'web' ? process.env.N1_UPLOAD_PROXY || '' : '';
 export const API_TIMEOUT_MS = 15000;
 
 /** Sent as x-app-version on every request; keep in step with package.json. */
