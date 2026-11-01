@@ -4,7 +4,7 @@ import type { WorkOrder } from '../orders';
 import type { JobCard } from '../jobCards';
 import { ALL, DUE_SOON_DAYS } from './constants';
 import type { CustomerShare } from '../customers';
-import { JOB_CARD_STRINGS } from '../jobCards';
+import { JOB_CARD_STRINGS, jobCardStage } from '../jobCards';
 import type {
   CustomerRow,
   PriorityJob,
@@ -82,6 +82,13 @@ export const byDueDate = (cards: readonly JobCard[]): JobCard[] =>
   [...cards].sort((a, b) =>
     (a.dueDate || '9999').localeCompare(b.dueDate || '9999'),
   );
+
+/**
+ * The priority list: job cards still to deliver, earliest due first. Done
+ * (dispatched) jobs need no attention, so they're left out.
+ */
+export const priorityJobCards = (cards: readonly JobCard[]): JobCard[] =>
+  byDueDate(cards.filter(c => jobCardStage(c).key !== 'done'));
 
 /** Overdue, or due within DUE_SOON_DAYS calendar days of today. */
 export function isDueSoon(dueIso: string, now = new Date()): boolean {

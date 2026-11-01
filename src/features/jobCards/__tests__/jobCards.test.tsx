@@ -21,6 +21,8 @@ import { apiClient } from '../../../services/api';
 import { jobCardActions } from '../store/jobCardsSlice';
 import { customerActions } from '../../customers/store/customersSlice';
 import { MOCK_JOB_CARDS } from '../api/mockData';
+import { MOCK_MACHINES } from '../../machines/api/mockData';
+import { machineActions } from '../../machines/store/machinesSlice';
 import type { JobCard, JobOperation } from '../types';
 import {
   assignedMachine,
@@ -920,7 +922,19 @@ describe('Job card details', () => {
 
     // Redo takes Start's place: one way to restart the failed step.
     expect(hasTestId(screen(), 'start-operation')).toBe(false);
-    // Redo picks the operator and an idle machine, then starts it.
+    // Machines loaded earlier, while the lathe was still busy with the
+    // step; it has finished since, so the server has it idle again.
+    await act(async () => {
+      h.store.dispatch(
+        machineActions.fetchSuccess(
+          MOCK_MACHINES.map(m =>
+            m.code === 'LATHE-01' ? { ...m, status: 'running' as const } : m,
+          ),
+        ),
+      );
+    });
+    // Redo picks the operator and an idle machine, then starts it. The
+    // machines are read again on open, so the freed lathe is offered.
     await press(byTestId(screen(), 'redo-operation'));
     const dialog = () => byTestId(h.root, 'start-step-dialog');
     expect(allText(dialog())).toContain('Start Turning (Lathe)');
@@ -1080,15 +1094,41 @@ describe('Job card details', () => {
     expect(canEditFlow({ ...card, materialQc: 'accepted' })).toBe(true);
   });
 
-  test('a rejected material shows what RM QC rejected; only supervisors re-initiate', async () => {
+  test('admin re-initiates RM QC by entering the replacement material', async () => {
     const h = await renderAdmin('JobCards');
     await h.navigate('JobCardDetails', { jobCardId: '1041' });
-    const screen = byTestId(h.root, 'job-card-details-screen');
-    await press(byTestId(screen, 'job-card-tab-qc'));
-    const rejected = allText(byTestId(screen, 'rejected-material'));
+    const screen = () => byTestId(h.root, 'job-card-details-screen');
+    await press(byTestId(screen(), 'job-card-tab-qc'));
+    const rejected = allText(byTestId(screen(), 'rejected-material'));
     expect(rejected).toContain('Rejected material');
     expect(rejected).toContain('HT-99212');
-    expect(hasTestId(screen, 'reinitiate-rm-qc')).toBe(false);
+
+    // Re-initiate asks for the new material; nobody is assigned the job.
+    await press(byTestId(screen(), 'reinitiate-rm-qc'));
+    const dialog = () => byTestId(h.root, 'rm-dialog');
+    expect(allText(dialog())).toContain('Replacement material');
+    expect(allText(dialog())).toContain('RM QC will inspect it again');
+    // A new heat: its number starts blank and is required.
+    expect(byTestId(dialog(), 'rm-dialog-heatNumber').props.value).toBe('');
+    await press(byTestId(dialog(), 'rm-dialog-submit'));
+    expect(allText(dialog())).toContain('This field is required');
+    expect(h.store.getState().jobCards.entities['1041'].materialQc).toBe(
+      'rejected',
+    );
+    await typeInto(byTestId(dialog(), 'rm-dialog-heatNumber'), 'HT-70001');
+    await press(byLabel(dialog(), 'Bought out'));
+    await press(byTestId(dialog(), 'rm-dialog-submit'));
+
+    // Back with RM QC: pending again, nothing left to re-initiate.
+    expect(hasTestId(h.root, 'rm-dialog-submit')).toBe(false);
+    expect(h.store.getState().jobCards.entities['1041'].materialQc).toBe(
+      'pending',
+    );
+    expect(h.store.getState().orders.entities['1041']?.heatNumber).toBe(
+      'HT-70001',
+    );
+    expect(hasTestId(screen(), 'reinitiate-rm-qc')).toBe(false);
+    expect(hasTestId(screen(), 'rejected-material')).toBe(false);
   });
 
   test('an unknown card says it no longer exists', async () => {

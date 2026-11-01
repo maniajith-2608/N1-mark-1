@@ -19,8 +19,8 @@ import { DrawingPreview, ORDER_STRINGS, orderHeading } from '../../orders';
 import { VIEW } from '../../orders/components/DrawingPreview';
 import { useDrawingThumbnail } from '../../orders/hooks/useDrawingThumbnail';
 import { selectOrderById } from '../../orders/store/selectors';
-import { openMaskedDrawing } from '../../orders/drawings';
-import { drawingPrintHtml } from '../../orders/printing';
+import { openDrawingWithQr } from '../../orders/drawings';
+import { drawingPrintHtml, printDrawingWithQr } from '../../orders/printing';
 import type { JobsScreenProps } from '../types';
 import { jobViewOf } from '../utils';
 
@@ -53,24 +53,32 @@ export function DrawingScreen({
   const designFile = order?.designFile ?? undefined;
   const company = order?.customerName ?? '';
   const thumbnail = useDrawingThumbnail(designFile, company);
-  // Masked as when printing: no customer name, address or logo.
+  // As it prints: the order's QR stamped on, no customer name, address or
+  // logo.
   const openFile = useCallback(() => {
-    if (designFile) {
-      openMaskedDrawing(designFile, company)
+    if (designFile && order) {
+      openDrawingWithQr(designFile, order)
         .then(opened => opened || notifyUnavailable(D.downloadAction))
         .catch(() => notifyUnavailable(D.downloadAction));
     }
-  }, [designFile, company]);
+  }, [designFile, order]);
 
+  // The stored drawing prints with the order's QR stamped on it, as on the
+  // admin's job card; only an order without a file prints the placeholder.
   const print = useCallback(() => {
-    if (order) {
-      printOrNotify(
-        drawingPrintHtml(order, drawingNumber),
-        ORDER_STRINGS.print.drawingJob(orderHeading(order)),
-        D.printDrawing,
-      );
+    if (!order) {
+      return;
     }
-  }, [order, drawingNumber]);
+    if (designFile) {
+      printDrawingWithQr(order, designFile);
+      return;
+    }
+    printOrNotify(
+      drawingPrintHtml(order, drawingNumber),
+      ORDER_STRINGS.print.drawingJob(orderHeading(order)),
+      D.printDrawing,
+    );
+  }, [order, designFile, drawingNumber]);
 
   const header = (
     <N1Header

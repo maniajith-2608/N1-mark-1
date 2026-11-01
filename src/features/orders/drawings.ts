@@ -3,10 +3,12 @@ import {
   openStoredFile,
 } from '../../services/files/fileStorage';
 import { reserveTab } from '../../services/files/viewDocument';
+import { escapeHtml } from '../../services/print/printPage';
 import type { Attachment } from '../../shared/types';
-import { maskedDrawing } from './drawingStamp';
-import { DRAWING_KIND } from './constants';
-import type { WorkOrder } from './types';
+import { maskedDrawing, stampedPreview } from './drawingStamp';
+import { DRAWING_KIND, ORDER_STRINGS } from './constants';
+import type { OrderSummary, WorkOrder } from './types';
+import { orderQrValue } from './utils';
 
 // An order holds one design file; its other drawings are stored among its
 // documents, marked with DRAWING_KIND.
@@ -56,6 +58,56 @@ export async function openMaskedDrawing(
   }
   try {
     const masked = await maskedDrawing(doc, company).catch(() => null);
+    return tab.open(masked ?? doc.uri ?? (await fileDownloadUrl(doc.id)));
+  } catch (error) {
+    tab.close();
+    throw error;
+  }
+}
+
+/**
+ * Opens the drawing in a new tab as the shop floor prints it: the order's QR
+ * and WO number stamped on, the customer's details blanked. The pages are
+ * shown as images on a page of their own, which mobile browsers and in-app
+ * web views display (they show a PDF opened from the app as a blank tab).
+ * Files that can't be stamped here (DWG, STEP) open masked or as stored.
+ * False when nothing opened.
+ */
+export async function openDrawingWithQr(
+  doc: Attachment,
+  order: OrderSummary,
+): Promise<boolean> {
+  const tab = reserveTab();
+  if (!tab) {
+    return openStoredFile(doc);
+  }
+  const D = ORDER_STRINGS.details;
+  const title = `${ORDER_STRINGS.workOrder(order.number)} · ${doc.name}`;
+  tab.show(title, `<p>${escapeHtml(D.preparingDrawing)}</p>`);
+  try {
+    const preview = await stampedPreview(
+      doc,
+      orderQrValue(order),
+      order.customerName,
+      ORDER_STRINGS.workOrder(order.number),
+    ).catch(() => null);
+    if (preview) {
+      tab.show(
+        title,
+        preview.pages
+          .map(
+            (page, i) =>
+              `<img src="${page.uri}" alt="${escapeHtml(
+                `${doc.name} ${i + 1}`,
+              )}">`,
+          )
+          .join(''),
+      );
+      return true;
+    }
+    const masked = await maskedDrawing(doc, order.customerName).catch(
+      () => null,
+    );
     return tab.open(masked ?? doc.uri ?? (await fileDownloadUrl(doc.id)));
   } catch (error) {
     tab.close();

@@ -28,11 +28,12 @@ const D = ORDER_STRINGS.details;
 
 type RawMaterial = Pick<WorkOrder, (typeof RAW_MATERIAL_FIELDS)[number]>;
 
-const valuesOf = (o?: WorkOrder | null): RawMaterial => ({
+// Replacement material comes from a new heat, so its heat number starts blank.
+const valuesOf = (o?: WorkOrder | null, replacement = false): RawMaterial => ({
   materialSource: o?.materialSource ?? '',
   rmPartNumber: o?.rmPartNumber ?? '',
   rawMaterialSize: o?.rawMaterialSize ?? '',
-  heatNumber: o?.heatNumber ?? '',
+  heatNumber: replacement ? '' : o?.heatNumber ?? '',
   rawMaterialGrade: o?.rawMaterialGrade ?? '',
 });
 
@@ -63,6 +64,11 @@ type Props = {
   jobCardId: string;
   /** The details are saved; with the order's job card, new or not. */
   onSaved: (jobCardId: string) => void;
+  /**
+   * RM QC rejected the material: enter its replacement. Saving it on the
+   * job card sends it back to RM QC (pending) without assigning anyone.
+   */
+  replacement?: boolean;
 };
 
 /**
@@ -77,6 +83,7 @@ export function RawMaterialDialog({
   jobCardId,
   onClose,
   onSaved,
+  replacement = false,
 }: Props) {
   // Kept while the dialog fades out.
   const order = useHeldWhileVisible(visible, orderProp);
@@ -88,18 +95,25 @@ export function RawMaterialDialog({
   const savedJobCardId = useAppSelector(state =>
     order ? selectOrderById(state, order.id)?.jobCardId ?? '' : '',
   );
-  const form = useForm<RawMaterial>(valuesOf(order), validate);
+  const form = useForm<RawMaterial>(valuesOf(order, replacement), validate);
   const { reset, values, errors, bind } = form;
 
   const clearCommandErrors = commands.clearErrors;
   const clearOrderErrors = orders.clearErrors;
   useEffect(() => {
     if (visible) {
-      reset(valuesOf(order));
+      reset(valuesOf(order, replacement));
       clearCommandErrors();
       clearOrderErrors();
     }
-  }, [visible, order, reset, clearCommandErrors, clearOrderErrors]);
+  }, [
+    visible,
+    order,
+    replacement,
+    reset,
+    clearCommandErrors,
+    clearOrderErrors,
+  ]);
 
   useOnSettled(saving, saveError, () => {
     if (visible) {
@@ -151,14 +165,30 @@ export function RawMaterialDialog({
     <N1Modal
       visible={visible}
       onClose={onClose}
-      title={creating ? D.createJobCard : D.rawMaterialTitle}
+      title={
+        creating
+          ? D.createJobCard
+          : replacement
+          ? D.replacementTitle
+          : D.rawMaterialTitle
+      }
       subtitle={
-        creating ? D.createJobCardHelp(workOrder) : D.rawMaterialHelp(workOrder)
+        creating
+          ? D.createJobCardHelp(workOrder)
+          : replacement
+          ? D.replacementHelp(workOrder)
+          : D.rawMaterialHelp(workOrder)
       }
       footer={
         <FormFooter
           onCancel={onClose}
-          submitLabel={creating ? D.createJobCard : D.rawMaterialSubmit}
+          submitLabel={
+            creating
+              ? D.createJobCard
+              : replacement
+              ? D.replacementSubmit
+              : D.rawMaterialSubmit
+          }
           onSubmit={form.submit(save)}
           loading={saving}
           submitTestID="rm-dialog-submit"
