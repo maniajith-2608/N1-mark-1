@@ -159,6 +159,7 @@ export { N1Timer, formatElapsed, type N1TimerProps } from './N1Timer';
 export { N1Modal, type N1ModalProps } from './N1Modal';
 export { N1BottomSheet, type N1BottomSheetProps } from './N1BottomSheet';
 export { N1ConfirmDialog, type N1ConfirmDialogProps } from './N1ConfirmDialog';
+export { ServerWakeScreen } from './ServerWakeScreen';
 
 // App-level primitives
 export { AppText } from './AppText';
