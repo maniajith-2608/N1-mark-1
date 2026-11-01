@@ -8,7 +8,11 @@ export function openDocument(_doc: Attachment): boolean {
   return false;
 }
 
-export type ReservedTab = { open: (uri: string) => boolean; close: () => void };
+export type ReservedTab = {
+  open: (uri: string) => boolean;
+  show: (title: string, body: string) => void;
+  close: () => void;
+};
 
 /** Phones have no browser tabs to hold open. */
 export function reserveTab(): ReservedTab | null {

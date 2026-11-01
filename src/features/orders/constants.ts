@@ -91,6 +91,8 @@ export const ORDER_STRINGS = {
     printAction: 'Printing documents',
     downloadDocument: 'Download',
     openInNewTab: 'Open in new tab',
+    /** The new tab while the QR is stamped on the drawing. */
+    preparingDrawing: 'Preparing the drawing…',
     viewerOpenHelp: 'This file opens in its own tab.',
     viewerUnavailable:
       'A preview of this file will show here once the backend stores uploaded files.',
@@ -119,6 +121,11 @@ export const ORDER_STRINGS = {
     rawMaterialHelp: (workOrder: string) =>
       `${workOrder} is missing some raw material details. Fill them in so RM QC can inspect the material.`,
     rawMaterialSubmit: 'Save raw material',
+    /** Re-initiate RM QC: the replacement for material RM QC rejected. */
+    replacementTitle: 'Replacement material',
+    replacementHelp: (workOrder: string) =>
+      `Enter the new material for ${workOrder}. RM QC will inspect it again.`,
+    replacementSubmit: 'Re-initiate RM QC',
     /** An order without a job card: its raw material opens the card. */
     createJobCard: 'Create job card',
     createJobCardHelp: (workOrder: string) =>

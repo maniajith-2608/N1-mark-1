@@ -129,6 +129,7 @@ export function StartStepDialog({
   const role = useOptionalEmployeeRole();
   const { run, saving, saveError, clearErrors } = useCloseWhenSaved(onClose);
   const machines = useMachines();
+  const reloadMachines = machines.reload;
   const [operatorId, setOperatorId] = useState('');
   const [machineId, setMachineId] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -138,8 +139,12 @@ export function StartStepDialog({
       setMachineId('');
       setSubmitted(false);
       clearErrors();
+      // Machines go busy and idle as steps start and finish (here or on
+      // another screen), so read them again: a machine freed by a finished
+      // step is offered, and one just taken isn't.
+      reloadMachines();
     }
-  }, [current, clearErrors]);
+  }, [current, clearErrors, reloadMachines]);
 
   const idle = useMemo(
     () =>

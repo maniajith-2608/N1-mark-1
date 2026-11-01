@@ -25,8 +25,16 @@ export function openDocument(doc: Attachment): boolean {
   return browser.open(doc.uri, '_blank') !== null;
 }
 
-/** A tab opened now, while the tap still allows pop-ups, for a link that's on its way. */
-export type ReservedTab = { open: (uri: string) => boolean; close: () => void };
+/**
+ * A tab opened now, while the tap still allows pop-ups, for a link that's on
+ * its way. `show` fills it with a page of its own instead (title and body
+ * HTML; the caller escapes it), which every browser and web view displays.
+ */
+export type ReservedTab = {
+  open: (uri: string) => boolean;
+  show: (title: string, body: string) => void;
+  close: () => void;
+};
 
 /**
  * Opens an empty tab straight away: browsers block a tab opened after an
@@ -42,6 +50,19 @@ export function reserveTab(): ReservedTab | null {
     open: uri => {
       tab.location.href = uri;
       return true;
+    },
+    show: (title, body) => {
+      tab.document.write(
+        `<!doctype html><meta charset="utf-8">` +
+          '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+          `<title>${escapeHtml(title)}</title>` +
+          '<style>body{margin:0;padding:16px;background:#f2f2f2;' +
+          'font-family:system-ui,sans-serif;display:flex;flex-direction:column;' +
+          'align-items:center;gap:16px}img{max-width:100%;height:auto;' +
+          'background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.15)}</style>' +
+          body,
+      );
+      tab.document.close();
     },
     close: () => tab.close(),
   };

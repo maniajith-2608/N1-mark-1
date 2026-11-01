@@ -11,6 +11,7 @@ import {
   filterUsers,
   isDueSoon,
   periodStart,
+  priorityJobCards,
   summarizePeriod,
   visibleMenuItems,
 } from '../utils';
@@ -189,6 +190,28 @@ describe('priority jobs', () => {
     ];
     expect(byDueDate(cards).map(c => c.id)).toEqual(['a', 'b', 'none']);
     expect(cards.map(c => c.id)).toEqual(['b', 'none', 'a']);
+  });
+
+  test('priorityJobCards: leaves out done (dispatched) jobs, keeps the rest', () => {
+    const card = (
+      id: string,
+      dueDate: string,
+      billing: JobCard['billing'],
+    ): JobCard =>
+      ({
+        id,
+        dueDate,
+        billing,
+        materialQc: 'accepted',
+        operations: [],
+        qcHistory: [],
+      } as unknown as JobCard);
+    const cards = [
+      card('done', '2026-10-01', 'invoiced'),
+      card('late', '2026-10-20', 'not_invoiced'),
+      card('soon', '2026-10-05', 'not_invoiced'),
+    ];
+    expect(priorityJobCards(cards).map(c => c.id)).toEqual(['soon', 'late']);
   });
 });
 

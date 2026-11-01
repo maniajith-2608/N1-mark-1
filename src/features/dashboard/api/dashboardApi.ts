@@ -8,7 +8,7 @@ import type {
   DashboardData,
   DashboardPeriod,
 } from '../types';
-import { byDueDate, withRouteCards } from '../utils';
+import { priorityJobCards, withRouteCards } from '../utils';
 
 // N1 Core API: dashboard(period) on POST /graphql. The week runs Monday to
 // today (India time); outstanding is everything unpaid now.
@@ -87,7 +87,7 @@ async function priorityJobs() {
     jobCardsApi.list(),
     ordersApi.list(),
   ]);
-  const sorted = byDueDate(cards);
+  const sorted = priorityJobCards(cards);
   return {
     jobs: withRouteCards(sorted.slice(0, PRIORITY_JOBS_LIMIT), orders),
     totalJobs: sorted.length,

@@ -6,8 +6,8 @@ import { ordersApi } from '../../orders/api/mockOrdersApi';
 import { PRIORITY_JOBS_LIMIT } from '../constants';
 import type { DashboardData, DashboardPeriod } from '../types';
 import {
-  byDueDate,
   customerRows,
+  priorityJobCards,
   summarizePeriod,
   withRouteCards,
 } from '../utils';
@@ -32,7 +32,7 @@ async function get(period: DashboardPeriod): Promise<DashboardData> {
     totalRevenue: c.totalRevenue,
     outstandingBalance: c.outstandingBalance,
   }));
-  const sorted = byDueDate(cards);
+  const sorted = priorityJobCards(cards);
   return {
     stats: summarizePeriod(invoices, orders, period),
     customers: customerRows(shares, orders),

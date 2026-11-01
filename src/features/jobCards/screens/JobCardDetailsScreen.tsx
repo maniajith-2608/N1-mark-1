@@ -65,6 +65,7 @@ import {
   type ViewerTarget,
 } from '../../orders/components/DocumentViewer';
 import { DrawingQrSection } from '../../orders/components/DrawingQrSection';
+import { RawMaterialDialog } from '../../orders/components/RawMaterialDialog';
 import { printOrNotify } from '../../../services/print';
 import { ORDER_STRINGS } from '../../orders/constants';
 import { orderDrawings } from '../../orders/drawings';
@@ -501,9 +502,13 @@ export function JobCardDetailsScreen({
     [isCompact, openFile],
   );
   const employeeRole = useOptionalEmployeeRole();
-  // Supervisor only: enter the replacement material so RM QC checks it again.
-  // RawMaterial lives in the role's stack, not the admin Job Cards stack.
-  const canReinitiate = employeeRole === 'supervisor';
+  // Supervisor and admin: enter the replacement material so RM QC checks it
+  // again. The supervisor uses RawMaterial in their own stack; admin (no
+  // such screen) gets the raw material popup, which saves it on the card
+  // without assigning the job to anyone.
+  const canReinitiate = employeeRole === null || employeeRole === 'supervisor';
+  const [replacingMaterial, openReplacement, closeReplacement] =
+    useToggle(false);
   // Admin and supervisor restart a step whose QC failed.
   const canRedo = employeeRole === null || employeeRole === 'supervisor';
   // Invoices are for owner, admin and accountant: the backend refuses the
@@ -512,12 +517,14 @@ export function JobCardDetailsScreen({
   const canDispatch =
     employeeRole === null && !!jobCard && canGenerateDispatch(jobCard);
   const reinitiate = useCallback(() => {
-    if (orderId) {
+    if (employeeRole === null) {
+      openReplacement();
+    } else if (orderId) {
       navigation.dispatch(
         StackActions.push('RawMaterial', { orderId, retest: true }),
       );
     }
-  }, [navigation, orderId]);
+  }, [employeeRole, openReplacement, navigation, orderId]);
 
   const backLink = (
     <Pressable
@@ -912,6 +919,17 @@ export function JobCardDetailsScreen({
     />
   );
 
+  // Admin: the replacement material, saved on the card; RM QC is pending again.
+  const replacementModal = (
+    <RawMaterialDialog
+      visible={replacingMaterial}
+      order={order ?? null}
+      jobCardId={jobCard.id}
+      replacement
+      onClose={closeReplacement}
+      onSaved={closeReplacement}
+    />
+  );
   const dispatchModal = (
     <GenerateDispatchModal
       visible={dispatchOpen}
@@ -1011,6 +1029,7 @@ export function JobCardDetailsScreen({
           onClose={closeFlow}
         />
         {dispatchModal}
+        {replacementModal}
         {stepDialogs}
         {viewer}
         {reportSheet}
@@ -1041,6 +1060,7 @@ export function JobCardDetailsScreen({
         )}
       </N1Card>
       {dispatchModal}
+      {replacementModal}
       {stepDialogs}
       {viewer}
     </AdminScreen>
