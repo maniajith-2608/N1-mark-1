@@ -4,6 +4,7 @@ import {
   graphqlRequest,
   toWireEnum,
 } from '../../../services/api';
+import { jobCardsApi } from '../../jobCards/api/jobCardsApi';
 import type {
   Machine,
   MachineInput,
@@ -53,9 +54,11 @@ const bareNumber = (number: string | null | undefined) =>
   (number ?? '').replace(/^WO-?/i, '');
 
 /**
- * The WO numbers of the job cards the machines are running, in one request.
- * Current work only carries the order's id, so without this the list could
- * only show a UUID. Best effort: on failure the work shows without a number.
+ * The WO numbers of the job cards the machines are running. Current work
+ * only carries the order's id, so without this the list could only show a
+ * UUID. Production runs only registered documents (backend N1C-031), so this
+ * reuses the job card query, one request per card. Best effort: a card that
+ * fails shows without a number.
  */
 async function workOrderNumbers(
   nodes: readonly MachineNode[],
@@ -67,26 +70,14 @@ async function workOrderNumbers(
       ),
     ),
   ];
-  if (ids.length === 0) {
-    return new Map();
-  }
-  const args = ids.map((_, i) => `$j${i}: ID!`).join(', ');
-  const fields = ids
-    .map((_, i) => `j${i}: jobCard(id: $j${i}) { id number }`)
-    .join('\n');
-  try {
-    const data = await graphqlRequest<
-      Record<string, { id: string; number: string | null }>
-    >(
-      `query MachineWorkNumbers(${args}) { ${fields} }`,
-      Object.fromEntries(ids.map((id, i) => [`j${i}`, id])),
-    );
-    return new Map(
-      Object.values(data).map(card => [card.id, bareNumber(card.number)]),
-    );
-  } catch {
-    return new Map();
-  }
+  const results = await Promise.allSettled(ids.map(id => jobCardsApi.get(id)));
+  return new Map(
+    results.flatMap(r =>
+      r.status === 'fulfilled'
+        ? [[r.value.id, bareNumber(r.value.number)] as const]
+        : [],
+    ),
+  );
 }
 
 function toMachine(node: MachineNode, numbers: Map<string, string>): Machine {
