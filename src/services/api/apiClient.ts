@@ -1,5 +1,29 @@
-import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios';
+import axios, {
+  AxiosError,
+  type AxiosResponse,
+  type AxiosResponseHeaders,
+  type AxiosResponseTransformer,
+  type InternalAxiosRequestConfig,
+  type RawAxiosResponseHeaders,
+} from 'axios';
 import { API_BASE_URL, API_TIMEOUT_MS, APP_VERSION } from '../../config';
+import {
+  BACKEND_WAKING_CODE,
+  BackendWakingError,
+  PLEASE_RETRY_MESSAGE,
+  isWakingResponse,
+  waitForBackendReady,
+} from './wakeup';
+
+declare module 'axios' {
+  export interface AxiosRequestConfig {
+    /**
+     * Whether the request may be sent again after the backend wakes up.
+     * Defaults to true for GET/HEAD/OPTIONS only; GraphQL sets it per operation.
+     */
+    replaySafe?: boolean;
+  }
+}
 
 /** One wrong field from a VALIDATION_FAILED error. */
 export type ApiErrorDetail = { path: string; message: string };
@@ -13,6 +37,8 @@ export class ApiError extends Error {
   /** Quote it in bug reports; the backend team finds the exact call by it. */
   requestId?: string;
   details?: ApiErrorDetail[];
+  /** Set on a BACKEND_WAKING error: re-sends the same request, same headers. */
+  retry?: () => Promise<unknown>;
 
   constructor(
     message: string,
@@ -96,10 +122,27 @@ const BASE_HEADERS = {
   'x-app-version': APP_VERSION,
 };
 
+// Runs before axios parses the body, so a waking HTML page never hits JSON.parse.
+function detectBackendWaking(
+  this: InternalAxiosRequestConfig,
+  data: unknown,
+  headers: RawAxiosResponseHeaders | AxiosResponseHeaders,
+  status?: number,
+) {
+  if (isWakingResponse(status, headers)) {
+    throw new BackendWakingError(this);
+  }
+  return data;
+}
+
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: API_TIMEOUT_MS,
   headers: BASE_HEADERS,
+  transformResponse: [
+    detectBackendWaking,
+    ...(axios.defaults.transformResponse as AxiosResponseTransformer[]),
+  ],
 });
 
 apiClient.interceptors.request.use(config => {
@@ -154,11 +197,43 @@ function refreshTokens(): Promise<AuthTokens | null> {
   return refreshing;
 }
 
-type RetriableConfig = InternalAxiosRequestConfig & { retried?: boolean };
+type RetriableConfig = InternalAxiosRequestConfig & {
+  retried?: boolean;
+  wakeRetried?: boolean;
+};
+
+const READ_METHODS = ['get', 'head', 'options'];
+
+/**
+ * Waits for the backend, then re-sends reads once. A mutation is never sent
+ * again: it rejects with the same headers (Idempotency-Key) for a manual retry.
+ */
+async function recoverFromWaking(
+  config: RetriableConfig,
+): Promise<AxiosResponse> {
+  await waitForBackendReady();
+  const replaySafe =
+    config.replaySafe ??
+    READ_METHODS.includes((config.method ?? 'get').toLowerCase());
+  if (replaySafe && !config.wakeRetried) {
+    config.wakeRetried = true;
+    return apiClient(config);
+  }
+  const error = new ApiError(PLEASE_RETRY_MESSAGE, undefined, undefined, {
+    code: BACKEND_WAKING_CODE,
+  });
+  if (!replaySafe) {
+    error.retry = () => apiClient.request(config);
+  }
+  throw error;
+}
 
 apiClient.interceptors.response.use(
   response => response,
-  async (error: AxiosError) => {
+  async (error: AxiosError | BackendWakingError) => {
+    if (error instanceof BackendWakingError) {
+      return recoverFromWaking(error.config as RetriableConfig);
+    }
     const config = error.config as RetriableConfig | undefined;
     // An expired access token: refresh once and replay the request with the
     // same headers (so a save keeps its Idempotency-Key).

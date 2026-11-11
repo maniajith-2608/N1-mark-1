@@ -1,4 +1,5 @@
-import apiClient, { toApiError } from './apiClient';
+import apiClient, { ApiError, toApiError } from './apiClient';
+import { BACKEND_WAKING_CODE } from './wakeup';
 
 type GraphQLResponse<T> = { data?: T | null; errors?: unknown[] };
 
@@ -26,18 +27,28 @@ export async function graphqlRequest<T>(
   headers?: Record<string, string>,
 ): Promise<T> {
   const isMutation = /^\s*mutation\b/.test(query);
-  const { status, data } = await apiClient.post<GraphQLResponse<T>>(
-    '/graphql',
-    { query, variables },
-    {
-      headers: {
-        ...(isMutation ? { 'Idempotency-Key': newIdempotencyKey() } : {}),
-        ...headers,
-      },
-    },
-  );
-  if (data.errors?.length || !data.data) {
-    throw toApiError(status, data);
+  // Built once, so a manual retry after a wake-up reuses the same key.
+  const requestHeaders = {
+    ...(isMutation ? { 'Idempotency-Key': newIdempotencyKey() } : {}),
+    ...headers,
+  };
+  const send = async (): Promise<T> => {
+    const { status, data } = await apiClient.post<GraphQLResponse<T>>(
+      '/graphql',
+      { query, variables },
+      { headers: requestHeaders, replaySafe: !isMutation },
+    );
+    if (data.errors?.length || !data.data) {
+      throw toApiError(status, data);
+    }
+    return data.data;
+  };
+  try {
+    return await send();
+  } catch (error) {
+    if (error instanceof ApiError && error.code === BACKEND_WAKING_CODE) {
+      error.retry = send;
+    }
+    throw error;
   }
-  return data.data;
 }
