@@ -9,6 +9,7 @@
     "start": "react-native start",
     "test": "jest",
     "web": "webpack serve --mode development",
+    "web:live": "N1_API_PROXY_TARGET=https://api.app.none1.in webpack serve --mode development",
     "build:web": "webpack --mode production"
   },
   "dependencies": {

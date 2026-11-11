@@ -319,18 +319,64 @@ async function myJobs(): Promise<JobCard[]> {
   return nodes.map(toJobCard);
 }
 
-/** One mutation that answers with the job card. */
+/**
+ * The production moves, each a fixed document. Production runs only
+ * documents whose exact text is registered (backend N1C-031), so a document
+ * must never be built at runtime: its text, and so its hash, must be known at
+ * build time.
+ */
+const JOB_CARD_MUTATIONS = {
+  updateJobCardRoute: `mutation UpdateJobCardRoute($id: ID!, $steps: [JobRouteStepInput!]!) {
+      updateJobCardRoute(id: $id, steps: $steps) { ...JobCardFields }
+    }
+    ${JOB_CARD_FIELDS}`,
+  assignJobOperation: `mutation AssignJobOperation($operationId: ID!, $operatorId: ID!) {
+      assignJobOperation(operationId: $operationId, operatorId: $operatorId) { ...JobCardFields }
+    }
+    ${JOB_CARD_FIELDS}`,
+  startJobStep: `mutation StartJobStep($input: StartJobStepInput!) {
+      startJobStep(input: $input) { ...JobCardFields }
+    }
+    ${JOB_CARD_FIELDS}`,
+  pauseJobStep: `mutation PauseJobStep($input: PauseJobStepInput!) {
+      pauseJobStep(input: $input) { ...JobCardFields }
+    }
+    ${JOB_CARD_FIELDS}`,
+  resumeJobStep: `mutation ResumeJobStep($operationId: ID!) {
+      resumeJobStep(operationId: $operationId) { ...JobCardFields }
+    }
+    ${JOB_CARD_FIELDS}`,
+  completeJobStep: `mutation CompleteJobStep($input: CompleteJobStepInput!) {
+      completeJobStep(input: $input) { ...JobCardFields }
+    }
+    ${JOB_CARD_FIELDS}`,
+  setJobCardDesignApproval: `mutation SetJobCardDesignApproval($id: ID!, $approval: DesignApproval!) {
+      setJobCardDesignApproval(id: $id, approval: $approval) { ...JobCardFields }
+    }
+    ${JOB_CARD_FIELDS}`,
+  saveJobCardRawMaterial: `mutation SaveJobCardRawMaterial($id: ID!, $input: RawMaterialInput!) {
+      saveJobCardRawMaterial(id: $id, input: $input) { ...JobCardFields }
+    }
+    ${JOB_CARD_FIELDS}`,
+  watchJob: `mutation WatchJob($id: ID!) {
+      watchJob(id: $id) { ...JobCardFields }
+    }
+    ${JOB_CARD_FIELDS}`,
+  unwatchJob: `mutation UnwatchJob($id: ID!) {
+      unwatchJob(id: $id) { ...JobCardFields }
+    }
+    ${JOB_CARD_FIELDS}`,
+} as const;
+
+type JobCardMutation = keyof typeof JOB_CARD_MUTATIONS;
+
+/** One production move; it answers with the job card. */
 async function mutate(
-  field: string,
-  signature: string,
-  args: string,
+  field: JobCardMutation,
   variables: Record<string, unknown>,
 ): Promise<JobCard> {
   const data = await graphqlRequest<Record<string, JobCardNode>>(
-    `mutation ${field[0].toUpperCase()}${field.slice(1)}(${signature}) {
-      ${field}(${args}) { ...JobCardFields }
-    }
-    ${JOB_CARD_FIELDS}`,
+    JOB_CARD_MUTATIONS[field],
     variables,
   );
   return toJobCard(data[field]);
@@ -374,19 +420,15 @@ async function recordQc(input: QcRecordInput): Promise<JobCard> {
 async function run(id: string, command: JobCardCommand): Promise<JobCard> {
   switch (command.type) {
     case 'route':
-      return mutate(
-        'updateJobCardRoute',
-        '$id: ID!, $steps: [JobRouteStepInput!]!',
-        'id: $id, steps: $steps',
-        { id, steps: command.steps.map(step => definedOnly(step)) },
-      );
+      return mutate('updateJobCardRoute', {
+        id,
+        steps: command.steps.map(step => definedOnly(step)),
+      });
     case 'assign':
-      return mutate(
-        'assignJobOperation',
-        '$operationId: ID!, $operatorId: ID!',
-        'operationId: $operationId, operatorId: $operatorId',
-        { operationId: command.operationId, operatorId: command.operatorId },
-      );
+      return mutate('assignJobOperation', {
+        operationId: command.operationId,
+        operatorId: command.operatorId,
+      });
     case 'start':
       // Each step needs its operator before it starts.
       if (command.operatorId) {
@@ -396,72 +438,47 @@ async function run(id: string, command: JobCardCommand): Promise<JobCard> {
           operatorId: command.operatorId,
         });
       }
-      return mutate(
-        'startJobStep',
-        '$input: StartJobStepInput!',
-        'input: $input',
-        {
-          input: {
-            operationId: command.operationId,
-            machineId: command.machineId,
-          },
+      return mutate('startJobStep', {
+        input: {
+          operationId: command.operationId,
+          machineId: command.machineId,
         },
-      );
+      });
     case 'pause':
-      return mutate(
-        'pauseJobStep',
-        '$input: PauseJobStepInput!',
-        'input: $input',
-        {
-          input: definedOnly({
-            operationId: command.operationId,
-            reason: toWireEnum(command.reason),
-            note: textOrNull(command.note) ?? undefined,
-          }),
-        },
-      );
+      return mutate('pauseJobStep', {
+        input: definedOnly({
+          operationId: command.operationId,
+          reason: toWireEnum(command.reason),
+          note: textOrNull(command.note) ?? undefined,
+        }),
+      });
     case 'resume':
-      return mutate(
-        'resumeJobStep',
-        '$operationId: ID!',
-        'operationId: $operationId',
-        { operationId: command.operationId },
-      );
+      return mutate('resumeJobStep', { operationId: command.operationId });
     case 'complete': {
       const { operationId, good, reject, rework, scrap } = command;
-      return mutate(
-        'completeJobStep',
-        '$input: CompleteJobStepInput!',
-        'input: $input',
-        { input: { operationId, good, reject, rework, scrap } },
-      );
+      return mutate('completeJobStep', {
+        input: { operationId, good, reject, rework, scrap },
+      });
     }
     case 'designApproval':
-      return mutate(
-        'setJobCardDesignApproval',
-        '$id: ID!, $approval: DesignApproval!',
-        'id: $id, approval: $approval',
-        { id, approval: toWireEnum(command.approval) },
-      );
+      return mutate('setJobCardDesignApproval', {
+        id,
+        approval: toWireEnum(command.approval),
+      });
     case 'rawMaterial': {
       const m = command.rawMaterial;
-      return mutate(
-        'saveJobCardRawMaterial',
-        '$id: ID!, $input: RawMaterialInput!',
-        'id: $id, input: $input',
-        {
-          id,
-          input: {
-            rawMaterialGrade: textOrNull(m.rawMaterialGrade),
-            rawMaterialSize: textOrNull(m.rawMaterialSize),
-            heatNumber: textOrNull(m.heatNumber),
-            rmPartNumber: textOrNull(m.rmPartNumber),
-            materialSource: m.materialSource
-              ? toWireEnum(m.materialSource)
-              : null,
-          },
+      return mutate('saveJobCardRawMaterial', {
+        id,
+        input: {
+          rawMaterialGrade: textOrNull(m.rawMaterialGrade),
+          rawMaterialSize: textOrNull(m.rawMaterialSize),
+          heatNumber: textOrNull(m.heatNumber),
+          rmPartNumber: textOrNull(m.rmPartNumber),
+          materialSource: m.materialSource
+            ? toWireEnum(m.materialSource)
+            : null,
         },
-      );
+      });
     }
     case 'recordQc': {
       const { kind, operationId, passed, remark, inspector } = command;
@@ -491,9 +508,9 @@ async function run(id: string, command: JobCardCommand): Promise<JobCard> {
       return get(id);
     }
     case 'watch':
-      return mutate('watchJob', '$id: ID!', 'id: $id', { id });
+      return mutate('watchJob', { id });
     case 'unwatch':
-      return mutate('unwatchJob', '$id: ID!', 'id: $id', { id });
+      return mutate('unwatchJob', { id });
   }
 }
 

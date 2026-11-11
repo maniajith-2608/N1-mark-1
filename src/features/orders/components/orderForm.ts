@@ -138,6 +138,7 @@ export const REQUIRED_ORDER_FIELDS = [
   'poNumber',
   'partName',
   'drawingNumber',
+  'quantity',
 ] as const satisfies (keyof OrderFormValues)[];
 
 /** Required fields, then format checks on the rest. */
