@@ -98,6 +98,13 @@ jest.mock('@react-native-community/datetimepicker', () => {
   };
 });
 
+// MMKV needs the native Nitro module, so tests save the session the way web
+// does (globalThis.localStorage, which tests may fake). keyValueStorage.test.ts
+// covers the native MMKV version.
+jest.mock('./src/features/auth/keyValueStorage', () =>
+  jest.requireActual('./src/features/auth/keyValueStorage.web'),
+);
+
 // Tests never reach the N1 Core API: these features run on in-memory stand-ins.
 jest.mock('./src/features/auth/api/authApi', () =>
   jest.requireActual('./src/features/auth/api/mockAuthApi'),

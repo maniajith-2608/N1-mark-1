@@ -55,7 +55,7 @@ function* watchTokens() {
 }
 
 export default function* sessionSaga() {
-  // A page refresh picks up where the saved session left off.
+  // A web refresh or a native relaunch picks up the saved session.
   setAuthTokens(loadSessionTokens());
   yield fork(watchTokens);
   yield takeEvery(sessionActions.signIn.type, saveSignIn);
