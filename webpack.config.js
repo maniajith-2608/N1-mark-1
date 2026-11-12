@@ -94,6 +94,8 @@ module.exports = (env, argv) => {
         // S3 only accepts browser uploads from the deployed app's origin, so
         // the dev server forwards them through /s3 (see the proxy below).
         'process.env.N1_UPLOAD_PROXY': JSON.stringify(isDev ? '/s3' : ''),
+        // Native-only backend switch (src/config/env.ts); web uses N1_API_URL.
+        'process.env.N1_APP_ENV': JSON.stringify(''),
         __REACT_NATIVE_VERSION__: JSON.stringify(
           require(path.resolve(
             appDirectory,
