@@ -1,24 +1,17 @@
 import type { AuthTokens } from '../../services/api';
 import { USER_ROLES, type UserRole } from './constants';
+import { keyValueStorage, type KeyValueStorage } from './keyValueStorage';
 
 const KEY = 'n1.session.role';
 const TOKENS_KEY = 'n1.session.tokens';
 
-/** The part of the browser's localStorage used here. */
-type KeyValueStorage = {
-  getItem: (key: string) => string | null;
-  setItem: (key: string, value: string) => void;
-  removeItem: (key: string) => void;
-};
 const ROLES = Object.values(USER_ROLES) as string[];
 
-// Web keeps the signed-in role across refreshes; native (and tests) have no
-// localStorage, so the session lasts until the app closes.
+// The signed-in session survives a web refresh and a native app being killed
+// (localStorage on web, MMKV on iOS / Android); only logout clears it.
 function storage(): KeyValueStorage | null {
   try {
-    return (
-      (globalThis as { localStorage?: KeyValueStorage }).localStorage ?? null
-    );
+    return keyValueStorage();
   } catch {
     return null;
   }
