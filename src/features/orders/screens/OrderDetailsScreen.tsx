@@ -69,7 +69,7 @@ import {
   printDrawingWithQr,
   qrPrintHtml,
 } from '../printing';
-import { orderHeading, orderQrValue } from '../utils';
+import { orderDrawingQr, orderHeading, orderQrValue } from '../utils';
 
 const D = ORDER_STRINGS.details;
 const F = ORDER_STRINGS.form;
@@ -519,6 +519,7 @@ export function OrderDetailsScreen({
       drawingNumber: drawingNo,
       doc,
       company: order.customerName,
+      qr: orderDrawingQr(order),
     });
   const previewDrawing = (doc: Attachment) =>
     setViewing({

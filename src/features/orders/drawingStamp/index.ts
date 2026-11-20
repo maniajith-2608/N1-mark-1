@@ -6,4 +6,4 @@ export {
 } from './stampDrawing';
 export { findQrSpot, inkMapFromPixels } from './findQrSpot';
 export type { InkMap, QrSpot, QrSpotOptions } from './findQrSpot';
-export type { StampedDrawing, StampedPreview } from './types';
+export type { DrawingQr, StampedDrawing, StampedPreview } from './types';

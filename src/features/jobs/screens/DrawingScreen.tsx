@@ -16,6 +16,8 @@ import { notifyUnavailable } from '../../../shared/utils';
 import { useAppSelector } from '../../../app/store/hooks';
 import { useJobCardForOrder } from '../../jobCards';
 import { DrawingPreview, ORDER_STRINGS, orderHeading } from '../../orders';
+import { DRAWING_QR } from '../../orders/constants';
+import { orderDrawingQr } from '../../orders/utils';
 import { VIEW } from '../../orders/components/DrawingPreview';
 import { useDrawingThumbnail } from '../../orders/hooks/useDrawingThumbnail';
 import { selectOrderById } from '../../orders/store/selectors';
@@ -52,7 +54,14 @@ export function DrawingScreen({
   const drawingNumber = order?.drawingNumber || D.noDrawing;
   const designFile = order?.designFile ?? undefined;
   const company = order?.customerName ?? '';
-  const thumbnail = useDrawingThumbnail(designFile, company);
+  // Drawn large, so small dimensions stay readable when zoomed in, and as
+  // it prints: the order QR on it.
+  const thumbnail = useDrawingThumbnail(
+    designFile,
+    company,
+    DRAWING_QR.fullViewPixels,
+    order ? orderDrawingQr(order) : undefined,
+  );
   // As it prints: the order's QR stamped on, no customer name, address or
   // logo.
   const openFile = useCallback(() => {
@@ -142,6 +151,7 @@ export function DrawingScreen({
         drawingNumber={drawingNumber}
         uri={thumbnail}
         style={styles.drawing}
+        zoomable
       />
     </UserScreen>
   );

@@ -38,10 +38,10 @@ export const ORDER_STRINGS = {
       `Open job card for ${workOrderLabel(number)}`,
   },
   workOrder: workOrderLabel,
-  /** Labels for the order details encoded under the WO number in its QR code. */
+  /** Labels for the order details printed beside its QR (never the customer). */
   qr: {
-    customer: 'Customer',
     part: 'Part',
+    description: 'Description',
     partNumber: 'Part no',
     drawingNumber: 'Drawing no',
     poNumber: 'PO no',
@@ -289,6 +289,11 @@ export const DRAWING_QR = {
   mapPixels: 1000,
   /** The drawing thumbnail's longer side: sharp at twice its on-screen size. */
   thumbnailPixels: 600,
+  /**
+   * The full-screen drawing's longer side: small dimensions on an A3 sheet
+   * stay readable on a phone, zoomed in.
+   */
+  fullViewPixels: 2400,
   /** The QR preview's longer side: the code's modules stay distinct. */
   previewPixels: 1400,
   /** A picture drawing is treated as a sheet this long (A3). */

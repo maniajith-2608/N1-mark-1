@@ -15,7 +15,9 @@ import {
   PriorityBadge,
   orderHeading,
 } from '../../orders';
+import { DRAWING_QR } from '../../orders/constants';
 import { useDrawingThumbnail } from '../../orders/hooks/useDrawingThumbnail';
+import { orderDrawingQr } from '../../orders/utils';
 import { JOBS_STRINGS } from '../constants';
 import type { JobsScreenProps, OrderView } from '../types';
 
@@ -61,9 +63,12 @@ export const OrderSummaryTile = memo(function OrderSummaryTileComponent({
 }) {
   const styles = useN1Styles(makeStyles);
   const drawingNumber = order.drawingNumber || D.noDrawing;
+  // As it prints, with the order QR on it.
   const thumbnail = useDrawingThumbnail(
     order.designFile ?? undefined,
     order.customerName,
+    DRAWING_QR.thumbnailPixels,
+    orderDrawingQr(order),
   );
   const navigation =
     useNavigation<JobsScreenProps<'ImportOrder'>['navigation']>();

@@ -70,7 +70,7 @@ import { printOrNotify } from '../../../services/print';
 import { ORDER_STRINGS } from '../../orders/constants';
 import { orderDrawings } from '../../orders/drawings';
 import { drawingPrintHtml, printDrawingWithQr } from '../../orders/printing';
-import { orderHeading, orderQrValue } from '../../orders/utils';
+import { orderDrawingQr, orderHeading, orderQrValue } from '../../orders/utils';
 import { COMMON_STRINGS } from '../../../shared/constants';
 import { QcHistory } from '../components/QcHistory';
 import { QcReportSheet } from '../components/QcReportSheet';
@@ -731,6 +731,7 @@ export function JobCardDetailsScreen({
             drawingNumber,
             doc,
             company: jobCard.customerName,
+            qr: orderDrawingQr(order ?? jobCard),
           })
         }
         onPrintDrawing={printDrawing}

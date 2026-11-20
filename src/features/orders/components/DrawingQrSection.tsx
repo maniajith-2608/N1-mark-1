@@ -13,7 +13,7 @@ import {
   ORDER_QR_SIZE,
 } from '../../../shared/constants';
 import type { Attachment } from '../../../shared/types';
-import { ORDER_STRINGS } from '../constants';
+import { DRAWING_QR, ORDER_STRINGS } from '../constants';
 import { useDrawingThumbnail } from '../hooks/useDrawingThumbnail';
 import { DocumentList } from './DocumentList';
 import { DrawingPreview } from './DrawingPreview';
@@ -109,7 +109,13 @@ export const DrawingQrSection = memo(function DrawingQrSectionComponent({
   );
   // The thumbnail and buttons are for the first file.
   const [first] = drawings;
-  const thumbnail = useDrawingThumbnail(first, company);
+  // As it prints: the order QR, with the WO number (its first line) above.
+  const thumbnail = useDrawingThumbnail(
+    first,
+    company,
+    DRAWING_QR.thumbnailPixels,
+    { value: qrValue, label: qrValue.split('\n')[0] },
+  );
   const viewFirst = () => onViewDrawing(first);
   const printFirst = () => onPrintDrawing(first);
   return (

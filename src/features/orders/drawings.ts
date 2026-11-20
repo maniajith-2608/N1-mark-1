@@ -5,7 +5,12 @@ import {
 import { reserveTab } from '../../services/files/viewDocument';
 import { escapeHtml } from '../../services/print/printPage';
 import type { Attachment } from '../../shared/types';
-import { maskedDrawing, stampedPreview } from './drawingStamp';
+import {
+  maskedDrawing,
+  stampDrawing,
+  stampedPreview,
+  type DrawingQr,
+} from './drawingStamp';
 import { DRAWING_KIND, ORDER_STRINGS } from './constants';
 import type { OrderSummary, WorkOrder } from './types';
 import { orderQrValue } from './utils';
@@ -59,6 +64,37 @@ export async function openMaskedDrawing(
   try {
     const masked = await maskedDrawing(doc, company).catch(() => null);
     return tab.open(masked ?? doc.uri ?? (await fileDownloadUrl(doc.id)));
+  } catch (error) {
+    tab.close();
+    throw error;
+  }
+}
+
+/**
+ * Downloads (opens) the drawing as it prints: the order QR and WO number
+ * (`qr`) stamped on every page, the customer's (`company`) details blanked.
+ * Files that can't be stamped here (DWG, STEP) open masked or as stored.
+ * False when nothing opened.
+ */
+export async function downloadDrawingWithQr(
+  doc: Attachment,
+  qr: DrawingQr,
+  company: string,
+): Promise<boolean> {
+  const tab = reserveTab();
+  if (!tab) {
+    return openStoredFile(doc);
+  }
+  try {
+    const stamped = await stampDrawing(doc, qr.value, company, qr.label).catch(
+      () => null,
+    );
+    const masked = stamped
+      ? null
+      : await maskedDrawing(doc, company).catch(() => null);
+    return tab.open(
+      stamped?.url ?? masked ?? doc.uri ?? (await fileDownloadUrl(doc.id)),
+    );
   } catch (error) {
     tab.close();
     throw error;

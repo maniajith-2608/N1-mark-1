@@ -16,8 +16,9 @@ import {
 import { useHeldWhileVisible } from '../../../shared/hooks';
 import type { Attachment } from '../../../shared/types';
 import { formatFileSize } from '../../../shared/utils';
-import { ORDER_STRINGS } from '../constants';
-import { openMaskedDrawing } from '../drawings';
+import { DRAWING_QR, ORDER_STRINGS } from '../constants';
+import type { DrawingQr } from '../drawingStamp';
+import { downloadDrawingWithQr, openMaskedDrawing } from '../drawings';
 import { useDrawingThumbnail } from '../hooks/useDrawingThumbnail';
 import { useStampedPreview } from '../hooks/useStampedPreview';
 import { DrawingPreview } from './DrawingPreview';
@@ -74,14 +75,16 @@ const makeStyles = createN1Styles(t => ({
 export type ViewerTarget =
   | { type: 'document'; doc: Attachment }
   /**
-   * `doc`: the uploaded drawing file, shown by its first page with the
-   * customer's (`company`) details blanked, as when printing.
+   * `doc`: the uploaded drawing file, shown with the customer's (`company`)
+   * details blanked, as when printing; given `qr`, every page with the order
+   * QR on it (as 'drawingQr'), and it downloads that way too.
    */
   | {
       type: 'drawing';
       drawingNumber: string;
       doc?: Attachment;
       company: string;
+      qr?: DrawingQr;
     }
   /** The drawing file as it prints: the order QR on every page. */
   | {
@@ -98,6 +101,19 @@ export type ViewerTarget =
 
 const isDrawing = (target: ViewerTarget | null) =>
   target?.type === 'drawing' || target?.type === 'drawingQr';
+
+/** The drawing to show with the order QR on every page, if any. */
+const stampedOf = (target: ViewerTarget | null) =>
+  target?.type === 'drawingQr'
+    ? target
+    : target?.type === 'drawing' && target.doc && target.qr
+    ? {
+        doc: target.doc,
+        qrValue: target.qr.value,
+        company: target.company,
+        label: target.qr.label,
+      }
+    : null;
 
 type Props = {
   target: ViewerTarget | null;
@@ -126,27 +142,37 @@ export function DocumentViewer({
   // Kept while the dialog fades out.
   const target = useHeldWhileVisible(visible, targetProp);
   const doc = target?.doc ?? null;
+  // The opened drawing is drawn large, so its small text stays sharp.
+  const withQr = stampedOf(target);
   const thumbnail = useDrawingThumbnail(
-    target?.type === 'drawing' ? target.doc : undefined,
+    target?.type === 'drawing' && !withQr ? target.doc : undefined,
     target?.type === 'drawing' ? target.company : '',
+    DRAWING_QR.fullViewPixels,
   );
-  // A drawing downloads masked too; other documents as stored.
+  // A drawing downloads as it prints (QR on every page) when it has one,
+  // else masked; other documents as stored.
   const download = (file: Attachment) =>
-    target?.type === 'drawing' || target?.type === 'drawingQr'
+    withQr
+      ? downloadDrawingWithQr(
+          file,
+          { value: withQr.qrValue, label: withQr.label },
+          withQr.company,
+        ).catch(() => onDownload(file))
+      : target?.type === 'drawing'
       ? openMaskedDrawing(file, target.company).catch(() => onDownload(file))
       : onDownload(file);
   const stamped = useStampedPreview(
-    target?.type === 'drawingQr' ? target.doc : undefined,
-    target?.type === 'drawingQr' ? target.qrValue : '',
-    target?.type === 'drawingQr' ? target.company : '',
-    target?.type === 'drawingQr' ? target.label : '',
+    withQr?.doc,
+    withQr?.qrValue ?? '',
+    withQr?.company ?? '',
+    withQr?.label ?? '',
   );
 
   const body = () => {
     if (!target) {
       return null;
     }
-    if (target.type === 'drawingQr') {
+    if (withQr) {
       const crowded = stamped.preview?.crowdedPages ?? [];
       return (
         <AsyncContent
@@ -183,6 +209,7 @@ export function DocumentViewer({
           drawingNumber={target.drawingNumber}
           uri={thumbnail}
           style={thumbnail ? styles.drawing : undefined}
+          zoomable
         />
       );
     }

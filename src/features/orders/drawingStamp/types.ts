@@ -1,3 +1,6 @@
+/** The order QR stamped on a drawing, and the WO number above it. */
+export type DrawingQr = { value: string; label: string };
+
 /** A drawing with the order QR on every page, ready to print. */
 export type StampedDrawing = {
   /** A link to the stamped PDF, valid until the page reloads. */
