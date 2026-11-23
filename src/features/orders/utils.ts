@@ -1,4 +1,4 @@
-import { formatDate, workOrderSearchTerms } from '../../shared/utils';
+import { workOrderSearchTerms } from '../../shared/utils';
 import { matchesAny } from '../../shared/hooks';
 import { ORDER_STRINGS, PRIORITY_META } from './constants';
 import type { JobCard } from '../jobCards/types';
@@ -36,28 +36,22 @@ export const orderHeading = (
     .join(' · ');
 
 /**
- * What an order's QR code holds: the WO number on the first line, which is all
- * the Scan QR screen reads, then the entered details for anyone scanning it
- * with a phone camera. Blank details are left out.
+ * What an order's QR code holds: the WO number and nothing else. The Scan QR
+ * screen reads it, and a phone camera shows only "WO #1042", never the
+ * customer or order details (it is printed on drawings whose customer details
+ * are blanked).
  */
-export function orderQrValue(o: OrderSummary): string {
-  const Q = ORDER_STRINGS.qr;
-  const details: [string, string][] = [
-    [Q.customer, o.customerName],
-    [Q.part, orderTitle(o)],
-    [Q.partNumber, o.partNumber],
-    [Q.drawingNumber, o.drawingNumber],
-    [Q.poNumber, o.poNumber],
-    [Q.quantity, o.quantity ? String(o.quantity) : ''],
-    [Q.dueDate, formatDate(o.dueDate)],
-  ];
-  return [
-    ORDER_STRINGS.workOrder(o.number),
-    ...details
-      .filter(([, value]) => value.trim())
-      .map(([label, value]) => `${label}: ${value.trim()}`),
-  ].join('\n');
-}
+export const orderQrValue = (o: Pick<OrderSummary, 'number'>): string =>
+  ORDER_STRINGS.workOrder(o.number);
+
+/**
+ * The QR stamped on an order's drawings wherever they show, print or
+ * download, with the WO number above it.
+ */
+export const orderDrawingQr = (o: Pick<OrderSummary, 'number'>) => ({
+  value: orderQrValue(o),
+  label: ORDER_STRINGS.workOrder(o.number),
+});
 
 /** High before medium before low; then earliest due date; undated last. */
 export function compareOrders(a: WorkOrder, b: WorkOrder): number {

@@ -27,7 +27,8 @@ import {
   type TextLine,
 } from './companyArea';
 import { findQrSpot, inkMapFromPixels, type QrSpot } from './findQrSpot';
-import type { StampedDrawing, StampedPreview } from './types';
+import { removeWatermarks } from './removeWatermarks';
+import type { DrawingQr, StampedDrawing, StampedPreview } from './types';
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
@@ -355,8 +356,9 @@ async function drawingPdfBytes(doc: Attachment) {
   if (!type) {
     return null;
   }
+  // Watermarks never reach print, preview, download or a thumbnail.
   return type === PDF_TYPE
-    ? new Uint8Array(await blob.arrayBuffer())
+    ? removeWatermarks(new Uint8Array(await blob.arrayBuffer()))
     : imageAsPdf(blob, type);
 }
 
@@ -364,12 +366,14 @@ async function drawingPdfBytes(doc: Attachment) {
  * The stamped PDF's bytes, or null for files that can't be drawn here.
  * `company`: the customer, whose name, address and logo are blanked.
  * `label`: printed above the QR, e.g. "WO #13"; blank for none.
+ * `maxPages`: stamp only the first pages (a thumbnail needs one).
  */
 async function stampedBytes(
   doc: Attachment,
   qrValue: string,
   company: string,
   label: string,
+  maxPages = Infinity,
 ) {
   const bytes = await drawingPdfBytes(doc);
   if (!bytes) {
@@ -382,7 +386,7 @@ async function stampedBytes(
   const font = label ? await pdf.embedFont(StandardFonts.HelveticaBold) : null;
   const crowdedPages: number[] = [];
   try {
-    for (let i = 0; i < pages.length; i++) {
+    for (let i = 0; i < Math.min(pages.length, maxPages); i++) {
       const { spot, band, hidden, viewport } = await spotOnPage(
         await source.getPage(i + 1),
         company,
@@ -492,15 +496,42 @@ export async function maskedDrawing(
   return browser.URL.createObjectURL(blob);
 }
 
+/** The stamped drawing's first page as a PNG `pixels` long. */
+async function stampedFirstPage(
+  doc: Attachment,
+  company: string,
+  pixels: number,
+  qr: DrawingQr,
+): Promise<string | null> {
+  const stamped = await stampedBytes(doc, qr.value, company, qr.label, 1);
+  if (!stamped) {
+    return null;
+  }
+  const source = await pdfjs.getDocument({ data: stamped.bytes }).promise;
+  try {
+    const { canvas } = await renderPage(await source.getPage(1), pixels);
+    return canvas.toDataURL('image/png');
+  } finally {
+    source.destroy();
+  }
+}
+
 /**
- * The drawing's first page as an image, for its thumbnail, with the
- * customer's details (`company`) blanked as when printing. Null for files
- * that can't be drawn here (DWG, STEP…).
+ * The drawing's first page as an image, `pixels` long on its longer side
+ * (small for a thumbnail, large for the full-screen view), with the
+ * customer's details (`company`) blanked as when printing and, given `qr`,
+ * the order QR stamped on as it prints. Null for files that can't be drawn
+ * here (DWG, STEP…).
  */
 export async function drawingThumbnail(
   doc: Attachment,
   company = '',
+  pixels: number = DRAWING_QR.thumbnailPixels,
+  qr?: DrawingQr,
 ): Promise<string | null> {
+  if (qr) {
+    return stampedFirstPage(doc, company, pixels, qr);
+  }
   if (doc.uri?.startsWith('data:image')) {
     return doc.uri;
   }
@@ -509,15 +540,12 @@ export async function drawingThumbnail(
   if (type !== PDF_TYPE) {
     return type ? browser.URL.createObjectURL(blob) : null;
   }
-  const data = new Uint8Array(await blob.arrayBuffer());
+  const data = await removeWatermarks(new Uint8Array(await blob.arrayBuffer()));
   const source = await pdfjs.getDocument({ data }).promise;
   try {
     const page = await source.getPage(1);
     const { hidden, viewport: found } = await companyDetails(page, company);
-    const { canvas, context, viewport } = await renderPage(
-      page,
-      DRAWING_QR.thumbnailPixels,
-    );
+    const { canvas, context, viewport } = await renderPage(page, pixels);
     // Found on a smaller drawing of the same page: scale up to this one.
     const k = viewport.scale / found.scale;
     context.fillStyle = lightTheme.colors.qrBackground;

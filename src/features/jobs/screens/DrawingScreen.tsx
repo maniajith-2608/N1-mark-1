@@ -12,14 +12,18 @@ import {
   useN1Styles,
 } from '../../../shared/components';
 import { printOrNotify } from '../../../services/print';
-import { notifyUnavailable } from '../../../shared/utils';
 import { useAppSelector } from '../../../app/store/hooks';
 import { useJobCardForOrder } from '../../jobCards';
 import { DrawingPreview, ORDER_STRINGS, orderHeading } from '../../orders';
+import { DRAWING_QR } from '../../orders/constants';
+import { orderDrawingQr } from '../../orders/utils';
 import { VIEW } from '../../orders/components/DrawingPreview';
 import { useDrawingThumbnail } from '../../orders/hooks/useDrawingThumbnail';
 import { selectOrderById } from '../../orders/store/selectors';
-import { openDrawingWithQr } from '../../orders/drawings';
+import {
+  notifyDrawingNotOpened,
+  openDrawingWithQr,
+} from '../../orders/drawings';
 import { drawingPrintHtml, printDrawingWithQr } from '../../orders/printing';
 import type { JobsScreenProps } from '../types';
 import { jobViewOf } from '../utils';
@@ -28,8 +32,10 @@ const D = ORDER_STRINGS.details;
 
 const makeStyles = createN1Styles(t => ({
   heading: { gap: t.spacing.xxs },
-  // As wide as the screen, in the drawing's own proportions.
+  // The placeholder: as wide as the screen, in its own proportions.
   drawing: { height: undefined, width: '100%', aspectRatio: VIEW.w / VIEW.h },
+  // The real drawing: all the room left under the heading, to zoom into.
+  drawingFill: { height: undefined, flex: 1 },
 }));
 
 /**
@@ -52,14 +58,21 @@ export function DrawingScreen({
   const drawingNumber = order?.drawingNumber || D.noDrawing;
   const designFile = order?.designFile ?? undefined;
   const company = order?.customerName ?? '';
-  const thumbnail = useDrawingThumbnail(designFile, company);
+  // Drawn large, so small dimensions stay readable when zoomed in, and as
+  // it prints: the order QR on it.
+  const thumbnail = useDrawingThumbnail(
+    designFile,
+    company,
+    DRAWING_QR.fullViewPixels,
+    order ? orderDrawingQr(order) : undefined,
+  );
   // As it prints: the order's QR stamped on, no customer name, address or
   // logo.
   const openFile = useCallback(() => {
     if (designFile && order) {
       openDrawingWithQr(designFile, order)
-        .then(opened => opened || notifyUnavailable(D.downloadAction))
-        .catch(() => notifyUnavailable(D.downloadAction));
+        .then(opened => opened || notifyDrawingNotOpened())
+        .catch(notifyDrawingNotOpened);
     }
   }, [designFile, order]);
 
@@ -101,6 +114,7 @@ export function DrawingScreen({
   return (
     <UserScreen
       header={header}
+      fill
       // Phones: just the drawing, without Open in new tab or Print.
       footer={
         isCompact
@@ -141,7 +155,8 @@ export function DrawingScreen({
       <DrawingPreview
         drawingNumber={drawingNumber}
         uri={thumbnail}
-        style={styles.drawing}
+        style={thumbnail ? styles.drawingFill : styles.drawing}
+        zoomable
       />
     </UserScreen>
   );

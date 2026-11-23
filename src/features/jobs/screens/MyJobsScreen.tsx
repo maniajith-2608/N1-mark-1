@@ -11,8 +11,8 @@ import { COMMON_STRINGS } from '../../../shared/constants';
 import { useListFilter } from '../../../shared/hooks';
 import {
   currentOperation,
-  jobCardSearchText,
   jobCardStage,
+  shopFloorJobSearchText,
   stageMeta,
   type JobCard,
 } from '../../jobCards';
@@ -57,7 +57,7 @@ export function MyJobsScreen() {
   const rows = ROLE_JOBS[role].list === 'rows';
   const [filters, setFilters] = useState<FilterValues>({});
   const { query, setQuery, filtered } = useListFilter(items, {
-    getSearchText: jobCardSearchText,
+    getSearchText: shopFloorJobSearchText,
   });
   const shown = useMemo(
     () => filtered.filter(c => matchesFilters(c, filters)),

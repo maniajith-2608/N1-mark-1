@@ -16,8 +16,13 @@ import {
 import { useHeldWhileVisible } from '../../../shared/hooks';
 import type { Attachment } from '../../../shared/types';
 import { formatFileSize } from '../../../shared/utils';
-import { ORDER_STRINGS } from '../constants';
-import { openMaskedDrawing } from '../drawings';
+import { DRAWING_QR, ORDER_STRINGS } from '../constants';
+import type { DrawingQr } from '../drawingStamp';
+import {
+  downloadDrawingWithQr,
+  notifyDrawingNotOpened,
+  openMaskedDrawing,
+} from '../drawings';
 import { useDrawingThumbnail } from '../hooks/useDrawingThumbnail';
 import { useStampedPreview } from '../hooks/useStampedPreview';
 import { DrawingPreview } from './DrawingPreview';
@@ -29,8 +34,10 @@ const D = ORDER_STRINGS.details;
 const VIEWER_HEIGHT = DRAWING_PREVIEW_HEIGHT * 2;
 
 const makeStyles = createN1Styles(t => ({
-  // An uploaded drawing's page shows as large as an image.
+  // An uploaded drawing's page shows as large as an image; on phones (full
+  // screen) it takes the whole screen to zoom into.
   drawing: { height: VIEWER_HEIGHT },
+  drawingFill: { height: undefined, flex: 1 },
   image: {
     width: '100%',
     height: VIEWER_HEIGHT,
@@ -54,7 +61,8 @@ const makeStyles = createN1Styles(t => ({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // The stamped pages scroll one under another, each at its own shape.
+  // The stamped pages scroll one under another, each at its own shape: in
+  // a window of the dialog, or down the whole screen on phones.
   stampedPages: { maxHeight: VIEWER_HEIGHT },
   stampedPagesContent: { gap: t.spacing.md },
   stampedPage: {
@@ -74,14 +82,16 @@ const makeStyles = createN1Styles(t => ({
 export type ViewerTarget =
   | { type: 'document'; doc: Attachment }
   /**
-   * `doc`: the uploaded drawing file, shown by its first page with the
-   * customer's (`company`) details blanked, as when printing.
+   * `doc`: the uploaded drawing file, shown with the customer's (`company`)
+   * details blanked, as when printing; given `qr`, every page with the order
+   * QR on it (as 'drawingQr'), and it downloads that way too.
    */
   | {
       type: 'drawing';
       drawingNumber: string;
       doc?: Attachment;
       company: string;
+      qr?: DrawingQr;
     }
   /** The drawing file as it prints: the order QR on every page. */
   | {
@@ -98,6 +108,19 @@ export type ViewerTarget =
 
 const isDrawing = (target: ViewerTarget | null) =>
   target?.type === 'drawing' || target?.type === 'drawingQr';
+
+/** The drawing to show with the order QR on every page, if any. */
+const stampedOf = (target: ViewerTarget | null) =>
+  target?.type === 'drawingQr'
+    ? target
+    : target?.type === 'drawing' && target.doc && target.qr
+    ? {
+        doc: target.doc,
+        qrValue: target.qr.value,
+        company: target.company,
+        label: target.qr.label,
+      }
+    : null;
 
 type Props = {
   target: ViewerTarget | null;
@@ -126,27 +149,52 @@ export function DocumentViewer({
   // Kept while the dialog fades out.
   const target = useHeldWhileVisible(visible, targetProp);
   const doc = target?.doc ?? null;
+  // The opened drawing is drawn large, so its small text stays sharp.
+  const withQr = stampedOf(target);
   const thumbnail = useDrawingThumbnail(
-    target?.type === 'drawing' ? target.doc : undefined,
+    target?.type === 'drawing' && !withQr ? target.doc : undefined,
     target?.type === 'drawing' ? target.company : '',
+    DRAWING_QR.fullViewPixels,
   );
-  // A drawing downloads masked too; other documents as stored.
-  const download = (file: Attachment) =>
-    target?.type === 'drawing' || target?.type === 'drawingQr'
-      ? openMaskedDrawing(file, target.company).catch(() => onDownload(file))
-      : onDownload(file);
+  // A drawing downloads as it prints (QR on every page) when it has one,
+  // else masked; other documents as stored. A drawing never falls back to
+  // the stored file, which shows the customer: if it can't be prepared (or
+  // on a phone, which can't yet) the user is told instead.
+  const download = (file: Attachment) => {
+    if (!isDrawing(target)) {
+      onDownload(file);
+      return;
+    }
+    const opening = withQr
+      ? downloadDrawingWithQr(
+          file,
+          { value: withQr.qrValue, label: withQr.label },
+          withQr.company,
+        )
+      : openMaskedDrawing(
+          file,
+          target?.type === 'drawing' ? target.company : '',
+        );
+    opening
+      .then(opened => opened || notifyDrawingNotOpened())
+      .catch(notifyDrawingNotOpened);
+  };
   const stamped = useStampedPreview(
-    target?.type === 'drawingQr' ? target.doc : undefined,
-    target?.type === 'drawingQr' ? target.qrValue : '',
-    target?.type === 'drawingQr' ? target.company : '',
-    target?.type === 'drawingQr' ? target.label : '',
+    withQr?.doc,
+    withQr?.qrValue ?? '',
+    withQr?.company ?? '',
+    withQr?.label ?? '',
   );
+
+  // Phones: the opened drawing fills the screen (see styles.drawingFill).
+  const fillsScreen =
+    isCompact && target?.type === 'drawing' && !withQr && Boolean(thumbnail);
 
   const body = () => {
     if (!target) {
       return null;
     }
-    if (target.type === 'drawingQr') {
+    if (withQr) {
       const crowded = stamped.preview?.crowdedPages ?? [];
       return (
         <AsyncContent
@@ -155,7 +203,7 @@ export function DocumentViewer({
           testID="document-viewer-stamped-status"
         >
           <ScrollView
-            style={styles.stampedPages}
+            style={isCompact ? undefined : styles.stampedPages}
             contentContainerStyle={styles.stampedPagesContent}
             testID="document-viewer-stamped"
           >
@@ -182,7 +230,14 @@ export function DocumentViewer({
         <DrawingPreview
           drawingNumber={target.drawingNumber}
           uri={thumbnail}
-          style={thumbnail ? styles.drawing : undefined}
+          style={
+            thumbnail
+              ? isCompact
+                ? styles.drawingFill
+                : styles.drawing
+              : undefined
+          }
+          zoomable
         />
       );
     }
@@ -235,6 +290,7 @@ export function DocumentViewer({
       visible={visible}
       onClose={onClose}
       size="lg"
+      fill={fillsScreen}
       title={
         target?.type === 'drawing'
           ? D.drawingTitle(target.drawingNumber)

@@ -16,7 +16,8 @@ const rows = (items: { label: string; value: string | undefined }[]) =>
   );
 
 /**
- * The work order's Overview, Dispatch and Raw material, two columns each
+ * The work order's Overview (with its description, when entered), Dispatch
+ * and Raw material, two columns each
  * like the admin order (Order, Order Details). The drawing sits in
  * OrderSummaryTile above them. The job view (operator, QC) has no PO amount
  * or raw material details, so those rows are left out.
@@ -56,6 +57,11 @@ export const OrderInfo = memo(function OrderInfoComponent({
             { label: F.drawingNumber, value: order.drawingNumber },
             { label: F.poNumber, value: order.poNumber },
           ]),
+          // As on the printed QR sheet. Only when entered: the job view
+          // (from a job card) doesn't carry it, so a dash would mislead.
+          ...(order.description.trim()
+            ? [{ label: D.description, value: order.description.trim() }]
+            : []),
           // Prices are for the office: the job view has none.
           ...(order.poAmount === undefined
             ? []

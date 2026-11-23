@@ -12,6 +12,11 @@ export type UserScreenProps = {
   background?: 'surface' | 'muted';
   /** Edge to edge: no padding or gap around the content (e.g. a cover). */
   flush?: boolean;
+  /**
+   * The content is at least as tall as the screen, so a child with flex: 1
+   * takes the room left (e.g. the full-screen drawing).
+   */
+  fill?: boolean;
   children: ReactNode;
   testID?: string;
 };
@@ -29,6 +34,7 @@ const makeStyles = createN1Styles(t => ({
     padding: t.spacing.lg,
   },
   flush: { gap: 0, padding: 0 },
+  fill: { flexGrow: 1 },
 }));
 
 /** Scrolling page body for the shop-floor (non-admin) screens. */
@@ -37,6 +43,7 @@ export function UserScreen({
   footer,
   background = 'surface',
   flush = false,
+  fill = false,
   children,
   testID,
 }: UserScreenProps) {
@@ -49,7 +56,11 @@ export function UserScreen({
       {header}
       <KeyboardScrollView
         style={styles.scroll}
-        contentContainerStyle={[styles.content, flush && styles.flush]}
+        contentContainerStyle={[
+          styles.content,
+          flush && styles.flush,
+          fill && styles.fill,
+        ]}
       >
         {children}
       </KeyboardScrollView>

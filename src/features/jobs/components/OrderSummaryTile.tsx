@@ -15,7 +15,9 @@ import {
   PriorityBadge,
   orderHeading,
 } from '../../orders';
+import { DRAWING_QR } from '../../orders/constants';
 import { useDrawingThumbnail } from '../../orders/hooks/useDrawingThumbnail';
+import { orderDrawingQr } from '../../orders/utils';
 import { JOBS_STRINGS } from '../constants';
 import type { JobsScreenProps, OrderView } from '../types';
 
@@ -50,7 +52,8 @@ const makeStyles = createN1Styles(t => ({
 }));
 
 /**
- * The order's badges, heading and customer, then its drawing as a thumbnail
+ * The order's badges and heading (never the customer: this is the page a
+ * QR scan opens on the shop floor), then its drawing as a thumbnail
  * that opens the Drawing screen. Import Order and Order Details pin it
  * above their scrolling details.
  */
@@ -61,9 +64,12 @@ export const OrderSummaryTile = memo(function OrderSummaryTileComponent({
 }) {
   const styles = useN1Styles(makeStyles);
   const drawingNumber = order.drawingNumber || D.noDrawing;
+  // As it prints, with the order QR on it.
   const thumbnail = useDrawingThumbnail(
     order.designFile ?? undefined,
     order.customerName,
+    DRAWING_QR.thumbnailPixels,
+    orderDrawingQr(order),
   );
   const navigation =
     useNavigation<JobsScreenProps<'ImportOrder'>['navigation']>();
@@ -76,11 +82,6 @@ export const OrderSummaryTile = memo(function OrderSummaryTileComponent({
           {order.status && <OrderStatusBadge status={order.status} />}
         </View>
         <N1Text variant="h2">{orderHeading(order)}</N1Text>
-        {order.customerName !== '' && (
-          <N1Text weight="semiBold" color="secondary">
-            {order.customerName}
-          </N1Text>
-        )}
       </View>
       <Pressable
         accessibilityRole="button"

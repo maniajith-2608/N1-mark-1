@@ -46,9 +46,12 @@ export const jobCardTitle = (c: JobCard) =>
     .filter(Boolean)
     .join(' · ');
 
-/** "#JOB1 · Acme Metalworks" */
-export const jobCardHeading = (c: JobCard) =>
-  [JOB_CARD_STRINGS.jobCardNumber(c.code), c.customerName]
+/**
+ * "#JOB1 · Acme Metalworks"; just "#JOB1" without `showCustomer` (the shop
+ * floor never sees the customer).
+ */
+export const jobCardHeading = (c: JobCard, showCustomer = true) =>
+  [JOB_CARD_STRINGS.jobCardNumber(c.code), showCustomer && c.customerName]
     .filter(Boolean)
     .join(' · ');
 
@@ -449,14 +452,21 @@ export function routeInput(c: JobCard, steps: RouteStep[]): JobCardInput {
 
 // ---- List filters ----
 
-export const jobCardSearchText = (c: JobCard) => {
+export const jobCardSearchText = (c: JobCard, withCustomer = true) => {
   const op = currentOperation(c);
   return `${c.code} ${workOrderSearchTerms(
     c.number.replace(/^WO-?/i, ''),
-  )} ${jobTitle(c)} ${c.customerName} ${op?.name ?? ''} ${assignedMachine(
-    c,
-  )} ${assignedOperator(c)}`;
+  )} ${jobTitle(c)} ${withCustomer ? c.customerName : ''} ${
+    op?.name ?? ''
+  } ${assignedMachine(c)} ${assignedOperator(c)}`;
 };
+
+/**
+ * As jobCardSearchText, without the customer: the shop floor never sees it,
+ * so typing a customer's name mustn't find (and so reveal) their jobs.
+ */
+export const shopFloorJobSearchText = (c: JobCard) =>
+  jobCardSearchText(c, false);
 
 export const matchesJobCardFilters = (c: JobCard, f: JobCardFilters) => {
   const op = currentOperation(c);

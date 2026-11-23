@@ -8,6 +8,7 @@ import {
 } from '../../../shared/components';
 import { DRAWING_PREVIEW_HEIGHT } from '../../../shared/constants';
 import { ORDER_STRINGS } from '../constants';
+import { ZoomableDrawing } from './ZoomableDrawing';
 
 // Placeholder part outline in a 200×120 viewBox, until real drawing thumbnails
 // exist. Exported so the printed drawing (printing.ts) draws the same part.
@@ -42,12 +43,15 @@ export const DrawingPreview = memo(function DrawingPreviewComponent({
   drawingNumber,
   uri,
   style,
+  zoomable = false,
 }: {
   drawingNumber: string;
   /** The first page as an image; null or absent shows the placeholder. */
   uri?: string | null;
   /** e.g. a smaller box for a thumbnail. */
   style?: StyleProp<ViewStyle>;
+  /** Pinch and double-tap zoom on phones, for the full-screen drawing. */
+  zoomable?: boolean;
 }) {
   const styles = useN1Styles(makeStyles);
   const { colors } = useN1Theme();
@@ -59,15 +63,18 @@ export const DrawingPreview = memo(function DrawingPreviewComponent({
   const dimX = PART.x + PART.w + 12;
   const label = ORDER_STRINGS.details.drawingA11y(drawingNumber);
   if (uri) {
+    const image = (
+      <Image
+        source={{ uri }}
+        resizeMode="contain"
+        style={styles.image}
+        accessibilityLabel={label}
+        testID="drawing-preview-image"
+      />
+    );
     return (
       <View style={[styles.box, style]}>
-        <Image
-          source={{ uri }}
-          resizeMode="contain"
-          style={styles.image}
-          accessibilityLabel={label}
-          testID="drawing-preview-image"
-        />
+        {zoomable ? <ZoomableDrawing>{image}</ZoomableDrawing> : image}
       </View>
     );
   }

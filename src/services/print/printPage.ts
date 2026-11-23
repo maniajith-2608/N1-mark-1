@@ -51,7 +51,7 @@ dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: ${px
   spacing.xs,
 )} ${px(spacing.lg)}; }
 dt { color: ${colors.textSecondary}; }
-dd { margin: 0; }
+dd { margin: 0; white-space: pre-line; }
 `;
 
 /** A whole printable page: `body` is already-escaped HTML. */

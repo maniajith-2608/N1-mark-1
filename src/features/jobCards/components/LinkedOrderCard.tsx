@@ -39,18 +39,21 @@ type Props = {
   order: WorkOrder;
   /** Opens the order; omit where the order screen isn't available. */
   onPress?: () => void;
+  /** False on the shop floor, which never sees the customer. */
+  showCustomer?: boolean;
 };
 
 /** The work order behind a job card, as one card that opens it. */
 export const LinkedOrderCard = memo(function LinkedOrderCardComponent({
   order,
   onPress,
+  showCustomer = true,
 }: Props) {
   const styles = useN1Styles(makeStyles);
   const [hovered, setHovered] = useState(false);
   // "Bright Steel Co. · PO-8840 · Due 03 Oct 2026"
   const details = [
-    order.customerName,
+    showCustomer && order.customerName,
     order.poNumber,
     order.dueDate && O.due(formatLongDate(order.dueDate)),
   ]

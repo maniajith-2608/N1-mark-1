@@ -150,7 +150,9 @@ test('only orders with a job card show the job card button', async () => {
   expect(hasTestId(h.root, 'job-card-1044')).toBe(false);
   // Edit is there either way.
   expect(hasTestId(h.root, 'edit-order-1043')).toBe(true);
-  expect(allText(byTestId(h.root, 'orders-table'))).not.toMatch(/Job card(?! no)/);
+  expect(allText(byTestId(h.root, 'orders-table'))).not.toMatch(
+    /Job card(?! no)/,
+  );
   // A job card with its route opens; one without steps opens with Create flow.
   await press(byLabel(h.root, 'Open job card for WO #1042'));
   expect(h.currentRoute()).toBe('JobCardDetails');
@@ -1121,32 +1123,13 @@ test('order helpers', () => {
       description: 'Line one\nline two',
     }),
   ).toBe('Line one');
-  // The QR code holds the WO number first, then the entered details.
+  // The QR code holds only the WO number: no customer or order details for
+  // a phone camera to show.
   const qr = orderQrValue(first);
-  expect(qr.split('\n')).toEqual([
-    'WO #1042',
-    'Customer: Acme Metalworks',
-    'Part: Bracket — Job A',
-    'Part no: PN-33021',
-    'Drawing no: DRW-1187',
-    'PO no: PO-8842',
-    'Qty: 200',
-    'Due: Oct 2, 2026',
-  ]);
-  // The Scan QR screen reads its first line: the WO number.
+  expect(qr).toBe('WO #1042');
+  expect(qr).not.toContain(first.customerName);
+  // The Scan QR screen reads it as the WO number.
   expect(normaliseJobCode(qr)).toBe('WO-1042');
-  // Blank details are left out.
-  expect(
-    orderQrValue({
-      ...first,
-      customerName: ' ',
-      partNumber: '',
-      drawingNumber: '',
-      poNumber: '',
-      quantity: 0,
-      dueDate: '',
-    }).split('\n'),
-  ).toEqual(['WO #1042', 'Part: Bracket — Job A']);
   const undated = { ...first, id: '1', dueDate: '', priority: 'high' as const };
   expect(compareOrders(first, undated)).toBeLessThan(0);
   expect(compareOrders(undated, first)).toBeGreaterThan(0);

@@ -36,6 +36,7 @@ export {
   jobCardStage,
   nextOperation,
   runningOperation,
+  shopFloorJobSearchText,
   stageMeta,
   startBlockedReason,
 } from './utils';

@@ -70,7 +70,7 @@ import { printOrNotify } from '../../../services/print';
 import { ORDER_STRINGS } from '../../orders/constants';
 import { orderDrawings } from '../../orders/drawings';
 import { drawingPrintHtml, printDrawingWithQr } from '../../orders/printing';
-import { orderHeading, orderQrValue } from '../../orders/utils';
+import { orderDrawingQr, orderHeading, orderQrValue } from '../../orders/utils';
 import { COMMON_STRINGS } from '../../../shared/constants';
 import { QcHistory } from '../components/QcHistory';
 import { QcReportSheet } from '../components/QcReportSheet';
@@ -502,6 +502,9 @@ export function JobCardDetailsScreen({
     [isCompact, openFile],
   );
   const employeeRole = useOptionalEmployeeRole();
+  // Shop-floor roles never see the customer (drawings are blanked the same
+  // way); admin does.
+  const showCustomer = employeeRole === null;
   // Supervisor and admin: enter the replacement material so RM QC checks it
   // again. The supervisor uses RawMaterial in their own stack; admin (no
   // such screen) gets the raw material popup, which saves it on the card
@@ -684,7 +687,7 @@ export function JobCardDetailsScreen({
       <View style={styles.titleRow}>
         <View style={styles.title}>
           <N1Text variant={isCompact ? 'h2' : 'h1'} accessibilityRole="header">
-            {jobCardHeading(jobCard)}
+            {jobCardHeading(jobCard, showCustomer)}
           </N1Text>
           <N1Text variant="small" color="secondary" testID="job-card-wo">
             {S.workOrder(jobCard.number)}
@@ -723,7 +726,9 @@ export function JobCardDetailsScreen({
         drawingNumber={drawingNumber}
         hasDrawing={Boolean(jobCard.designFile)}
         drawings={drawings}
-        qrValue={order ? orderQrValue(order) : jobCard.number}
+        // "WO #5" from the order, or the card's own number while the order
+        // loads; never the raw "WO-5", so the QR doesn't change under it.
+        qrValue={orderQrValue(order ?? jobCard)}
         company={jobCard.customerName}
         onViewDrawing={doc =>
           setViewing({
@@ -731,6 +736,7 @@ export function JobCardDetailsScreen({
             drawingNumber,
             doc,
             company: jobCard.customerName,
+            qr: orderDrawingQr(order ?? jobCard),
           })
         }
         onPrintDrawing={printDrawing}
@@ -793,6 +799,7 @@ export function JobCardDetailsScreen({
         <LinkedOrderCard
           order={order}
           onPress={canOpenOrder ? openOrder : undefined}
+          showCustomer={showCustomer}
         />
       ) : (
         <N1Text color="secondary">{ORDER_STRINGS.details.notFound}</N1Text>

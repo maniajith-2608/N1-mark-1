@@ -117,3 +117,16 @@ dependencies {
         implementation jscFlavor
     }
 }
+
+// The page the hidden drawing WebView loads (scripts/build-drawing-renderer.js),
+// rebuilt from the web drawing code before every build.
+def drawingRendererOut = file("src/main/assets/drawing-renderer")
+tasks.register("buildDrawingRenderer", Exec) {
+    workingDir = rootDir.parentFile
+    commandLine "node", "scripts/build-drawing-renderer.js"
+    inputs.dir(new File(rootDir.parentFile, "src"))
+    inputs.file(new File(rootDir.parentFile, "scripts/build-drawing-renderer.js"))
+    inputs.file(new File(rootDir.parentFile, "webpack.config.js"))
+    outputs.dir(drawingRendererOut)
+}
+preBuild.dependsOn("buildDrawingRenderer")

@@ -1,11 +1,15 @@
-import {
-  fileDownloadUrl,
-  openStoredFile,
-} from '../../services/files/fileStorage';
+import { Platform } from 'react-native';
+import { fileDownloadUrl } from '../../services/files/fileStorage';
 import { reserveTab } from '../../services/files/viewDocument';
 import { escapeHtml } from '../../services/print/printPage';
 import type { Attachment } from '../../shared/types';
-import { maskedDrawing, stampedPreview } from './drawingStamp';
+import { notify, notifyUnavailable } from '../../shared/utils';
+import {
+  maskedDrawing,
+  stampDrawing,
+  stampedPreview,
+  type DrawingQr,
+} from './drawingStamp';
 import { DRAWING_KIND, ORDER_STRINGS } from './constants';
 import type { OrderSummary, WorkOrder } from './types';
 import { orderQrValue } from './utils';
@@ -43,9 +47,23 @@ export const drawingsToOrderFiles = (
 });
 
 /**
+ * Tells the user a drawing didn't open or download. On a phone that's
+ * expected (it can't blank the file yet), so they're pointed to the web
+ * app; on the web it's an unexpected failure.
+ */
+export function notifyDrawingNotOpened() {
+  const D = ORDER_STRINGS.details;
+  if (Platform.OS === 'web') {
+    notifyUnavailable(D.downloadAction);
+  } else {
+    notify(D.drawingDownloadPhoneTitle, D.drawingDownloadPhone);
+  }
+}
+
+/**
  * Opens (downloads) a drawing with the customer's (`company`) name, address
  * and logo blanked, as when printing. Files that can't be masked here (DWG,
- * STEP, or a native build) open as stored. False when nothing opened.
+ * STEP) open as stored. False when nothing opened, as on phones.
  */
 export async function openMaskedDrawing(
   doc: Attachment,
@@ -54,11 +72,46 @@ export async function openMaskedDrawing(
   // Web: the tab opens on the tap; the masked copy takes a moment.
   const tab = reserveTab();
   if (!tab) {
-    return openStoredFile(doc);
+    // Phones can't blank the file itself yet, and the stored one shows the
+    // customer: nothing opens (callers say so).
+    return false;
   }
   try {
     const masked = await maskedDrawing(doc, company).catch(() => null);
     return tab.open(masked ?? doc.uri ?? (await fileDownloadUrl(doc.id)));
+  } catch (error) {
+    tab.close();
+    throw error;
+  }
+}
+
+/**
+ * Downloads (opens) the drawing as it prints: the order QR and WO number
+ * (`qr`) stamped on every page, the customer's (`company`) details blanked.
+ * Files that can't be stamped here (DWG, STEP) open masked or as stored.
+ * False when nothing opened.
+ */
+export async function downloadDrawingWithQr(
+  doc: Attachment,
+  qr: DrawingQr,
+  company: string,
+): Promise<boolean> {
+  const tab = reserveTab();
+  if (!tab) {
+    // Phones can't blank the file itself yet, and the stored one shows the
+    // customer: nothing opens (callers say so).
+    return false;
+  }
+  try {
+    const stamped = await stampDrawing(doc, qr.value, company, qr.label).catch(
+      () => null,
+    );
+    const masked = stamped
+      ? null
+      : await maskedDrawing(doc, company).catch(() => null);
+    return tab.open(
+      stamped?.url ?? masked ?? doc.uri ?? (await fileDownloadUrl(doc.id)),
+    );
   } catch (error) {
     tab.close();
     throw error;
@@ -79,7 +132,9 @@ export async function openDrawingWithQr(
 ): Promise<boolean> {
   const tab = reserveTab();
   if (!tab) {
-    return openStoredFile(doc);
+    // Phones can't blank the file itself yet, and the stored one shows the
+    // customer: nothing opens (callers say so).
+    return false;
   }
   const D = ORDER_STRINGS.details;
   const title = `${ORDER_STRINGS.workOrder(order.number)} · ${doc.name}`;

@@ -88,3 +88,6 @@ ios/Podfile.lock
 
 # Claude Code personal settings
 .claude/settings.local.json
+
+# Built by scripts/build-drawing-renderer.js during the Android build
+android/app/src/main/assets/drawing-renderer/

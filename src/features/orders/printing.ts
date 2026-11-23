@@ -70,11 +70,12 @@ function qrSvg(order: OrderSummary, scale = PRINT_QR_SCALE): string {
   );
 }
 
+/** The order's details beside its QR: never the customer's. */
 const orderDetails = (order: OrderSummary) => {
   const Q = ORDER_STRINGS.qr;
   return detailList([
-    [Q.customer, order.customerName],
     [Q.part, orderTitle(order)],
+    [Q.description, order.description],
     [Q.partNumber, order.partNumber],
     [Q.poNumber, order.poNumber],
     [

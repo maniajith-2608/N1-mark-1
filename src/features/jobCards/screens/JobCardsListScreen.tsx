@@ -32,6 +32,7 @@ import {
   type ViewerTarget,
 } from '../../orders/components/DocumentViewer';
 import { ORDER_STRINGS } from '../../orders/constants';
+import { orderDrawingQr } from '../../orders/utils';
 import { FlowActionButton } from '../components/FlowActionButton';
 import { FlowEditorSheet } from '../components/FlowEditorSheet';
 import { JobCardStatusBadge } from '../components/JobCardBadges';
@@ -154,6 +155,7 @@ export function JobCardsListScreen() {
         drawingNumber: drawingNumberOf(c),
         doc: c.designFile ?? undefined,
         company: c.customerName,
+        qr: orderDrawingQr(c),
       }),
     [drawingNumberOf],
   );
