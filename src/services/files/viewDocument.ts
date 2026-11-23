@@ -1,11 +1,18 @@
+import { Linking } from 'react-native';
 import type { Attachment } from '../../shared/types';
 
 /**
- * iOS / Android: no file viewer is installed yet, so nothing opens; callers
- * explain that instead. The web build uses viewDocument.web.ts.
+ * iOS / Android: a stored file's link opens in the phone's browser, which
+ * shows or downloads it. Other files (picked on the device, not uploaded)
+ * have no viewer yet, so nothing opens and callers explain that instead.
+ * The web build uses viewDocument.web.ts.
  */
-export function openDocument(_doc: Attachment): boolean {
-  return false;
+export function openDocument(doc: Attachment): boolean {
+  if (!doc.uri || !/^https?:\/\//i.test(doc.uri)) {
+    return false;
+  }
+  Linking.openURL(doc.uri).catch(() => undefined);
+  return true;
 }
 
 export type ReservedTab = {

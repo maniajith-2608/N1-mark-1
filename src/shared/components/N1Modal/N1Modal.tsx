@@ -36,6 +36,11 @@ export type N1ModalProps = {
    * Set false to keep a centred dialog, e.g. for short confirmations.
    */
   fullScreenOnCompact?: boolean;
+  /**
+   * Full screen on phones: the body is at least as tall as the screen, so a
+   * child with flex: 1 takes the room left (e.g. a zoomable drawing).
+   */
+  fill?: boolean;
   children?: ReactNode;
   testID?: string;
 };
@@ -78,6 +83,7 @@ const makeStyles = createN1Styles(t => ({
     borderBottomColor: t.colors.border,
   },
   screenBody: { padding: t.spacing.lg, gap: t.spacing.lg },
+  fill: { flexGrow: 1 },
   screenFooter: {
     flexDirection: 'row',
     gap: t.spacing.md,
@@ -100,6 +106,7 @@ export const N1Modal = React.memo(function N1ModalComponent({
   size = 'md',
   closeOnBackdrop = true,
   fullScreenOnCompact = true,
+  fill = false,
   children,
   testID,
 }: N1ModalProps) {
@@ -155,7 +162,7 @@ export const N1Modal = React.memo(function N1ModalComponent({
                 {titles}
               </View>
               <KeyboardScrollView
-                contentContainerStyle={styles.screenBody}
+                contentContainerStyle={[styles.screenBody, fill && styles.fill]}
                 footerMode
               >
                 {children}

@@ -99,7 +99,7 @@ type Props = {
 
 /**
  * One job on a shop-floor user's home: the part's letter tile with its name
- * and customer, where it is now, chips for the work order, job card,
+ * (never the customer), where it is now, chips for the work order, job card,
  * priority, quantity and due date, then the operator and how far along it
  * is, with its progress bar. The whole card opens the job.
  */
@@ -138,9 +138,6 @@ export const UserJobCard = memo(function UserJobCardComponent({
         <View style={styles.titles}>
           <N1Text variant="title" weight="bold" numberOfLines={1}>
             {title}
-          </N1Text>
-          <N1Text variant="small" color="tertiary" numberOfLines={1}>
-            {c.customerName || COMMON_STRINGS.dash}
           </N1Text>
         </View>
         {action}

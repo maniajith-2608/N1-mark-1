@@ -169,9 +169,6 @@ export function QcFailScreen({ route, navigation }: JobsScreenProps<'QcFail'>) {
         <N1Text variant="title" weight="bold">
           {jobHeading(jobCard)}
         </N1Text>
-        <N1Text variant="small" color="secondary">
-          {jobCard.customerName}
-        </N1Text>
       </View>
       {isRm && (
         <>

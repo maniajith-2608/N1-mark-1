@@ -1,10 +1,13 @@
 import type { Attachment } from '../../../shared/types';
-import { renderDrawingImage } from './renderer/renderDrawing';
+import {
+  renderDrawingImage,
+  renderStampedPreview,
+} from './renderer/renderDrawing';
 import type { DrawingQr, StampedDrawing, StampedPreview } from './types';
 
 /**
- * Native: drawings aren't drawn on the device yet, so nothing is stamped and
- * the drawing prints as a sheet with the order's QR instead.
+ * Native: no stamped PDF file is made on the device (phones don't print or
+ * save files yet), so the drawing prints as a sheet with the order's QR.
  */
 export async function stampDrawing(
   _doc: Attachment,
@@ -15,14 +18,19 @@ export async function stampDrawing(
   return null;
 }
 
-/** Native: nothing is stamped, so there is nothing to preview. */
-export async function stampedPreview(
-  _doc: Attachment,
-  _qrValue: string,
-  _company?: string,
-  _label?: string,
+/**
+ * Every page as it prints, as images: the order QR stamped on, the
+ * customer's details (`company`) blanked, as on web. Drawn by the web code
+ * in the hidden WebView (Android); null on iOS for now and for files that
+ * can't be drawn (DWG, STEP…).
+ */
+export function stampedPreview(
+  doc: Attachment,
+  qrValue: string,
+  company = '',
+  label = '',
 ): Promise<StampedPreview | null> {
-  return null;
+  return renderStampedPreview(doc, { value: qrValue, label }, company);
 }
 
 /**

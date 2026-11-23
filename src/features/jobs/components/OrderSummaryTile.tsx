@@ -52,7 +52,8 @@ const makeStyles = createN1Styles(t => ({
 }));
 
 /**
- * The order's badges, heading and customer, then its drawing as a thumbnail
+ * The order's badges and heading (never the customer: this is the page a
+ * QR scan opens on the shop floor), then its drawing as a thumbnail
  * that opens the Drawing screen. Import Order and Order Details pin it
  * above their scrolling details.
  */
@@ -81,11 +82,6 @@ export const OrderSummaryTile = memo(function OrderSummaryTileComponent({
           {order.status && <OrderStatusBadge status={order.status} />}
         </View>
         <N1Text variant="h2">{orderHeading(order)}</N1Text>
-        {order.customerName !== '' && (
-          <N1Text weight="semiBold" color="secondary">
-            {order.customerName}
-          </N1Text>
-        )}
       </View>
       <Pressable
         accessibilityRole="button"

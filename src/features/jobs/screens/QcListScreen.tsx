@@ -16,7 +16,7 @@ import {
 import { EmployeeHomeHeader } from '../../profile';
 import { COMMON_STRINGS } from '../../../shared/constants';
 import { useListFilter } from '../../../shared/hooks';
-import { jobCardSearchText, type JobCard } from '../../jobCards';
+import { shopFloorJobSearchText, type JobCard } from '../../jobCards';
 import { distinctOptions } from '../../jobCards/utils';
 import { JOBS_STRINGS, QC_STATUS_META, QC_STRINGS } from '../constants';
 import { useMyJobs } from '../hooks/useMyJobs';
@@ -149,7 +149,7 @@ export function QcListScreen() {
   const [kind, setKind] = useState<QcKind>('rm');
   const [filters, setFilters] = useState<FilterValues>({});
   const { query, setQuery, filtered } = useListFilter(items, {
-    getSearchText: jobCardSearchText,
+    getSearchText: shopFloorJobSearchText,
   });
   const sectionTabsOptions = useSectionTabsOptions();
   // With two tabs, each takes half the width (as on Billing).

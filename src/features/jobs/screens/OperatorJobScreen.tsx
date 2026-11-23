@@ -137,9 +137,6 @@ export function OperatorJobScreen({
           <JobCardStatusBadge jobCard={jobCard} />
         </View>
         <N1Text variant="h2">{jobHeading(jobCard)}</N1Text>
-        <N1Text weight="semiBold" color="secondary">
-          {jobCard.customerName}
-        </N1Text>
       </View>
       <JobOverview
         jobCard={jobCard}

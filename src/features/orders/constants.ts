@@ -97,6 +97,10 @@ export const ORDER_STRINGS = {
     viewerUnavailable:
       'A preview of this file will show here once the backend stores uploaded files.',
     downloadAction: 'Downloading documents',
+    /** A drawing's Download on a phone, which can't blank the file yet. */
+    drawingDownloadPhoneTitle: 'Download it on the web',
+    drawingDownloadPhone:
+      'On the phone you can view the drawing here. To download it with the order QR and without the customer’s details, use N1 on the web.',
     routeCard: 'Route card',
     routeCardHelp:
       'See the full routing sequence, sign-offs and QC checkpoints logged for this work order.',

@@ -28,13 +28,27 @@ const config = {
     publicPath: '',
     clean: true,
   },
+  resolve: {
+    ...base.resolve,
+    alias: {
+      ...base.resolve.alias,
+      // pdf.js's legacy build, for older Android WebViews: the modern one
+      // calls Promise.withResolvers (Chrome 119+), and WebView 113 draws
+      // nothing. The worker's code comes from the same build.
+      'pdfjs-dist$': require.resolve('pdfjs-dist/legacy/build/pdf.mjs'),
+      'pdfjs-dist/build/pdf.worker.mjs$': require.resolve(
+        'pdfjs-dist/legacy/build/pdf.worker.mjs',
+      ),
+    },
+  },
   module: {
     ...base.module,
-    // The worker's code goes into the bundle as text: a page opened from a
-    // file can't start a worker from another file (see rendererPage.web.ts).
+    // The worker runs on the page (see rendererPage.web.ts), so the worker
+    // file the web build serves isn't needed: its import is left as a URL
+    // and the file isn't written.
     rules: base.module.rules.map(rule =>
       String(rule.test) === String(/pdf\.worker\.min\.mjs$/)
-        ? { ...rule, type: 'asset/source' }
+        ? { ...rule, generator: { emit: false } }
         : rule,
     ),
   },

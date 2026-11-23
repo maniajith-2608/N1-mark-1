@@ -116,9 +116,6 @@ export function QcCheckScreen({
           )}
         </View>
         <N1Text variant="h2">{jobHeading(jobCard)}</N1Text>
-        <N1Text weight="semiBold" color="secondary">
-          {jobCard.customerName}
-        </N1Text>
       </View>
       {item.status === 'in_progress' && (
         <N1Text color="secondary">{S.running}</N1Text>

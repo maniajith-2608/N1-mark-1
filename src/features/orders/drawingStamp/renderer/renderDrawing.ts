@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 import { fileDownloadUrl } from '../../../../services/files/fileStorage';
 import type { Attachment } from '../../../../shared/types';
 import { DRAWING_QR } from '../../constants';
-import type { DrawingQr } from '../types';
+import type { DrawingQr, StampedPreview } from '../types';
 import type { RenderRequest, RendererMessage } from './protocol';
 
 /**
@@ -12,6 +12,8 @@ import type { RenderRequest, RendererMessage } from './protocol';
 
 /** A drawing that hasn't come back by then is given up (placeholder). */
 const RENDER_TIMEOUT_MS = 60000;
+/** Every page of a preview is drawn, so it gets longer. */
+const PREVIEW_TIMEOUT_MS = 180000;
 
 const IMAGE_TYPES: Record<string, string> = {
   png: 'image/png',
@@ -20,7 +22,7 @@ const IMAGE_TYPES: Record<string, string> = {
 };
 
 type Pending = {
-  resolve: (uri: string | null) => void;
+  resolve: (result: unknown) => void;
   reject: (error: Error) => void;
   timer: ReturnType<typeof setTimeout>;
 };
@@ -66,6 +68,8 @@ export function onRendererMessage(raw: string) {
   clearTimeout(p.timer);
   if (message.type === 'rendered') {
     p.resolve(message.uri);
+  } else if (message.type === 'previewed') {
+    p.resolve(message.preview);
   } else {
     p.reject(new Error(message.error));
   }
@@ -74,16 +78,23 @@ export function onRendererMessage(raw: string) {
 const pageReady = () =>
   send ? Promise.resolve() : new Promise<void>(go => waiting.push(go));
 
-function request(body: Omit<RenderRequest, 'id'>): Promise<string | null> {
+function request<T>(
+  body: Omit<RenderRequest, 'id'>,
+  timeoutMs = RENDER_TIMEOUT_MS,
+): Promise<T> {
   const id = `drawing-${++nextId}`;
   return pageReady().then(
     () =>
-      new Promise<string | null>((resolve, reject) => {
+      new Promise<T>((resolve, reject) => {
         const timer = setTimeout(() => {
           pending.delete(id);
           reject(new Error('Drawing took too long'));
-        }, RENDER_TIMEOUT_MS);
-        pending.set(id, { resolve, reject, timer });
+        }, timeoutMs);
+        pending.set(id, {
+          resolve: result => resolve(result as T),
+          reject,
+          timer,
+        });
         send?.(JSON.stringify({ id, ...body }));
       }),
   );
@@ -124,17 +135,65 @@ export async function renderDrawingImage(
   if (Platform.OS !== 'android') {
     return null;
   }
-  const extension = doc.name.split('.').pop()?.toLowerCase() ?? '';
+  const { type, isImage } = drawableType(doc);
   // Without a QR, a picture is shown as uploaded, at its original quality.
   // With a QR it is stamped like a PDF.
-  const imageType = IMAGE_TYPES[extension];
-  if (imageType && !qr) {
-    return downloadAsDataUrl(doc, imageType);
+  if (isImage && !qr) {
+    return downloadAsDataUrl(doc, type);
   }
-  const type = imageType ?? (extension === 'pdf' ? 'application/pdf' : '');
   if (!type) {
     return null;
   }
   const data = await downloadAsDataUrl(doc, type);
-  return request({ data, type, name: doc.name, company, pixels, qr });
+  return request<string | null>({
+    data,
+    type,
+    name: doc.name,
+    company,
+    pixels,
+    qr,
+  });
+}
+
+/**
+ * The drawing as it prints, drawn as page images to check before printing:
+ * the order QR (`qr`) on every page, the customer's details (`company`)
+ * blanked (see stampDrawing.ts). Android only for now; null elsewhere and
+ * for files that can't be drawn (DWG, STEP…).
+ */
+export async function renderStampedPreview(
+  doc: Attachment,
+  qr: DrawingQr,
+  company: string,
+): Promise<StampedPreview | null> {
+  if (Platform.OS !== 'android') {
+    return null;
+  }
+  const { type } = drawableType(doc);
+  if (!type) {
+    return null;
+  }
+  const data = await downloadAsDataUrl(doc, type);
+  return request<StampedPreview | null>(
+    {
+      kind: 'preview',
+      data,
+      type,
+      name: doc.name,
+      company,
+      pixels: DRAWING_QR.previewPixels,
+      qr,
+    },
+    PREVIEW_TIMEOUT_MS,
+  );
+}
+
+/** The type the page draws the file as, by its extension; '' if it can't. */
+function drawableType(doc: Attachment) {
+  const extension = doc.name.split('.').pop()?.toLowerCase() ?? '';
+  const imageType = IMAGE_TYPES[extension];
+  return {
+    type: imageType ?? (extension === 'pdf' ? 'application/pdf' : ''),
+    isImage: Boolean(imageType),
+  };
 }
